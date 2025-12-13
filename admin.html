@@ -40,7 +40,7 @@
 
     <div class="card">
         <div class="preview-title">Admin Confirm Tool</div>
-        <p class="text-center text-xs text-gray-400 mb-6">請輸入客人資料，發送確認卡片</p>
+        <p class="text-center text-xs text-gray-400 mb-6">點擊試算表連結可自動帶入資料</p>
 
         <form id="admin-form" onsubmit="return sendConfirmMessage(this)">
             
@@ -51,12 +51,13 @@
 
             <div class="input-group">
                 <label class="label">服務項目</label>
-                <select id="cust-service" class="input">
-                    <option value="專人佈置">✨ 專人佈置</option>
-                    <option value="氣球外送">🚚 氣球外送</option>
-                    <option value="後車廂驚喜">🚗 後車廂驚喜</option>
-                    <option value="工作室自取">🛍️ 工作室自取</option>
-                </select>
+                <input type="text" id="cust-service" class="input" placeholder="例如：專人佈置" required list="service-list">
+                <datalist id="service-list">
+                    <option value="專人佈置">
+                    <option value="氣球外送">
+                    <option value="後車廂驚喜">
+                    <option value="工作室自取">
+                </datalist>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -66,7 +67,7 @@
                 </div>
                 <div class="input-group">
                     <label class="label">時間</label>
-                    <input type="time" id="cust-time" class="input" required>
+                    <input type="text" id="cust-time" class="input" placeholder="13:00" required>
                 </div>
             </div>
 
@@ -82,10 +83,13 @@
     </div>
 
     <script>
-        // 使用同一個 LIFF ID 即可，因為是在同一個 Channel 下
+        // 建議您去申請一個新的 LIFF ID 專門給 admin.html 使用 (Endpoint 設定為 admin.html)
+        // 這樣才能直接用 https://liff.line.me/... 開啟並自動登入
+        // 如果暫時沒有，先用舊的也可以，但要在聊天室中貼上完整 GitHub 網址
         const LIFF_ID = '2004044468-w8s4Ex1k'; 
 
         window.onload = function() {
+            // 1. 初始化 LIFF
             liff.init({ liffId: LIFF_ID })
                 .then(() => {
                     console.log('LIFF initialized');
@@ -95,12 +99,18 @@
                 })
                 .catch((err) => {
                     console.error(err);
-                    Swal.fire('錯誤', 'LIFF 初始化失敗', 'error');
                 });
+
+            // 2. 自動讀取網址參數 (Magic Link 核心)
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('name')) document.getElementById('cust-name').value = params.get('name');
+            if (params.has('service')) document.getElementById('cust-service').value = params.get('service');
+            if (params.has('date')) document.getElementById('cust-date').value = params.get('date');
+            if (params.has('time')) document.getElementById('cust-time').value = params.get('time');
+            if (params.has('price')) document.getElementById('cust-price').value = params.get('price');
         };
 
         function sendConfirmMessage(form) {
-            // 防止表單跳轉
             event.preventDefault();
 
             const name = document.getElementById('cust-name').value;
@@ -110,11 +120,10 @@
             const price = document.getElementById('cust-price').value || '-';
 
             if (!liff.isInClient()) {
-                Swal.fire('請在 LINE 內開啟', '此功能必須在 LINE 聊天室中開啟連結才能發送訊息。', 'warning');
+                Swal.fire('請在 LINE 內開啟', '請將此連結傳送到與客人的聊天室中開啟，才能發送卡片。', 'warning');
                 return false;
             }
 
-            // 發送確認卡片 (Flex Message)
             liff.sendMessages([{
                 type: 'flex',
                 altText: '✅ 您的預約已確認成功！',
@@ -125,133 +134,31 @@
                         "type": "box",
                         "layout": "vertical",
                         "contents": [
+                            { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center", "letterSpacing": "1px" },
+                            { "type": "text", "text": "預約確認成功", "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
+                            { "type": "text", "text": "我們已收到您的款項，期待為您服務！", "size": "xs", "color": "#aaaaaa", "wrap": true, "align": "center", "margin": "sm" },
+                            { "type": "separator", "margin": "xxl" },
                             {
-                                "type": "text",
-                                "text": "PAYMENT CONFIRMED",
-                                "weight": "bold",
-                                "color": "#10B981", // 綠色
-                                "size": "xs",
-                                "align": "center",
-                                "letterSpacing": "1px"
-                            },
-                            {
-                                "type": "text",
-                                "text": "預約確認成功",
-                                "weight": "bold",
-                                "size": "xl",
-                                "margin": "md",
-                                "align": "center",
-                                "color": "#4A4A4A"
-                            },
-                            {
-                                "type": "text",
-                                "text": "我們已收到您的款項，期待為您服務！",
-                                "size": "xs",
-                                "color": "#aaaaaa",
-                                "wrap": true,
-                                "align": "center",
-                                "margin": "sm"
-                            },
-                            {
-                                "type": "separator",
-                                "margin": "xxl"
-                            },
-                            {
-                                "type": "box",
-                                "layout": "vertical",
-                                "margin": "xxl",
-                                "spacing": "sm",
+                                "type": "box", "layout": "vertical", "margin": "xxl", "spacing": "sm",
                                 "contents": [
-                                    {
-                                        "type": "box",
-                                        "layout": "horizontal",
-                                        "contents": [
-                                            { "type": "text", "text": "姓名", "size": "sm", "color": "#999999", "flex": 0 },
-                                            { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" }
-                                        ]
-                                    },
-                                    {
-                                        "type": "box",
-                                        "layout": "horizontal",
-                                        "contents": [
-                                            { "type": "text", "text": "項目", "size": "sm", "color": "#999999", "flex": 0 },
-                                            { "type": "text", "text": service, "size": "sm", "color": "#111111", "align": "end" }
-                                        ]
-                                    },
-                                    {
-                                        "type": "box",
-                                        "layout": "horizontal",
-                                        "contents": [
-                                            { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 },
-                                            { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end" }
-                                        ]
-                                    },
-                                    {
-                                        "type": "box",
-                                        "layout": "horizontal",
-                                        "contents": [
-                                            { "type": "text", "text": "時間", "size": "sm", "color": "#999999", "flex": 0 },
-                                            { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end" }
-                                        ]
-                                    }
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "姓名", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" } ] },
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "項目", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": service, "size": "sm", "color": "#111111", "align": "end" } ] },
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end" } ] },
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "時間", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end" } ] }
                                 ]
                             },
-                            {
-                                "type": "box",
-                                "layout": "vertical",
-                                "margin": "lg",
-                                "contents": [
-                                    { "type": "separator" }
-                                ]
-                            },
-                            {
-                                "type": "box",
-                                "layout": "horizontal",
-                                "margin": "lg",
-                                "contents": [
-                                    { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" },
-                                    { "type": "text", "text": price, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" }
-                                ]
-                            },
-                            {
-                                "type": "box",
-                                "layout": "vertical",
-                                "margin": "xxl",
-                                "contents": [
-                                    {
-                                        "type": "image",
-                                        "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png", // 這裡暫用星星，你可以換成自己的 Logo
-                                        "size": "xxs",
-                                        "aspectMode": "fit"
-                                    },
-                                    {
-                                        "type": "text",
-                                        "text": "MILU BALLOONS",
-                                        "size": "xxxs",
-                                        "color": "#dddddd",
-                                        "align": "center",
-                                        "margin": "xs",
-                                        "letterSpacing": "2px"
-                                    }
-                                ]
-                            }
+                            { "type": "box", "layout": "vertical", "margin": "lg", "contents": [ { "type": "separator" } ] },
+                            { "type": "box", "layout": "horizontal", "margin": "lg", "contents": [ { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" }, { "type": "text", "text": price, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" } ] },
+                            { "type": "box", "layout": "vertical", "margin": "xxl", "contents": [ { "type": "image", "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png", "size": "xxs", "aspectMode": "fit" }, { "type": "text", "text": "MILU BALLOONS", "size": "xxxs", "color": "#dddddd", "align": "center", "margin": "xs", "letterSpacing": "2px" } ] }
                         ]
                     }
                 }
             }]).then(() => {
-                Swal.fire({
-                    title: '發送成功！',
-                    icon: 'success',
-                    timer: 1500,
-                    showConfirmButton: false
-                }).then(() => {
-                    liff.closeWindow();
-                });
+                Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false }).then(() => { liff.closeWindow(); });
             }).catch((err) => {
                 console.log('error', err);
                 Swal.fire('發送失敗', '請確認您是在與客人的聊天室中打開此連結', 'error');
             });
-            
             return false;
         }
     </script>
