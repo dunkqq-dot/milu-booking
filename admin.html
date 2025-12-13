@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>訂單確認發送器 | MILU Admin</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        milu: { gold: '#C69C6D', dark: '#4A4A4A', green: '#10B981' }
+                    },
+                    fontFamily: {
+                        serif: ['"Playfair Display"', 'serif'],
+                        sans: ['"Noto Sans TC"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; color: #4A4A4A; padding: 20px; }
+        .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-width: 500px; margin: 0 auto; }
+        .input-group { margin-bottom: 16px; }
+        .label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 0.9rem; color: #374151; }
+        .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 1rem; }
+        .input:focus { border-color: #C69C6D; ring: 2px solid #C69C6D; }
+        .btn { width: 100%; padding: 14px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: bold; font-size: 1rem; margin-top: 10px; transition: all 0.2s; }
+        .btn:active { transform: scale(0.98); background-color: #333; }
+        .preview-title { text-align: center; font-family: 'Playfair Display', serif; color: #C69C6D; font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div class="preview-title">Admin Confirm Tool</div>
+        <p class="text-center text-xs text-gray-400 mb-6">請輸入客人資料，發送確認卡片</p>
+
+        <form id="admin-form" onsubmit="return sendConfirmMessage(this)">
+            
+            <div class="input-group">
+                <label class="label">客人姓名</label>
+                <input type="text" id="cust-name" class="input" placeholder="例如：王小美" required>
+            </div>
+
+            <div class="input-group">
+                <label class="label">服務項目</label>
+                <select id="cust-service" class="input">
+                    <option value="專人佈置">✨ 專人佈置</option>
+                    <option value="氣球外送">🚚 氣球外送</option>
+                    <option value="後車廂驚喜">🚗 後車廂驚喜</option>
+                    <option value="工作室自取">🛍️ 工作室自取</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="input-group">
+                    <label class="label">日期</label>
+                    <input type="date" id="cust-date" class="input" required>
+                </div>
+                <div class="input-group">
+                    <label class="label">時間</label>
+                    <input type="time" id="cust-time" class="input" required>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="label">金額 (選填)</label>
+                <input type="text" id="cust-price" class="input" placeholder="例如：$2,500 (含運)">
+            </div>
+
+            <button type="submit" class="btn">
+                發送「預約成功」卡片 <i class="fa-solid fa-paper-plane"></i>
+            </button>
+        </form>
+    </div>
+
+    <script>
+        // 使用同一個 LIFF ID 即可，因為是在同一個 Channel 下
+        const LIFF_ID = '2004044468-w8s4Ex1k'; 
+
+        window.onload = function() {
+            liff.init({ liffId: LIFF_ID })
+                .then(() => {
+                    console.log('LIFF initialized');
+                    if (!liff.isLoggedIn()) {
+                        liff.login();
+                    }
+                })
+                .catch((err) => {
+                    console.error(err);
+                    Swal.fire('錯誤', 'LIFF 初始化失敗', 'error');
+                });
+        };
+
+        function sendConfirmMessage(form) {
+            // 防止表單跳轉
+            event.preventDefault();
+
+            const name = document.getElementById('cust-name').value;
+            const service = document.getElementById('cust-service').value;
+            const date = document.getElementById('cust-date').value;
+            const time = document.getElementById('cust-time').value;
+            const price = document.getElementById('cust-price').value || '-';
+
+            if (!liff.isInClient()) {
+                Swal.fire('請在 LINE 內開啟', '此功能必須在 LINE 聊天室中開啟連結才能發送訊息。', 'warning');
+                return false;
+            }
+
+            // 發送確認卡片 (Flex Message)
+            liff.sendMessages([{
+                type: 'flex',
+                altText: '✅ 您的預約已確認成功！',
+                contents: {
+                    "type": "bubble",
+                    "size": "mega",
+                    "body": {
+                        "type": "box",
+                        "layout": "vertical",
+                        "contents": [
+                            {
+                                "type": "text",
+                                "text": "PAYMENT CONFIRMED",
+                                "weight": "bold",
+                                "color": "#10B981", // 綠色
+                                "size": "xs",
+                                "align": "center",
+                                "letterSpacing": "1px"
+                            },
+                            {
+                                "type": "text",
+                                "text": "預約確認成功",
+                                "weight": "bold",
+                                "size": "xl",
+                                "margin": "md",
+                                "align": "center",
+                                "color": "#4A4A4A"
+                            },
+                            {
+                                "type": "text",
+                                "text": "我們已收到您的款項，期待為您服務！",
+                                "size": "xs",
+                                "color": "#aaaaaa",
+                                "wrap": true,
+                                "align": "center",
+                                "margin": "sm"
+                            },
+                            {
+                                "type": "separator",
+                                "margin": "xxl"
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "margin": "xxl",
+                                "spacing": "sm",
+                                "contents": [
+                                    {
+                                        "type": "box",
+                                        "layout": "horizontal",
+                                        "contents": [
+                                            { "type": "text", "text": "姓名", "size": "sm", "color": "#999999", "flex": 0 },
+                                            { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" }
+                                        ]
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "horizontal",
+                                        "contents": [
+                                            { "type": "text", "text": "項目", "size": "sm", "color": "#999999", "flex": 0 },
+                                            { "type": "text", "text": service, "size": "sm", "color": "#111111", "align": "end" }
+                                        ]
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "horizontal",
+                                        "contents": [
+                                            { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 },
+                                            { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end" }
+                                        ]
+                                    },
+                                    {
+                                        "type": "box",
+                                        "layout": "horizontal",
+                                        "contents": [
+                                            { "type": "text", "text": "時間", "size": "sm", "color": "#999999", "flex": 0 },
+                                            { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end" }
+                                        ]
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "margin": "lg",
+                                "contents": [
+                                    { "type": "separator" }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "horizontal",
+                                "margin": "lg",
+                                "contents": [
+                                    { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" },
+                                    { "type": "text", "text": price, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" }
+                                ]
+                            },
+                            {
+                                "type": "box",
+                                "layout": "vertical",
+                                "margin": "xxl",
+                                "contents": [
+                                    {
+                                        "type": "image",
+                                        "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png", // 這裡暫用星星，你可以換成自己的 Logo
+                                        "size": "xxs",
+                                        "aspectMode": "fit"
+                                    },
+                                    {
+                                        "type": "text",
+                                        "text": "MILU BALLOONS",
+                                        "size": "xxxs",
+                                        "color": "#dddddd",
+                                        "align": "center",
+                                        "margin": "xs",
+                                        "letterSpacing": "2px"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }]).then(() => {
+                Swal.fire({
+                    title: '發送成功！',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                }).then(() => {
+                    liff.closeWindow();
+                });
+            }).catch((err) => {
+                console.log('error', err);
+                Swal.fire('發送失敗', '請確認您是在與客人的聊天室中打開此連結', 'error');
+            });
+            
+            return false;
+        }
+    </script>
+</body>
+</html>
