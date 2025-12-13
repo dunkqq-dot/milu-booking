@@ -35,7 +35,6 @@
         .btn:active { transform: scale(0.98); background-color: #333; }
         .preview-title { text-align: center; font-family: 'Playfair Display', serif; color: #C69C6D; font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
         
-        /* 公式產生器樣式 */
         .code-box { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #2563eb; word-break: break-all; position: relative; margin-top: 10px; min-height: 60px; display: flex; align-items: center; }
         .copy-btn { position: absolute; top: 5px; right: 5px; background-color: #e5e7eb; padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; color: #4b5563; cursor: pointer; border: none; font-weight: bold; }
         .copy-btn:hover { background-color: #d1d5db; }
@@ -46,10 +45,9 @@
 </head>
 <body>
 
-    <!-- 發送器主卡片 -->
     <div class="card">
         <div class="preview-title">Admin Confirm Tool</div>
-        <p class="text-center text-xs text-gray-400 mb-6">點擊試算表連結，選人發送確認卡</p>
+        <p class="text-center text-xs text-gray-400 mb-6">確認款項後，選取客人發送通知</p>
 
         <form id="admin-form" onsubmit="return sendConfirmMessage(this)">
             
@@ -60,7 +58,6 @@
 
             <div class="input-group">
                 <label class="label">服務項目</label>
-                <!-- 改為下拉選單，方便手機操作 -->
                 <select id="cust-service" class="input" required>
                     <option value="" disabled selected>請選擇服務</option>
                     <option value="專人佈置">✨ 專人佈置</option>
@@ -92,14 +89,12 @@
         </form>
     </div>
 
-    <!-- 小幫手卡片：Google 試算表公式產生器 -->
     <div class="card">
         <div class="preview-title" style="font-size: 1.2rem;">Google 試算表連動</div>
         <p class="text-xs text-gray-500 mb-4">
             請選擇服務類型，複製下方公式到 Google 試算表：
         </p>
 
-        <!-- 選項按鈕 -->
         <div class="pill-group">
             <div class="pill active" onclick="setFormula('專人佈置', this)">專人佈置</div>
             <div class="pill" onclick="setFormula('氣球外送', this)">氣球外送</div>
@@ -114,18 +109,22 @@
         
         <div class="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 leading-relaxed border border-gray-100">
             <p class="font-bold mb-1">💡 如何使用：</p>
-            1. 在試算表新增 H 欄「發送通知」。<br>
-            2. 貼上公式。<br>
-            3. 確認 <b>B2 (姓名), D2 (日期), E2 (時間), F2 (金額)</b> 欄位正確。
+            1. <b>強烈建議</b>為此工具申請一個新的 LIFF ID (Endpoint 設為 admin.html)。<br>
+            2. 在試算表新增 H 欄「發送通知」並貼上公式。<br>
+            3. 點擊連結 -> 按發送 -> 選擇客人 -> 完成！
         </div>
     </div>
 
     <script>
+        // ⚠️ 重要：建議您去 LINE Developers 申請一個【新的 LIFF ID】專門給 admin.html 用
+        // 因為原本的 ID 是綁定 index.html (預約頁)，直接用可能會打不開 admin.html
+        // 如果您申請了新的，請換掉下面這行：
         const LIFF_ID = '2004044468-w8s4Ex1k'; 
+
+        // ⚠️ 請確認您的 GitHub Pages 網址是否正確
         const BASE_URL = 'https://dunkqq-dot.github.io/milu-booking/admin.html';
 
         window.onload = function() {
-            // 初始化 LIFF
             liff.init({ liffId: LIFF_ID })
                 .then(() => {
                     console.log('LIFF initialized');
@@ -133,7 +132,6 @@
                 })
                 .catch((err) => { console.error(err); });
 
-            // 自動讀取網址參數
             const params = new URLSearchParams(window.location.search);
             if (params.has('name')) document.getElementById('cust-name').value = params.get('name');
             if (params.has('service')) document.getElementById('cust-service').value = params.get('service');
@@ -147,10 +145,11 @@
         function setFormula(serviceName, btn) {
             document.querySelectorAll('.pill').forEach(el => el.classList.remove('active'));
             if(btn) btn.classList.add('active');
-
-            // 假設欄位：B=姓名, C=項目, D=日期, E=時間, F=金額
-            // 修正公式：日期使用 TEXT 函數轉格式，避免變成數字
-            const formula = `=HYPERLINK("${BASE_URL}?service=${serviceName}&name="&B2&"&date="&TEXT(D2,"yyyy-mm-dd")&"&time="&E2&"&price="&F2, "📲 發送通知")`;
+            
+            // 產生公式：這裡會自動產生包含 LIFF URL 的連結
+            // 使用 liff.line.me 的格式，才能在手機上正確喚起 LINE
+            const formula = `=HYPERLINK("https://liff.line.me/${LIFF_ID}?name="&B2&"&service=${serviceName}&date="&TEXT(D2,"yyyy-mm-dd")&"&time="&E2&"&price="&F2, "📲 發送通知")`;
+            
             document.getElementById('formula-code').innerText = formula;
         }
 
@@ -163,80 +162,54 @@
             const time = document.getElementById('cust-time').value;
             const price = document.getElementById('cust-price').value || '-';
 
-            if (!liff.isInClient()) {
-                Swal.fire('請在 LINE 內開啟', '此功能必須在 LINE App 中使用。', 'warning');
-                return false;
-            }
-
-            // 定義要發送的 Flex Message
-            const messages = [{
-                type: 'flex',
-                altText: '✅ 您的預約已確認成功！',
-                contents: {
-                    "type": "bubble",
-                    "size": "mega",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                            { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center", "letterSpacing": "1px" },
-                            { "type": "text", "text": "預約確認成功", "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
-                            { "type": "text", "text": "我們已收到您的款項，期待為您服務！", "size": "xs", "color": "#aaaaaa", "wrap": true, "align": "center", "margin": "sm" },
-                            { "type": "separator", "margin": "xxl" },
-                            {
-                                "type": "box", "layout": "vertical", "margin": "xxl", "spacing": "sm",
-                                "contents": [
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "姓名", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "項目", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": service, "size": "sm", "color": "#111111", "align": "end" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "時間", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end" } ] }
-                                ]
-                            },
-                            { "type": "box", "layout": "vertical", "margin": "lg", "contents": [ { "type": "separator" } ] },
-                            { "type": "box", "layout": "horizontal", "margin": "lg", "contents": [ { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" }, { "type": "text", "text": price, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" } ] },
-                            { "type": "box", "layout": "vertical", "margin": "xxl", "contents": [ { "type": "image", "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png", "size": "xxs", "aspectMode": "fit" }, { "type": "text", "text": "MILU BALLOONS", "size": "xxxs", "color": "#dddddd", "align": "center", "margin": "xs", "letterSpacing": "2px" } ] }
-                        ]
-                    }
-                }
-            }];
-
-            // 1. 優先使用 ShareTargetPicker (選人發送)
+            // 使用 Share Target Picker (選人發送)
             if (liff.isApiAvailable('shareTargetPicker')) {
-                liff.shareTargetPicker(messages)
-                    .then(function (res) {
-                        if (res) {
-                            Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false })
-                                .then(() => { liff.closeWindow(); });
-                        } else {
-                            console.log('TargetPicker closed');
+                liff.shareTargetPicker([{
+                    type: 'flex',
+                    altText: '✅ 您的預約已確認成功！',
+                    contents: {
+                        "type": "bubble",
+                        "size": "mega",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center", "letterSpacing": "1px" },
+                                { "type": "text", "text": "預約確認成功", "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
+                                { "type": "text", "text": "我們已收到您的款項，期待為您服務！", "size": "xs", "color": "#aaaaaa", "wrap": true, "align": "center", "margin": "sm" },
+                                { "type": "separator", "margin": "xxl" },
+                                {
+                                    "type": "box", "layout": "vertical", "margin": "xxl", "spacing": "sm",
+                                    "contents": [
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "姓名", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "項目", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": service, "size": "sm", "color": "#111111", "align": "end" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "時間", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end" } ] }
+                                    ]
+                                },
+                                { "type": "box", "layout": "vertical", "margin": "lg", "contents": [ { "type": "separator" } ] },
+                                { "type": "box", "layout": "horizontal", "margin": "lg", "contents": [ { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" }, { "type": "text", "text": price, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" } ] },
+                                { "type": "box", "layout": "vertical", "margin": "xxl", "contents": [ { "type": "image", "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png", "size": "xxs", "aspectMode": "fit" }, { "type": "text", "text": "MILU BALLOONS", "size": "xxxs", "color": "#dddddd", "align": "center", "margin": "xs", "letterSpacing": "2px" } ] }
+                            ]
                         }
-                    })
-                    .catch(function (error) {
-                        console.error('ShareTargetPicker error', error);
-                        // 如果 ShareTargetPicker 失敗 (沒權限或不支援)，嘗試直接發送 (Fallback)
-                        doSendMessages(messages);
-                    });
+                    }
+                }])
+                .then(function (res) {
+                    if (res) {
+                        Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false }).then(() => { liff.closeWindow(); });
+                    } else {
+                        // 使用者取消選取
+                        console.log('TargetPicker closed');
+                    }
+                })
+                .catch(function (error) {
+                    console.error(error);
+                    Swal.fire('發送失敗', '請確認您已開啟 Share Target Picker 權限。\n(LINE Developers > LIFF > Share Target Picker)', 'error');
+                });
             } else {
-                // 2. 降級：直接發送到當前聊天室
-                doSendMessages(messages);
+                Swal.fire('環境錯誤', '請在 LINE App 中開啟此頁面。', 'error');
             }
             return false;
-        }
-
-        function doSendMessages(messages) {
-            liff.sendMessages(messages)
-                .then(() => {
-                    Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false })
-                        .then(() => { liff.closeWindow(); });
-                })
-                .catch((err) => {
-                    console.log('error', err);
-                    Swal.fire({
-                        title: '發送失敗',
-                        html: '請確認：<br>1. 是否已開啟 Share Target Picker 權限<br>2. 或者您必須在「與客人的聊天室」中開啟此連結',
-                        icon: 'error'
-                    });
-                });
         }
 
         function copyFormula() {
