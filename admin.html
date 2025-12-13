@@ -36,7 +36,6 @@
         .preview-title { text-align: center; font-family: 'Playfair Display', serif; color: #C69C6D; font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
         
         /* 公式產生器樣式 */
-        .formula-helper { background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 15px; border-radius: 12px; }
         .code-box { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #2563eb; word-break: break-all; position: relative; margin-top: 10px; min-height: 60px; display: flex; align-items: center; }
         .copy-btn { position: absolute; top: 5px; right: 5px; background-color: #e5e7eb; padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; color: #4b5563; cursor: pointer; border: none; font-weight: bold; }
         .copy-btn:hover { background-color: #d1d5db; }
@@ -50,7 +49,7 @@
     <!-- 發送器主卡片 -->
     <div class="card">
         <div class="preview-title">Admin Confirm Tool</div>
-        <p class="text-center text-xs text-gray-400 mb-6">確認款項後，發送通知給客人</p>
+        <p class="text-center text-xs text-gray-400 mb-6">點擊試算表連結，選人發送確認卡</p>
 
         <form id="admin-form" onsubmit="return sendConfirmMessage(this)">
             
@@ -88,7 +87,7 @@
             </div>
 
             <button type="submit" class="btn">
-                發送「預約成功」卡片 <i class="fa-solid fa-paper-plane ml-1"></i>
+                選取客人並發送 <i class="fa-solid fa-paper-plane ml-1"></i>
             </button>
         </form>
     </div>
@@ -97,7 +96,7 @@
     <div class="card">
         <div class="preview-title" style="font-size: 1.2rem;">Google 試算表連動</div>
         <p class="text-xs text-gray-500 mb-4">
-            因為表單內沒有「服務項目」欄位，請選擇您要貼上的試算表類型，複製對應的公式：
+            請選擇服務類型，複製下方公式到 Google 試算表：
         </p>
 
         <!-- 選項按鈕 -->
@@ -115,21 +114,16 @@
         
         <div class="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 leading-relaxed border border-gray-100">
             <p class="font-bold mb-1">💡 如何使用：</p>
-            1. 在試算表新增一欄「發送通知」。<br>
+            1. 在試算表新增 H 欄「發送通知」。<br>
             2. 貼上公式。<br>
-            3. 確認公式內的 <b>B2, C2, D2...</b> 對應到正確的欄位。<br>
-            (假設 B=姓名, C=日期, D=時間, E=金額)
+            3. 確認 <b>B2 (姓名), D2 (日期), E2 (時間), F2 (金額)</b> 欄位正確。
         </div>
     </div>
 
     <script>
-        // LIFF ID 設定
         const LIFF_ID = '2004044468-w8s4Ex1k'; 
-
-        // 預設 GitHub Pages 網址
         const BASE_URL = 'https://dunkqq-dot.github.io/milu-booking/admin.html';
 
-        // 初始化
         window.onload = function() {
             // 初始化 LIFF
             liff.init({ liffId: LIFF_ID })
@@ -142,26 +136,21 @@
             // 自動讀取網址參數
             const params = new URLSearchParams(window.location.search);
             if (params.has('name')) document.getElementById('cust-name').value = params.get('name');
-            // 如果網址有指定 service，自動選取；如果沒有，保持預設
             if (params.has('service')) document.getElementById('cust-service').value = params.get('service');
             if (params.has('date')) document.getElementById('cust-date').value = params.get('date');
             if (params.has('time')) document.getElementById('cust-time').value = params.get('time');
             if (params.has('price')) document.getElementById('cust-price').value = params.get('price');
 
-            // 初始化公式顯示 (預設專人佈置)
             setFormula('專人佈置', document.querySelector('.pill.active'));
         };
 
-        // 切換公式類型
         function setFormula(serviceName, btn) {
-            // 切換按鈕樣式
             document.querySelectorAll('.pill').forEach(el => el.classList.remove('active'));
             if(btn) btn.classList.add('active');
 
-            // 產生公式 (將服務名稱直接寫死在網址裡)
-            // 假設欄位：B=姓名, C=日期, D=時間, E=金額 (因為沒有服務項目欄位了)
-            const formula = `=HYPERLINK("${BASE_URL}?service=${serviceName}&name="&B2&"&date="&TEXT(C2,"yyyy-mm-dd")&"&time="&D2&"&price="&E2, "📲 發送通知")`;
-            
+            // 假設欄位：B=姓名, C=項目, D=日期, E=時間, F=金額
+            // 修正公式：日期使用 TEXT 函數轉格式，避免變成數字
+            const formula = `=HYPERLINK("${BASE_URL}?service=${serviceName}&name="&B2&"&date="&TEXT(D2,"yyyy-mm-dd")&"&time="&E2&"&price="&F2, "📲 發送通知")`;
             document.getElementById('formula-code').innerText = formula;
         }
 
@@ -175,11 +164,12 @@
             const price = document.getElementById('cust-price').value || '-';
 
             if (!liff.isInClient()) {
-                Swal.fire('請在 LINE 內開啟', '請將此連結傳送到與客人的聊天室中開啟，才能發送卡片。', 'warning');
+                Swal.fire('請在 LINE 內開啟', '此功能必須在 LINE App 中使用。', 'warning');
                 return false;
             }
 
-            liff.sendMessages([{
+            // 定義要發送的 Flex Message
+            const messages = [{
                 type: 'flex',
                 altText: '✅ 您的預約已確認成功！',
                 contents: {
@@ -208,13 +198,45 @@
                         ]
                     }
                 }
-            }]).then(() => {
-                Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false }).then(() => { liff.closeWindow(); });
-            }).catch((err) => {
-                console.log('error', err);
-                Swal.fire('發送失敗', '請確認您是在與客人的聊天室中打開此連結', 'error');
-            });
+            }];
+
+            // 1. 優先使用 ShareTargetPicker (選人發送)
+            if (liff.isApiAvailable('shareTargetPicker')) {
+                liff.shareTargetPicker(messages)
+                    .then(function (res) {
+                        if (res) {
+                            Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false })
+                                .then(() => { liff.closeWindow(); });
+                        } else {
+                            console.log('TargetPicker closed');
+                        }
+                    })
+                    .catch(function (error) {
+                        console.error('ShareTargetPicker error', error);
+                        // 如果 ShareTargetPicker 失敗 (沒權限或不支援)，嘗試直接發送 (Fallback)
+                        doSendMessages(messages);
+                    });
+            } else {
+                // 2. 降級：直接發送到當前聊天室
+                doSendMessages(messages);
+            }
             return false;
+        }
+
+        function doSendMessages(messages) {
+            liff.sendMessages(messages)
+                .then(() => {
+                    Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false })
+                        .then(() => { liff.closeWindow(); });
+                })
+                .catch((err) => {
+                    console.log('error', err);
+                    Swal.fire({
+                        title: '發送失敗',
+                        html: '請確認：<br>1. 是否已開啟 Share Target Picker 權限<br>2. 或者您必須在「與客人的聊天室」中開啟此連結',
+                        icon: 'error'
+                    });
+                });
         }
 
         function copyFormula() {
