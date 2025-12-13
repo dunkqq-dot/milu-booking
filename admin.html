@@ -29,14 +29,20 @@
         .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-width: 500px; margin: 0 auto; margin-bottom: 20px; }
         .input-group { margin-bottom: 16px; }
         .label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 0.9rem; color: #374151; }
-        .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 1rem; }
+        .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 1rem; background-color: #fff; }
         .input:focus { border-color: #C69C6D; ring: 2px solid #C69C6D; }
         .btn { width: 100%; padding: 14px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: bold; font-size: 1rem; margin-top: 10px; transition: all 0.2s; }
         .btn:active { transform: scale(0.98); background-color: #333; }
         .preview-title { text-align: center; font-family: 'Playfair Display', serif; color: #C69C6D; font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
-        .code-box { background-color: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #2563eb; word-break: break-all; position: relative; }
-        .copy-btn { position: absolute; top: 8px; right: 8px; background-color: #e5e7eb; padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; color: #4b5563; cursor: pointer; }
+        
+        /* 公式產生器樣式 */
+        .formula-helper { background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 15px; border-radius: 12px; }
+        .code-box { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #2563eb; word-break: break-all; position: relative; margin-top: 10px; min-height: 60px; display: flex; align-items: center; }
+        .copy-btn { position: absolute; top: 5px; right: 5px; background-color: #e5e7eb; padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; color: #4b5563; cursor: pointer; border: none; font-weight: bold; }
         .copy-btn:hover { background-color: #d1d5db; }
+        .pill-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+        .pill { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; border: 1px solid #C69C6D; color: #C69C6D; background: white; transition: all 0.2s; }
+        .pill.active { background: #C69C6D; color: white; }
     </style>
 </head>
 <body>
@@ -44,7 +50,7 @@
     <!-- 發送器主卡片 -->
     <div class="card">
         <div class="preview-title">Admin Confirm Tool</div>
-        <p class="text-center text-xs text-gray-400 mb-6">點擊試算表連結可自動帶入資料</p>
+        <p class="text-center text-xs text-gray-400 mb-6">確認款項後，發送通知給客人</p>
 
         <form id="admin-form" onsubmit="return sendConfirmMessage(this)">
             
@@ -55,13 +61,14 @@
 
             <div class="input-group">
                 <label class="label">服務項目</label>
-                <input type="text" id="cust-service" class="input" placeholder="例如：專人佈置" required list="service-list">
-                <datalist id="service-list">
-                    <option value="專人佈置">
-                    <option value="氣球外送">
-                    <option value="後車廂驚喜">
-                    <option value="工作室自取">
-                </datalist>
+                <!-- 改為下拉選單，方便手機操作 -->
+                <select id="cust-service" class="input" required>
+                    <option value="" disabled selected>請選擇服務</option>
+                    <option value="專人佈置">✨ 專人佈置</option>
+                    <option value="氣球外送">🚚 氣球外送</option>
+                    <option value="後車廂驚喜">🚗 後車廂驚喜</option>
+                    <option value="工作室自取">🛍️ 工作室自取</option>
+                </select>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -81,52 +88,82 @@
             </div>
 
             <button type="submit" class="btn">
-                發送「預約成功」卡片 <i class="fa-solid fa-paper-plane"></i>
+                發送「預約成功」卡片 <i class="fa-solid fa-paper-plane ml-1"></i>
             </button>
         </form>
     </div>
 
-    <!-- 小幫手卡片：顯示試算表公式 -->
+    <!-- 小幫手卡片：Google 試算表公式產生器 -->
     <div class="card">
-        <div class="preview-title" style="font-size: 1.2rem;">Google 試算表設定</div>
-        <p class="text-xs text-gray-500 mb-4">請將下方公式複製並貼上到您的 Google 試算表 (例如 H 欄)，即可自動產生發送連結。</p>
+        <div class="preview-title" style="font-size: 1.2rem;">Google 試算表連動</div>
+        <p class="text-xs text-gray-500 mb-4">
+            因為表單內沒有「服務項目」欄位，請選擇您要貼上的試算表類型，複製對應的公式：
+        </p>
+
+        <!-- 選項按鈕 -->
+        <div class="pill-group">
+            <div class="pill active" onclick="setFormula('專人佈置', this)">專人佈置</div>
+            <div class="pill" onclick="setFormula('氣球外送', this)">氣球外送</div>
+            <div class="pill" onclick="setFormula('後車廂驚喜', this)">後車廂</div>
+            <div class="pill" onclick="setFormula('工作室自取', this)">自取</div>
+        </div>
         
         <div class="code-box">
-            <!-- 這裡已經幫您填入 dunkqq-dot 的網址 -->
-            <code id="formula-code">=HYPERLINK("https://dunkqq-dot.github.io/milu-booking/admin.html?name="&B2&"&service="&C2&"&date="&TEXT(D2,"yyyy-mm-dd")&"&time="&E2&"&price="&F2, "📲 發送通知")</code>
+            <code id="formula-code"></code>
             <button onclick="copyFormula()" class="copy-btn">複製公式</button>
         </div>
-        <p class="text-xs text-gray-400 mt-2 leading-relaxed">
-            * 假設欄位順序：B=姓名, C=項目, D=日期, E=時間, F=金額。<br>
-            * 若您的欄位順序不同，請自行修改公式中的 B2, C2... 等代號。
-        </p>
+        
+        <div class="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 leading-relaxed border border-gray-100">
+            <p class="font-bold mb-1">💡 如何使用：</p>
+            1. 在試算表新增一欄「發送通知」。<br>
+            2. 貼上公式。<br>
+            3. 確認公式內的 <b>B2, C2, D2...</b> 對應到正確的欄位。<br>
+            (假設 B=姓名, C=日期, D=時間, E=金額)
+        </div>
     </div>
 
     <script>
         // LIFF ID 設定
         const LIFF_ID = '2004044468-w8s4Ex1k'; 
 
+        // 預設 GitHub Pages 網址
+        const BASE_URL = 'https://dunkqq-dot.github.io/milu-booking/admin.html';
+
+        // 初始化
         window.onload = function() {
-            // 1. 初始化 LIFF
+            // 初始化 LIFF
             liff.init({ liffId: LIFF_ID })
                 .then(() => {
                     console.log('LIFF initialized');
-                    if (!liff.isLoggedIn()) {
-                        liff.login();
-                    }
+                    if (!liff.isLoggedIn()) liff.login();
                 })
-                .catch((err) => {
-                    console.error(err);
-                });
+                .catch((err) => { console.error(err); });
 
-            // 2. 自動讀取網址參數 (Magic Link 核心)
+            // 自動讀取網址參數
             const params = new URLSearchParams(window.location.search);
             if (params.has('name')) document.getElementById('cust-name').value = params.get('name');
+            // 如果網址有指定 service，自動選取；如果沒有，保持預設
             if (params.has('service')) document.getElementById('cust-service').value = params.get('service');
             if (params.has('date')) document.getElementById('cust-date').value = params.get('date');
             if (params.has('time')) document.getElementById('cust-time').value = params.get('time');
             if (params.has('price')) document.getElementById('cust-price').value = params.get('price');
+
+            // 初始化公式顯示 (預設專人佈置)
+            setFormula('專人佈置', document.querySelector('.pill.active'));
         };
+
+        // 切換公式類型
+        function setFormula(serviceName, btn) {
+            // 切換按鈕樣式
+            document.querySelectorAll('.pill').forEach(el => el.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+
+            // 產生公式 (將服務名稱直接寫死在網址裡)
+            // 假設欄位：B=姓名, C=日期, D=時間, E=金額 (因為沒有服務項目欄位了)
+            const formula = `=HYPERLINK("${BASE_URL}?service=${serviceName}&name="&B2&"&date="&TEXT(C2,"yyyy-mm-dd")&"&time="&D2&"&price="&E2, "📲 發送通知")`;
+            
+            document.getElementById('formula-code').innerText = formula;
+        }
 
         function sendConfirmMessage(form) {
             event.preventDefault();
@@ -175,7 +212,7 @@
                 Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false }).then(() => { liff.closeWindow(); });
             }).catch((err) => {
                 console.log('error', err);
-                Swal.fire('發送失敗', '請確認您是在與客人的聊天室中打開此連結，且已開啟權限。', 'error');
+                Swal.fire('發送失敗', '請確認您是在與客人的聊天室中打開此連結', 'error');
             });
             return false;
         }
