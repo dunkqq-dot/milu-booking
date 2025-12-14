@@ -95,7 +95,7 @@
             <input type="hidden" id="cust-to-id" value="">
 
             <button type="submit" class="btn">
-                選取客人並發送 <i class="fa-solid fa-paper-plane ml-1"></i>
+                點此從官方帳號發送 <i class="fa-solid fa-paper-plane ml-1"></i>
             </button>
         </form>
     </div>
@@ -219,7 +219,7 @@
                 console.log("Client ID loaded successfully.");
             } else {
                 // 如果 ID 遺失，我們仍然載入其他資料，但彈出警告
-                Swal.fire('⚠️ 客戶 ID 遺失', '無法精準選人發送。請手動在選單中選擇客戶！', 'warning');
+                Swal.fire('⚠️ 客戶 ID 遺失', '無法精準發送。請確認 Google 試算表 L 欄有 User ID 亂碼，否則發送將會失敗！', 'warning');
             }
 
             // 自動讀取網址參數，並填入表單
@@ -258,34 +258,38 @@
             const toId = document.getElementById('cust-to-id').value; 
 
             if (!liff.isInClient()) {
-                Swal.fire('請在 LINE 內開啟', '請點擊試算表中的連結開啟此頁面，才能使用選人發送功能。', 'warning');
+                Swal.fire('請在 LINE 內開啟', '請點擊試算表中的連結開啟此頁面。', 'warning');
+                return false;
+            }
+
+            // 檢查客戶 ID 是否存在，若不存在則無法指定發送
+            if (!toId) {
+                Swal.fire('無法發送', '客戶 ID 遺失。請確認 L 欄有 User ID 亂碼，否則無法使用此功能。', 'error');
                 return false;
             }
 
             // 傳遞所有參數給 Flex 訊息生成器
             const flexMessage = buildFlexMessage(oid, name, service, date, time, price);
 
-            // 發送 Flex Message (ShareTargetPicker)
-            if (liff.isApiAvailable('shareTargetPicker')) {
-                liff.shareTargetPicker([flexMessage]) // 👈 *** 關鍵：移除 {to: toId}，確保選人介面正確彈出 ***
-                .then(function (res) {
-                    if (res) {
-                        Swal.fire({ 
-                            title: '發送成功！', 
-                            html: '<p>訊息已從 **您的官方帳號** 發出。</p><p class="text-xs text-gray-500 mt-2">請回 LINE 聊天室確認。</p>',
-                            icon: 'success', 
-                            timer: 3000, 
-                            showConfirmButton: false 
-                        }).then(() => { liff.closeWindow(); });
-                    }
-                })
-                .catch(function (error) {
-                    console.error(error);
-                    Swal.fire('發送失敗', '請確認您已開啟 Share Target Picker 權限 (LINE Developers)。', 'error');
-                });
-            } else {
-                Swal.fire('環境錯誤', '請在 LINE App 中開啟此頁面。', 'error');
-            }
+            // *** 關鍵：使用 liff.sendMessages 直接發送給指定的 User ID ***
+            liff.sendMessages([flexMessage], {
+                to: toId 
+            })
+            .then(function () {
+                Swal.fire({ 
+                    title: '發送成功！', 
+                    html: '<p>訊息已從 **您的官方帳號** 發出。</p><p class="text-xs text-gray-500 mt-2">請回 LINE 聊天室確認。</p>',
+                    icon: 'success', 
+                    timer: 3000, 
+                    showConfirmButton: false 
+                }).then(() => { liff.closeWindow(); });
+            })
+            .catch(function (error) {
+                console.error("LIFF Send Message Error:", error);
+                // 這裡的錯誤通常是客戶沒在 7 天內傳訊息給 OA，導致 LIFF 沒權限主動發送
+                Swal.fire('發送失敗', '請確認客戶是否已封鎖官方帳號或超過 7 天未互動。', 'error');
+            });
+            
             return false;
         }
 
