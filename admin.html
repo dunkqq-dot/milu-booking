@@ -128,7 +128,10 @@
     </div>
 
     <script>
-        // ✅ 這裡填入您之前提供的【管理員專用 LIFF ID】
+        // ✅ 這裡填入您在 Make 步驟一中獲得的 Webhook URL
+        const WEBHOOK_URL = '請替換為您的 Make Webhook URL'; 
+
+        // 這裡填入您之前提供的【管理員專用 LIFF ID】
         const LIFF_ID = '2004044468-KFCOlJSB'; 
 
         // 建立 Flex Message JSON 結構 (包含所有訂單資訊)
@@ -193,7 +196,7 @@
                 })
                 .catch((err) => { console.error(err); });
 
-            // *** 修正：處理 LIFF 重導向的參數 (liff.state) ***
+            // *** 處理 LIFF 重導向的參數 (liff.state) ***
             const urlParams = new URLSearchParams(window.location.search);
             let params;
             
@@ -218,8 +221,7 @@
                 document.getElementById('cust-to-id').value = toId;
                 console.log("Client ID loaded successfully.");
             } else {
-                // 如果 ID 遺失，我們仍然載入其他資料，但彈出警告
-                Swal.fire('⚠️ 客戶 ID 遺失', '無法精準發送。請確認 Google 試算表 L 欄有 User ID 亂碼，否則發送將會失敗！', 'warning');
+                Swal.fire('⚠️ 客戶 ID 遺失', '無法精準發送。請確認 Google 試算表 L 欄有 User ID 亂碼！', 'warning');
             }
 
             // 自動讀取網址參數，並填入表單
@@ -245,8 +247,8 @@
             document.getElementById('formula-code').innerText = formula;
         }
 
-        // 發送卡片邏輯
-        function sendConfirmMessage() {
+        // 發送卡片邏輯：現在是向 Make Webhook 發送數據
+        async function sendConfirmMessage() {
             event.preventDefault();
 
             const oid = document.getElementById('cust-oid').value || '#';
@@ -256,39 +258,62 @@
             const time = document.getElementById('cust-time').value;
             const price = document.getElementById('cust-price').value || '-';
             const toId = document.getElementById('cust-to-id').value; 
-
-            if (!liff.isInClient()) {
-                Swal.fire('請在 LINE 內開啟', '請點擊試算表中的連結開啟此頁面。', 'warning');
+            
+            if (WEBHOOK_URL.includes('請替換')) {
+                Swal.fire('設定錯誤', '請先將您的 Make Webhook URL 貼到程式碼的 WEBHOOK_URL 變數中。', 'error');
                 return false;
             }
 
-            // 檢查客戶 ID 是否存在，若不存在則無法指定發送
             if (!toId) {
                 Swal.fire('無法發送', '客戶 ID 遺失。請確認 L 欄有 User ID 亂碼，否則無法使用此功能。', 'error');
                 return false;
             }
 
-            // 傳遞所有參數給 Flex 訊息生成器
+            Swal.fire({
+                title: '正在從官方帳號發送...',
+                text: '請稍候，訊息正在透過伺服器傳送。',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            // 1. 建立 Flex 訊息 JSON
             const flexMessage = buildFlexMessage(oid, name, service, date, time, price);
 
-            // *** 關鍵：使用 liff.sendMessages 直接發送給指定的 User ID ***
-            liff.sendMessages([flexMessage], {
-                to: toId 
-            })
-            .then(function () {
-                Swal.fire({ 
-                    title: '發送成功！', 
-                    html: '<p>訊息已從 **您的官方帳號** 發出。</p><p class="text-xs text-gray-500 mt-2">請回 LINE 聊天室確認。</p>',
-                    icon: 'success', 
-                    timer: 3000, 
-                    showConfirmButton: false 
-                }).then(() => { liff.closeWindow(); });
-            })
-            .catch(function (error) {
-                console.error("LIFF Send Message Error:", error);
-                // 這裡的錯誤通常是客戶沒在 7 天內傳訊息給 OA，導致 LIFF 沒權限主動發送
-                Swal.fire('發送失敗', '請確認客戶是否已封鎖官方帳號或超過 7 天未互動。', 'error');
-            });
+            // 2. 建立要傳送給 Make 的 JSON 數據
+            const payload = {
+                to: toId, // 客戶的 User ID
+                message: flexMessage, // 完整的 Flex Message JSON
+                orderId: oid,
+                clientName: name
+            };
+
+            try {
+                // 3. 發送數據到 Make Webhook
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    Swal.fire({ 
+                        title: '發送成功！', 
+                        html: '<p>訊息已從 **您的官方帳號** 發出。</p><p class="text-xs text-gray-500 mt-2">請回 LINE 聊天室確認。</p>',
+                        icon: 'success', 
+                        timer: 4000, 
+                        showConfirmButton: false 
+                    }).then(() => { 
+                        liff.closeWindow(); 
+                    });
+                } else {
+                    throw new Error(`伺服器錯誤: ${response.status}`);
+                }
+            } catch (error) {
+                console.error("Webhook 發送錯誤:", error);
+                Swal.fire('發送失敗', '請檢查 Make 劇本是否正在運行，或是否有 LINE API 權限問題。', 'error');
+            }
             
             return false;
         }
