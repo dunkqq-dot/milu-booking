@@ -86,6 +86,7 @@
                 NAME: '貴誰日工作室 蔡佳苓' 
             },
             
+            // ⚠️ 請檢查以下 SYSTEM_ID 是否正確對應到 Google 表單的「系統專用 ID」欄位
             DECO: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855', SYSTEM_ID: '854196062', PAYMENT_ID: '1383504004' },
             DELIVERY: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019', SYSTEM_ID: '2002313802', PAYMENT_ID: '1973575588' }, 
             TRUNK: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591', SYSTEM_ID: '1545965466', PAYMENT_ID: '352227586' },
@@ -234,7 +235,15 @@
     <script>
         window.onload = function() {
             if (config.LIFF_ID) {
-                liff.init({ liffId: config.LIFF_ID }).then(() => console.log('LIFF initialized')).catch(err => console.error('LIFF Init Error:', err));
+                liff.init({ liffId: config.LIFF_ID })
+                    .then(() => {
+                        console.log('LIFF initialized');
+                        // *** 新增：檢查是否登入，如果沒有則執行靜默登入
+                        if (!liff.isLoggedIn()) {
+                            liff.login();
+                        }
+                    })
+                    .catch(err => console.error('LIFF Init Error:', err));
             }
             bindFormInputs();
         };
@@ -308,8 +317,10 @@
             const configEntry = config[type.toUpperCase()];
             form.action = configEntry.ACTION;
 
-            // 1. 自動填入 User ID (如果設定有 SYSTEM_ID) - *** 使用 await
             let sysInput = null;
+            let userIdValue = ''; // 用來儲存 ID 亂碼
+
+            // 1. 自動填入 User ID (如果設定有 SYSTEM_ID) - *** 使用 await
             if (configEntry.SYSTEM_ID) {
                 // 嘗試找尋或創建隱藏欄位
                 sysInput = form.querySelector(`input[name="entry.${configEntry.SYSTEM_ID}"]`);
@@ -324,16 +335,28 @@
                 if(liff.isInClient() && liff.isLoggedIn()) {
                     try {
                         const profile = await liff.getProfile();
-                        sysInput.value = profile.userId;
-                        console.log('Successfully retrieved User ID:', profile.userId);
+                        userIdValue = profile.userId; // 儲存 ID
+                        sysInput.value = userIdValue;
+                        console.log('Successfully retrieved User ID:', userIdValue);
                     } catch (e) {
                         console.error('Failed to get LIFF profile for submission:', e);
-                        // 如果獲取失敗，ID 欄位將保持空白或原值
+                        // 獲取失敗則 ID 保持空白
                     }
                 }
             }
             
-            // 2. 自動填入 Payment Status = "未付款" (如果設定有 PAYMENT_ID)
+            // 2. 檢查 ID 是否為空 (Debug 警告) - 僅在 LIFF 環境下執行
+            if (liff.isInClient() && configEntry.SYSTEM_ID && !userIdValue) {
+                Swal.fire({
+                    title: '⚠️ ID 欄位為空！',
+                    text: 'LIFF 權限不足或登入失敗，請確認 LINE Developers Console 已開啟「Profile」及「OpenID」權限。',
+                    icon: 'error',
+                    timer: 8000,
+                    customClass: { popup: 'font-sans' }
+                });
+            }
+
+            // 3. 自動填入 Payment Status = "未付款" (如果設定有 PAYMENT_ID)
             if (configEntry.PAYMENT_ID) {
                 let payInput = form.querySelector(`input[name="entry.${configEntry.PAYMENT_ID}"]`);
                 if(!payInput) {
