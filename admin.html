@@ -251,4 +251,38 @@
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "時間", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end" } ] }
                                     ]
                                 },
-                                { "type": "box", "layout": "vertical", "margin": "lg", "contents":
+                                { "type": "box", "layout": "vertical", "margin": "lg", "contents": [ { "type": "separator" } ] },
+                                { "type": "box", "layout": "horizontal", "margin": "lg", "contents": [ { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" }, { "type": "text", "text": price, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" } ] },
+                                { "type": "box", "layout": "vertical", "margin": "xxl", "contents": [ { "type": "image", "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png", "size": "xxs", "aspectMode": "fit" }, { "type": "text", "text": "MILU BALLOONS", "size": "xxxs", "color": "#dddddd", "align": "center", "margin": "xs", "letterSpacing": "2px" } ] }
+                            ]
+                        }
+                    }
+                }], {
+                    // 如果 'to' 參數存在，嘗試指定發送給該客戶
+                    // 注意：ShareTargetPicker 仍然會跳出選擇視窗，但會預先選擇這個客戶
+                    to: toId 
+                })
+                .then(function (res) {
+                    if (res) {
+                        Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false }).then(() => { liff.closeWindow(); });
+                    }
+                })
+                .catch(function (error) {
+                    console.error(error);
+                    Swal.fire('發送失敗', '請確認您已開啟 Share Target Picker 權限 (LINE Developers)。', 'error');
+                });
+            } else {
+                Swal.fire('環境錯誤', '請在 LINE App 中開啟此頁面。', 'error');
+            }
+            return false;
+        }
+
+        function copyFormula() {
+            const formula = document.getElementById('formula-code').innerText.trim();
+            navigator.clipboard.writeText(formula).then(() => {
+                Swal.fire({ title: '已複製公式', icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
+            });
+        }
+    </script>
+</body>
+</html>
