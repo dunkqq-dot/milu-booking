@@ -213,20 +213,19 @@
             const time = params.get('time');
             const price = params.get('price');
 
-
             // 檢查 'to' 參數是否存在
             if (toId) {
                 document.getElementById('cust-to-id').value = toId;
                 console.log("Client ID loaded successfully.");
             } else {
-                Swal.fire('錯誤：未找到客戶 ID', 'to 參數遺失或未成功從 LIFF 傳輸。請確認 Google 試算表 L 欄有 User ID 亂碼。', 'error');
+                // 如果 ID 遺失，我們仍然載入其他資料，但彈出警告
+                Swal.fire('⚠️ 客戶 ID 遺失', '無法精準選人發送。請手動在選單中選擇客戶！', 'warning');
             }
 
             // 自動讀取網址參數，並填入表單
             if (oid) document.getElementById('cust-oid').value = oid;
             if (name) document.getElementById('cust-name').value = name;
             if (service) document.getElementById('cust-service').value = service;
-            // 日期：需要 YYYY-MM-DD 格式
             if (date) document.getElementById('cust-date').value = date; 
             if (time) document.getElementById('cust-time').value = time;
             if (price) document.getElementById('cust-price').value = price;
@@ -256,16 +255,10 @@
             const date = document.getElementById('cust-date').value;
             const time = document.getElementById('cust-time').value;
             const price = document.getElementById('cust-price').value || '-';
-            const toId = document.getElementById('cust-to-id').value; // 讀取隱藏欄位的客戶 ID
+            const toId = document.getElementById('cust-to-id').value; 
 
             if (!liff.isInClient()) {
                 Swal.fire('請在 LINE 內開啟', '請點擊試算表中的連結開啟此頁面，才能使用選人發送功能。', 'warning');
-                return false;
-            }
-
-            // 如果客戶 ID 仍然是空的，則提醒管理員
-            if (!toId) {
-                Swal.fire('錯誤：未找到客戶 ID', '客戶 ID 遺失。請確認 L 欄資料正確，或使用「選人發送」功能手動選擇客戶。', 'error');
                 return false;
             }
 
@@ -274,12 +267,16 @@
 
             // 發送 Flex Message (ShareTargetPicker)
             if (liff.isApiAvailable('shareTargetPicker')) {
-                liff.shareTargetPicker([flexMessage], {
-                    to: toId 
-                })
+                liff.shareTargetPicker([flexMessage]) // 👈 *** 關鍵：移除 {to: toId}，確保選人介面正確彈出 ***
                 .then(function (res) {
                     if (res) {
-                        Swal.fire({ title: '發送成功！', icon: 'success', timer: 1500, showConfirmButton: false }).then(() => { liff.closeWindow(); });
+                        Swal.fire({ 
+                            title: '發送成功！', 
+                            html: '<p>訊息已從 **您的官方帳號** 發出。</p><p class="text-xs text-gray-500 mt-2">請回 LINE 聊天室確認。</p>',
+                            icon: 'success', 
+                            timer: 3000, 
+                            showConfirmButton: false 
+                        }).then(() => { liff.closeWindow(); });
                     }
                 })
                 .catch(function (error) {
