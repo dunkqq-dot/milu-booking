@@ -3,172 +3,252 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>發送通知確認 (管理後台專用)</title>
+    <title>收款確認發送器 | MILU Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        milu: { gold: '#C69C6D', dark: '#4A4A4A', green: '#10B981' }
+                    },
+                    fontFamily: {
+                        serif: ['"Playfair Display"', 'serif'],
+                        sans: ['"Noto Sans TC"', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background-color: #f7f7f7; padding: 20px; }
-        .card { background: white; border-radius: 12px; padding: 30px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); max-width: 400px; width: 100%; text-align: center; }
-        .btn { padding: 12px 20px; border-radius: 8px; font-weight: 700; transition: background-color 0.3s; }
-        .status-box { background: #e0f7fa; color: #00796b; padding: 15px; border-radius: 8px; margin-top: 15px; font-size: 0.9rem; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; color: #4A4A4A; padding: 20px; padding-bottom: 80px; }
+        .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-width: 500px; margin: 0 auto; margin-bottom: 20px; }
+        .input-group { margin-bottom: 16px; }
+        .label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 0.9rem; color: #374151; }
+        .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 1rem; background-color: #fff; }
+        .input:focus { border-color: #C69C6D; ring: 2px solid #C69C6D; }
+        .input-readonly { background-color: #f9fafb; color: #6b7280; border-color: #e5e7eb; }
+        .btn { width: 100%; padding: 14px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: bold; font-size: 1rem; margin-top: 10px; transition: all 0.2s; }
+        .btn:active { transform: scale(0.98); background-color: #333; }
+        .preview-title { text-align: center; font-family: 'Playfair Display', serif; color: #C69C6D; font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
+        
+        /* 輔助區塊樣式 */
+        .code-box { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #2563eb; word-break: break-all; position: relative; margin-top: 10px; min-height: 60px; display: flex; align-items: center; }
+        .copy-btn { position: absolute; top: 5px; right: 5px; background-color: #e5e7eb; padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; color: #4b5563; cursor: pointer; border: none; font-weight: bold; }
+        .copy-btn:hover { background-color: #d1d5db; }
+        .pill-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+        .pill { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; border: 1px solid #C69C6D; color: #C69C6D; background: white; transition: all 0.2s; }
+        .pill.active { background: #C69C6D; color: white; }
     </style>
 </head>
 <body>
 
+    <!-- 發送器主介面 -->
     <div class="card">
-        <h1 class="text-2xl font-bold text-gray-800 mb-4">發送預約確認通知</h1>
-        <p class="text-gray-600 mb-6">請確認您要發送以下通知給客戶：</p>
-        
-        <div id="content-display" class="status-box text-left">
-            <div class="font-bold text-lg mb-2">通知內容載入中...</div>
+        <div class="preview-title">Payment Confirm</div>
+        <p class="text-center text-xs text-gray-400 mb-6">確認款項後，選取客人發送通知</p>
+
+        <form id="admin-form" onsubmit="return sendConfirmMessage(this)">
+            
+            <div class="input-group">
+                <label class="label">訂單編號 (Order ID)</label>
+                <input type="text" id="cust-oid" class="input input-readonly" placeholder="自動帶入" readonly>
+            </div>
+
+            <div class="input-group">
+                <label class="label">客人姓名</label>
+                <input type="text" id="cust-name" class="input" placeholder="例如：王小美" required>
+            </div>
+
+            <div class="input-group">
+                <label class="label">服務項目</label>
+                <select id="cust-service" class="input" required>
+                    <option value="" disabled selected>請選擇服務</option>
+                    <option value="專人佈置">✨ 專人佈置</option>
+                    <option value="氣球外送">🚚 氣球外送</option>
+                    <option value="後車廂驚喜">🚗 後車廂驚喜</option>
+                    <option value="工作室自取">🛍️ 工作室自取</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div class="input-group">
+                    <label class="label">日期</label>
+                    <input type="date" id="cust-date" class="input" required>
+                </div>
+                <div class="input-group">
+                    <label class="label">時間</label>
+                    <input type="text" id="cust-time" class="input" placeholder="13:00" required>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label class="label">確認金額</label>
+                <input type="text" id="cust-price" class="input" placeholder="例如：$2,500 (含運)">
+            </div>
+            
+            <!-- 隱藏欄位，用於儲存客戶 ID -->
+            <input type="hidden" id="cust-to-id" value="">
+
+            <button type="submit" class="btn">
+                選取客人並發送 <i class="fa-solid fa-paper-plane ml-1"></i>
+            </button>
+        </form>
+    </div>
+
+    <!-- 試算表公式小幫手 -->
+    <div class="card">
+        <div class="preview-title" style="font-size: 1.2rem;">Google 試算表連動</div>
+        <p class="text-xs text-gray-500 mb-4">
+            請選擇服務類型，複製公式到 Google 試算表的「發送通知」欄：
+        </p>
+
+        <div class="pill-group">
+            <div class="pill active" onclick="setFormula('專人佈置', this)">專人佈置</div>
+            <div class="pill" onclick="setFormula('氣球外送', this)">氣球外送</div>
+            <div class="pill" onclick="setFormula('後車廂驚喜', this)">後車廂</div>
+            <div class="pill" onclick="setFormula('工作室自取', this)">自取</div>
         </div>
         
-        <button id="send-btn" class="btn bg-green-500 hover:bg-green-600 text-white w-full mt-6" onclick="sendConfirmation()">
-            點此發送 [✅ 款項已確認]
-        </button>
-
-        <p id="error-message" class="text-red-500 mt-4 text-sm hidden">發送失敗，請從 LINE APP 內部重試。</p>
+        <div class="code-box">
+            <code id="formula-code"></code>
+            <button onclick="copyFormula()" class="copy-btn">複製公式</button>
+        </div>
+        
+        <div class="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 leading-relaxed border border-gray-100">
+            <p class="font-bold mb-1">💡 如何使用：</p>
+            1. 在試算表新增一欄「發送通知」。<br>
+            2. 貼上公式。<br>
+            3. 確認公式內的儲存格代號 (如 B2, C2) 對應正確。
+        </div>
     </div>
 
     <script>
-        let USER_ID = '';
-        let FLEX_MESSAGE_JSON = null; // 儲存 Flex 訊息物件
+        // ✅ 這裡填入您之前提供的【管理員專用 LIFF ID】
+        const LIFF_ID = '2004044468-KFCOlJSB'; 
 
         window.onload = function() {
-            // 引入 SweetAlert 的字體，與 LINE 的 Noto Sans TC 一致
-            const link = document.createElement('link');
-            link.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap';
-            link.rel = 'stylesheet';
-            document.head.appendChild(link);
-            
-            // 獲取 URL 參數
+            liff.init({ liffId: LIFF_ID })
+                .then(() => {
+                    console.log('LIFF initialized');
+                    if (!liff.isLoggedIn()) liff.login();
+                })
+                .catch((err) => { console.error(err); });
+
+            // *** 修正：處理 LIFF 重導向的參數 (liff.state) ***
             const urlParams = new URLSearchParams(window.location.search);
+            let params;
             
-            // 從 URL 獲取必要參數
-            USER_ID = urlParams.get('to');
-            const name = urlParams.get('name') || '客戶';
-            const service = urlParams.get('service') || '預約服務';
-            const date = urlParams.get('date') || '未定日期';
-            const time = urlParams.get('time') || '請見內文'; // 假設時間也傳過來
-
-            // 建立 Flex 訊息物件
-            FLEX_MESSAGE_JSON = buildFlexMessage(name, service, date, time);
-            
-            // 顯示內容給管理員確認
-            document.getElementById('content-display').innerHTML = `
-                <p class="text-sm">發送給：<span class="font-bold">${name}</span></p>
-                <p class="text-sm">服務：${service}</p>
-                <p class="text-sm">日期：${date}</p>
-                <p class="text-sm">時間：${time}</p>
-                <hr class="my-2 border-gray-300">
-                <p class="font-bold text-gray-800">將以卡片形式發送確認通知。</p>
-            `;
-
-            // 初始化 LIFF
-            if (USER_ID) {
-                 liff.init({ liffId: '2004044468-w8s4Ex1k' })
-                    .then(() => {
-                        console.log('LIFF initialized');
-                    })
-                    .catch(err => {
-                        console.error('LIFF Init Error:', err);
-                        document.getElementById('error-message').textContent = 'LIFF 初始化失敗。';
-                        document.getElementById('error-message').classList.remove('hidden');
-                    });
+            if (urlParams.has('liff.state')) {
+                // 如果網址中有 liff.state，解析它
+                const stateValue = decodeURIComponent(urlParams.get('liff.state'));
+                // liff.state 的格式是 key=value&key2=value2，所以直接用 URLSearchParams 解析
+                params = new URLSearchParams(stateValue);
             } else {
-                 document.getElementById('content-display').innerHTML = `<p class="font-bold text-red-700">錯誤：未找到客戶 ID (to 參數遺失)。</p>`;
-                 document.getElementById('send-btn').disabled = true;
+                // 否則，讀取普通的 URL 參數
+                params = urlParams;
             }
+            
+            // 檢查 'to' 參數是否存在
+            const toId = params.get('to');
+            if (toId) {
+                document.getElementById('cust-to-id').value = toId;
+                console.log("Client ID loaded successfully.");
+            } else {
+                // 如果沒有客戶 ID，顯示錯誤 (這就是您看到的錯誤訊息的來源)
+                Swal.fire('錯誤：未找到客戶 ID', 'to 參數遺失或未成功從 LIFF 傳輸。請確認 Google 試算表 L 欄有 User ID 亂碼。', 'error');
+            }
+
+            // 自動讀取網址參數，並填入表單
+            if (params.has('oid')) document.getElementById('cust-oid').value = params.get('oid');
+            if (params.has('name')) document.getElementById('cust-name').value = params.get('name');
+            if (params.has('service')) document.getElementById('cust-service').value = params.get('service');
+            if (params.has('date')) document.getElementById('cust-date').value = params.get('date');
+            if (params.has('time')) document.getElementById('cust-time').value = params.get('time');
+            if (params.has('price')) document.getElementById('cust-price').value = params.get('price');
+
+            // 預設顯示公式
+            setFormula('專人佈置', document.querySelector('.pill.active'));
         };
 
-        // 建立 Flex Message JSON 結構
-        function buildFlexMessage(name, service, date, time) {
-            // 由於價格和訂單ID可能無法穩定從官方帳號後台點擊連結傳送，我們使用簡化版卡片。
-            const pricePlaceholder = '已收款 (請查閱原始訂單)';
-            const statusColor = "#10B981"; // 綠色
-
-            return {
-                type: 'flex',
-                altText: '✅ 您的預約已確認成功！',
-                contents: {
-                    "type": "bubble",
-                    "size": "mega",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                            { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" },
-                            { "type": "text", "text": "預約確認成功", "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
-                            { "type": "text", "text": "我們已收到您的款項，期待為您服務！", "size": "xs", "color": "#aaaaaa", "wrap": true, "align": "center", "margin": "sm" },
-                            
-                            { "type": "separator", "margin": "xxl" },
-                            {
-                                "type": "box",
-                                "layout": "vertical",
-                                "margin": "xxl",
-                                "spacing": "sm",
-                                "contents": [
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "姓名", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "項目", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": service, "size": "sm", "color": "#111111", "align": "end" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "時間", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end" } ] }
-                                ]
-                            },
-                            { "type": "box", "layout": "vertical", "margin": "lg", "contents": [ { "type": "separator" } ] },
-                            { "type": "box", "layout": "horizontal", "margin": "lg", "contents": [ { "type": "text", "text": "付款狀態", "size": "sm", "color": "#999999" }, { "type": "text", "text": pricePlaceholder, "size": "md", "color": statusColor, "align": "end", "weight": "bold" } ] },
-                            { "type": "box", "layout": "vertical", "margin": "xxl", "contents": [ { "type": "image", "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png", "size": "xxs", "aspectMode": "fit" }, { "type": "text", "text": "MILU BALLOONS", "size": "xxxs", "color": "#dddddd", "align": "center", "margin": "xs", "letterSpacing": "2px" } ] }
-                        ]
-                    }
-                }
-            };
+        // 產生 Google 試算表公式
+        function setFormula(serviceName, btn) {
+            document.querySelectorAll('.pill').forEach(el => el.classList.remove('active'));
+            if(btn) btn.classList.add('active');
+            
+            // 這裡顯示的公式是範本，與您實際使用的 ARRAYFORMULA 語法略有不同，但邏輯一致。
+            const formula = `=ARRAYFORMULA(IF(ISBLANK(B2:B);"";HYPERLINK("https://liff.line.me/${LIFF_ID}?to="&L2:L&"&oid="&A2:A&"&name="&C2:C&"&service=${serviceName}"&"&date="&TEXT(D2:D;"YYYY/MM/DD")&"&time="&P2:P&"&price="&K2:K;"📲 發送通知")))`;
+            
+            document.getElementById('formula-code').innerText = formula;
         }
 
-        function sendConfirmation() {
-            document.getElementById('send-btn').disabled = true;
-            document.getElementById('send-btn').textContent = '發送中...';
+        // 發送卡片邏輯
+        function sendConfirmMessage(form) {
+            event.preventDefault();
 
-            // 檢查 LIFF 是否準備好，且有目標 ID
-            if (liff.isInClient() && USER_ID && FLEX_MESSAGE_JSON) {
-                // 使用 liff.sendMessages 發送 Flex Message 給指定的 USER_ID
-                liff.sendMessages([FLEX_MESSAGE_JSON], {
-                    to: USER_ID // 使用 'to' 參數指定接收者
-                })
-                .then(() => {
-                    Swal.fire({
-                        title: '✅ 通知已成功發送！',
-                        icon: 'success',
-                        customClass: { popup: 'font-sans' }
-                    }).then(() => {
-                        // 嘗試關閉視窗，方便管理員回到後台
-                        if (liff.isInClient()) {
-                            liff.closeWindow();
-                        }
-                    });
-                })
-                .catch((err) => {
-                    console.error('Send message failed:', err);
-                    Swal.fire({
-                        title: '發送失敗',
-                        text: `錯誤代碼: ${err.code}。請確認您已正確取得客戶 ID，或從 LINE App 內部點擊連結重試。`,
-                        icon: 'error',
-                        customClass: { popup: 'font-sans' }
-                    });
-                    document.getElementById('error-message').classList.remove('hidden');
-                    document.getElementById('send-btn').disabled = false;
-                    document.getElementById('send-btn').textContent = '點此發送 [✅ 款項已確認]';
-                });
-            } else {
-                Swal.fire({
-                    title: '環境或參數錯誤',
-                    text: '無法在當前環境發送訊息。請從 LINE 官方帳號 App 點擊連結重試，並確保客戶 ID 存在。',
-                    icon: 'warning',
-                    customClass: { popup: 'font-sans' }
-                });
-                document.getElementById('send-btn').disabled = false;
-                document.getElementById('send-btn').textContent = '點此發送 [✅ 款項已確認]';
+            const oid = document.getElementById('cust-oid').value || '#';
+            const name = document.getElementById('cust-name').value;
+            const service = document.getElementById('cust-service').value;
+            const date = document.getElementById('cust-date').value;
+            const time = document.getElementById('cust-time').value;
+            const price = document.getElementById('cust-price').value || '-';
+            const toId = document.getElementById('cust-to-id').value; // 讀取隱藏欄位的客戶 ID
+
+            if (!liff.isInClient()) {
+                Swal.fire('請在 LINE 內開啟', '請點擊試算表中的連結開啟此頁面，才能使用選人發送功能。', 'warning');
+                return false;
             }
-        }
-    </script>
-</body>
-</html>
+
+            // 如果客戶 ID 仍然是空的，則提醒管理員
+            if (!toId) {
+                Swal.fire('錯誤：未找到客戶 ID', '客戶 ID 遺失。請確認 L 欄資料正確，或使用「選人發送」功能手動選擇客戶。', 'error');
+                return false;
+            }
+
+            // 發送 Flex Message (ShareTargetPicker)
+            if (liff.isApiAvailable('shareTargetPicker')) {
+                liff.shareTargetPicker([{
+                    type: 'flex',
+                    altText: '✅ 您的預約已確認成功！',
+                    contents: {
+                        "type": "bubble",
+                        "size": "mega",
+                        "body": {
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
+                                { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center", "letterSpacing": "1px" },
+                                { "type": "text", "text": "預約確認成功", "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
+                                { "type": "text", "text": "我們已收到您的款項，期待為您服務！", "size": "xs", "color": "#aaaaaa", "wrap": true, "align": "center", "margin": "sm" },
+                                
+                                // 訂單編號區塊
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "margin": "lg",
+                                    "backgroundColor": "#F0FDF4",
+                                    "cornerRadius": "md",
+                                    "paddingAll": "sm",
+                                    "contents": [
+                                        { "type": "text", "text": "ORDER ID: " + oid, "size": "xs", "color": "#10B981", "align": "center", "weight": "bold" }
+                                    ]
+                                },
+
+                                { "type": "separator", "margin": "xxl" },
+                                {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "margin": "xxl",
+                                    "spacing": "sm",
+                                    "contents": [
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "姓名", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "項目", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": service, "size": "sm", "color": "#111111", "align": "end" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "時間", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end" } ] }
+                                    ]
+                                },
+                                { "type": "box", "layout": "vertical", "margin": "lg", "contents":
