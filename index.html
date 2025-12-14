@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>線上預約 | MILU Balloons</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
@@ -26,87 +26,98 @@
     </script>
 
     <style>
-        html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; background-color: #FFFFFF; font-family: 'Noto Sans TC', sans-serif; color: #4A4A4A; }
-        body { padding-bottom: 40px; }
-        .custom-input { width: 100%; padding: 12px 0; background: transparent; border-bottom: 1px solid #E5E7EB; outline: none; border-radius: 0; font-size: 1rem; color: #111; }
+        /* 極簡全螢幕設定 */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow-x: hidden;
+            background-color: #FFFFFF;
+            font-family: 'Noto Sans TC', sans-serif; 
+            color: #4A4A4A;
+        }
+        /* 針對手機優化輸入框，移除 iOS 預設樣式 */
+        .custom-input { 
+            width: 100%; 
+            padding: 12px 0; 
+            background: transparent; 
+            border-bottom: 1px solid #E5E7EB; 
+            outline: none; 
+            border-radius: 0; 
+            font-size: 16px; /* 防止 iOS 縮放 */
+            color: #111;
+            -webkit-appearance: none;
+        }
         .custom-input:focus { border-bottom: 1px solid #C69C6D; }
-        .input-label { display: block; margin-top: 1rem; color: #4A4A4A; font-size: 0.9rem; font-weight: 700; }
+        
+        .input-label { 
+            display: block; 
+            margin-top: 1.2rem; 
+            color: #4A4A4A; 
+            font-size: 0.9rem; 
+            font-weight: 700; 
+        }
+
         .checkbox-item { display: flex; align-items: flex-start; gap: 0.8rem; margin-top: 0.8rem; font-size: 0.9rem; color: #666; cursor: pointer; line-height: 1.5; }
         .checkbox-input { margin-top: 0.2rem; accent-color: #C69C6D; width: 18px; height: 18px; }
+        
         .tab-btn { padding: 0.5rem 1rem; border-radius: 99px; font-size: 0.85rem; font-weight: 500; transition: all 0.3s; white-space: nowrap; border: 1px solid #F3F4F6; color: #9CA3AF; }
         .tab-active { background-color: #4A4A4A; color: white; border-color: #4A4A4A; }
+        
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .hidden { display: none; }
         input[type="date"], input[type="time"] { -webkit-appearance: none; min-height: 45px; }
 
-        /* 成功畫面樣式 */
-        #success-screen { display: none; text-align: center; padding-top: 50px; }
-        #main-content { transition: opacity 0.3s; }
+        /* 安全落地頁 (預設隱藏，失敗時顯示) */
+        #fallback-success { display: none; padding: 40px 20px; text-align: center; }
     </style>
 </head>
 <body>
 
-    <!-- 成功畫面 -->
-    <div id="success-screen" class="px-6">
+    <script>
+        const config = {
+            LIFF_ID: '2004044468-w8s4Ex1k', 
+            
+            BANK_INFO: { 
+                CODE: '009 彰化銀行 (汐科分行)', 
+                ACCOUNT: '54320100686300', 
+                NAME: '貴誰日工作室 蔡佳苓' 
+            },
+            
+            DECO: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855', SYSTEM_ID: '854196062', PAYMENT_ID: '1383504004' },
+            DELIVERY: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019', SYSTEM_ID: '2002313802', PAYMENT_ID: '1973575588' }, 
+            TRUNK: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591', SYSTEM_ID: '1545965466', PAYMENT_ID: '352227586' },
+            PICKUP: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeGfmaUfKjyhvUcerp1gpXU25-C6TRJBkCMyzGBg7qykSkjYg/formResponse', LINE_ID: '25342459', LOCATION_ID: '1448770209', DATE_ID: '995623192', TIME_ID: '1255688304', NAME_ID: '1307528521', PHONE_ID: '1776788492', TERMS_ID: '178386428', SYSTEM_ID: '1557454594', PAYMENT_ID: '347397920' }
+        };
+    </script>
+
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(submitted){/* JS handles callback */}"></iframe>
+
+    <!-- 安全落地頁 (當視窗關不掉時顯示這個) -->
+    <div id="fallback-success">
         <div class="mb-6 text-6xl text-green-500"><i class="fa-solid fa-circle-check"></i></div>
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">預約已送出！</h2>
-        <p class="text-gray-500 mb-6 text-sm leading-relaxed">感謝您的預約。<br>匯款資訊已發送至您的 LINE 聊天室。<br>請匯款後回傳帳號後五碼。</p>
-        <div class="bg-yellow-50 p-4 rounded-lg text-left text-sm text-gray-600 mb-8 border border-yellow-100">
-            <p class="font-bold text-yellow-800 mb-2">💰 匯款帳號備份</p>
-            <p>銀行：009 彰化銀行</p>
-            <p>帳號：54320100686300</p>
-            <p>戶名：貴誰日工作室 蔡佳苓</p>
+        <h2 class="text-2xl font-bold text-gray-800 mb-4 font-serif">預約已送出！</h2>
+        <p class="text-gray-500 mb-8 text-sm leading-relaxed">
+            請截圖保存下方匯款資訊<br>
+            並於匯款後回傳帳號後五碼
+        </p>
+        <div class="bg-yellow-50 p-6 rounded-xl text-left text-gray-700 mb-8 border border-yellow-100 shadow-sm">
+            <p class="font-bold text-yellow-800 mb-3 text-lg border-b border-yellow-200 pb-2">💰 匯款帳號</p>
+            <p class="mb-1 text-sm text-gray-500">銀行代碼</p>
+            <p class="font-bold text-lg mb-3">009 彰化銀行 (汐科分行)</p>
+            <p class="mb-1 text-sm text-gray-500">銀行帳號</p>
+            <p class="font-bold text-xl mb-3 text-milu-dark tracking-wide">54320100686300</p>
+            <p class="mb-1 text-sm text-gray-500">戶名</p>
+            <p class="font-bold text-lg">貴誰日工作室 蔡佳苓</p>
         </div>
-        <button onclick="liff.closeWindow()" class="w-full bg-gray-800 text-white py-3 rounded-lg">關閉視窗</button>
+        <button onclick="liff.closeWindow()" class="w-full bg-gray-800 text-white py-4 rounded-xl font-bold mb-4 shadow-lg hover:bg-gray-700">關閉視窗</button>
+        <p class="text-xs text-gray-400">若無法自動關閉，請點擊左上角 X</p>
     </div>
 
-    <!-- 主內容 -->
-    <div id="main-content" class="px-5 py-6 max-w-lg mx-auto">
-        
-        <script>
-            const config = {
-                LIFF_ID: '2004044468-w8s4Ex1k', 
-                
-                BANK_INFO: { 
-                    CODE: '009 彰化銀行 (汐科分行)', 
-                    ACCOUNT: '54320100686300', 
-                    NAME: '貴誰日工作室 蔡佳苓' 
-                },
-                
-                // 1. 專人佈置 (ID 已更新 ✅)
-                DECO: { 
-                    ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', 
-                    LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855', 
-                    SYSTEM_ID: '854196062',     // User ID
-                    PAYMENT_ID: '1383504004'    // 付款狀態
-                },
-                // 2. 氣球外送 (ID 已更新 ✅)
-                DELIVERY: { 
-                    ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', 
-                    LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019', 
-                    SYSTEM_ID: '2002313802',     // User ID (新)
-                    PAYMENT_ID: '1973575588'     // 付款狀態 (新)
-                }, 
-                // 3. 後車廂佈置 (ID 已更新 ✅)
-                TRUNK: { 
-                    ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', 
-                    LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591',
-                    SYSTEM_ID: '1545965466',   // User ID
-                    PAYMENT_ID: '352227586'    // 付款狀態
-                },
-                // 4. 工作室自取 (ID 已更新 ✅)
-                PICKUP: { 
-                    ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeGfmaUfKjyhvUcerp1gpXU25-C6TRJBkCMyzGBg7qykSkjYg/formResponse', 
-                    LINE_ID: '25342459', LOCATION_ID: '1448770209', DATE_ID: '995623192', TIME_ID: '1255688304', NAME_ID: '1307528521', PHONE_ID: '1776788492', TERMS_ID: '178386428',
-                    SYSTEM_ID: '1557454594',   // User ID
-                    PAYMENT_ID: '347397920'    // 付款狀態
-                }
-            };
-        </script>
-
-        <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(submitted){/* handled in JS */}"></iframe>
-
+    <!-- 預約表單主畫面 -->
+    <div id="booking-page" class="px-5 py-6 max-w-lg mx-auto">
         <div class="flex items-center justify-between mb-6">
             <div><h1 class="text-2xl font-bold font-serif text-milu-dark">MILU BALLOONS</h1><p class="text-xs text-gray-400 tracking-widest mt-1">MAKE YOUR MOMENT SPECIAL</p></div>
             <div class="text-2xl">🎈</div>
@@ -120,7 +131,7 @@
         </div>
 
         <!-- 1. 專人佈置 -->
-        <form id="form-deco" class="space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(this, 'deco')">
+        <form id="form-deco" class="space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(event, this, 'deco')">
             <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="deco-line" class="custom-input" placeholder="請填寫" required></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">佈置日期</label><input type="date" id="deco-date" class="custom-input" required></div>
@@ -142,7 +153,7 @@
         </form>
 
         <!-- 2. 氣球外送 -->
-        <form id="form-delivery" class="hidden space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(this, 'delivery')">
+        <form id="form-delivery" class="hidden space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(event, this, 'delivery')">
             <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="delivery-line" class="custom-input" placeholder="請填寫" required></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">外送日期</label><input type="date" id="delivery-date" class="custom-input" required></div>
@@ -164,7 +175,7 @@
         </form>
 
         <!-- 3. 工作室自取 -->
-        <form id="form-pickup" class="hidden space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(this, 'pickup')">
+        <form id="form-pickup" class="hidden space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(event, this, 'pickup')">
             <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="pickup-line" class="custom-input" placeholder="請填寫" required></div>
             <div><label class="input-label">取貨地點</label><div class="flex gap-3 mt-2">
                 <label class="flex-1 border border-gray-200 p-3 text-center cursor-pointer rounded-lg hover:border-milu-gold transition-colors has-[:checked]:bg-gray-800 has-[:checked]:text-white"><input type="radio" name="pickup-location-temp" value="板橋工作室（江子翠）" class="hidden" required onclick="document.getElementById('pickup-location').value=this.value"><span class="text-sm">板橋工作室</span></label>
@@ -173,7 +184,7 @@
             </div></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">取貨日期</label><input type="date" id="pickup-date" class="custom-input" required></div>
-                <div><label class="input-label">取貨時間</label><select id="pickup-time" class="custom-input" required><option value="" disabled selected>請選擇時段</option><option>10:00 - 11:00</option><option>11:00 - 12:00</option><option>12:00 - 13:00</option><option>13:00 - 14:00</option><option>14:00 - 15:00</option><option>15:00 - 16:00</option><option>16:00 - 17:00</option><option>17:00 - 18:00</option></select></div>
+                <div><label class="input-label">取貨時間</label><select id="pickup-time" class="custom-input" required><option value="" disabled selected>請選擇時段</option><option>12:30 - 13:00</option><option>13:00 - 14:00</option><option>14:00 - 15:00</option><option>15:00 - 16:00</option><option>16:00 - 17:00</option><option>17:00 - 18:00</option></select></div>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">取貨人姓名</label><input type="text" id="pickup-name" class="custom-input" required></div>
@@ -190,7 +201,7 @@
         </form>
 
         <!-- 4. 後車廂佈置 -->
-        <form id="form-trunk" class="hidden space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(this, 'trunk')">
+        <form id="form-trunk" class="hidden space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(event, this, 'trunk')">
             <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="trunk-line" class="custom-input" placeholder="請填寫" required></div>
             <div><label class="input-label">施作地點</label><div class="flex gap-3 mt-2">
                 <label class="flex-1 border border-gray-200 p-3 text-center cursor-pointer rounded-lg hover:border-milu-gold transition-colors has-[:checked]:bg-gray-800 has-[:checked]:text-white"><input type="radio" name="trunk-location-temp" value="板橋工作室（江子翠）" class="hidden" required onclick="document.getElementById('trunk-location').value=this.value"><span class="text-sm">板橋工作室</span></label>
@@ -220,18 +231,10 @@
         </div>
     </div>
 
-    <!-- JS 邏輯區 -->
     <script>
         window.onload = function() {
             if (config.LIFF_ID) {
-                liff.init({ liffId: config.LIFF_ID })
-                    .then(() => {
-                        console.log('LIFF initialized');
-                        if (!liff.isLoggedIn()) {
-                            // liff.login(); 
-                        }
-                    })
-                    .catch((err) => { console.error('LIFF Init Error:', err); });
+                liff.init({ liffId: config.LIFF_ID }).then(() => console.log('LIFF initialized')).catch(err => console.error('LIFF Init Error:', err));
             }
             bindFormInputs();
         };
@@ -245,6 +248,8 @@
             document.getElementById('deco-location').name = 'entry.' + config.DECO.LOCATION_ID;
             document.getElementById('deco-name').name = 'entry.' + config.DECO.NAME_ID;
             document.getElementById('deco-phone').name = 'entry.' + config.DECO.PHONE_ID;
+            // 創建隱藏欄位來接收 LIFF User ID
+            if(config.DECO.SYSTEM_ID) createHiddenInput(decoForm, 'entry.' + config.DECO.SYSTEM_ID, '');
 
             // DELIVERY
             const deliveryForm = document.getElementById('form-delivery');
@@ -255,6 +260,7 @@
                 document.getElementById('delivery-address').name = 'entry.' + config.DELIVERY.ADDRESS_ID;
                 document.getElementById('delivery-receiver').name = 'entry.' + config.DELIVERY.RECEIVER_ID;
                 document.getElementById('delivery-phone').name = 'entry.' + config.DELIVERY.PHONE_ID;
+                if(config.DELIVERY.SYSTEM_ID) createHiddenInput(deliveryForm, 'entry.' + config.DELIVERY.SYSTEM_ID, '');
             }
 
             // PICKUP
@@ -266,6 +272,7 @@
                 document.getElementById('pickup-time').name = 'entry.' + config.PICKUP.TIME_ID; 
                 document.getElementById('pickup-name').name = 'entry.' + config.PICKUP.NAME_ID;
                 document.getElementById('pickup-phone').name = 'entry.' + config.PICKUP.PHONE_ID;
+                if(config.PICKUP.SYSTEM_ID) createHiddenInput(pickupForm, 'entry.' + config.PICKUP.SYSTEM_ID, '');
             }
 
             // TRUNK
@@ -277,6 +284,7 @@
             document.getElementById('trunk-car').name = 'entry.' + config.TRUNK.CAR_ID;
             document.getElementById('trunk-name').name = 'entry.' + config.TRUNK.NAME_ID;
             document.getElementById('trunk-phone').name = 'entry.' + config.TRUNK.PHONE_ID;
+            if(config.TRUNK.SYSTEM_ID) createHiddenInput(trunkForm, 'entry.' + config.TRUNK.SYSTEM_ID, '');
         }
 
         function switchTab(type) {
@@ -294,28 +302,47 @@
         }
 
         var submitted = false;
-        function handleFormSubmit(form, type) {
+        async function handleFormSubmit(event, form, type) { // *** 已改為 async 函數
+            event.preventDefault(); // *** 阻止表單預設提交
+
             const configEntry = config[type.toUpperCase()];
             form.action = configEntry.ACTION;
 
-            // 1. 自動填入 User ID (如果設定有 SYSTEM_ID)
+            // 1. 自動填入 User ID (如果設定有 SYSTEM_ID) - *** 使用 await
+            let sysInput = null;
             if (configEntry.SYSTEM_ID) {
-                liff.getProfile().then(profile => {
-                    const sysInput = document.createElement('input');
+                // 嘗試找尋或創建隱藏欄位
+                sysInput = form.querySelector(`input[name="entry.${configEntry.SYSTEM_ID}"]`);
+                if (!sysInput) {
+                    sysInput = document.createElement('input');
                     sysInput.type = 'hidden';
                     sysInput.name = 'entry.' + configEntry.SYSTEM_ID;
-                    sysInput.value = profile.userId;
                     form.appendChild(sysInput);
-                }).catch(err => console.log('Profile Error (Ignore if not in LINE)', err));
+                }
+                
+                // *** 關鍵：等待 User ID 載入
+                if(liff.isInClient() && liff.isLoggedIn()) {
+                    try {
+                        const profile = await liff.getProfile();
+                        sysInput.value = profile.userId;
+                        console.log('Successfully retrieved User ID:', profile.userId);
+                    } catch (e) {
+                        console.error('Failed to get LIFF profile for submission:', e);
+                        // 如果獲取失敗，ID 欄位將保持空白或原值
+                    }
+                }
             }
-
+            
             // 2. 自動填入 Payment Status = "未付款" (如果設定有 PAYMENT_ID)
             if (configEntry.PAYMENT_ID) {
-                const payInput = document.createElement('input');
-                payInput.type = 'hidden';
-                payInput.name = 'entry.' + configEntry.PAYMENT_ID;
+                let payInput = form.querySelector(`input[name="entry.${configEntry.PAYMENT_ID}"]`);
+                if(!payInput) {
+                    payInput = document.createElement('input');
+                    payInput.type = 'hidden';
+                    payInput.name = 'entry.' + configEntry.PAYMENT_ID;
+                    form.appendChild(payInput);
+                }
                 payInput.value = '未付款';
-                form.appendChild(payInput);
             }
 
             // 日期處理
@@ -354,6 +381,9 @@
 
             submitted = true;
             
+            // *** 手動提交表單，確保 User ID 已被注入
+            form.submit();
+
             const nameVal = document.getElementById(type + '-name') ? document.getElementById(type + '-name').value : '-';
             const dateVal = dateInput ? dateInput.value : '-';
             const timeVal = timeInput ? timeInput.value : '-';
@@ -384,14 +414,16 @@
                     customClass: { title: 'font-serif text-milu-gold', popup: 'rounded-xl border border-milu-light' },
                     allowOutsideClick: false
                 }).then(() => {
+                    // 按下關閉後，發送卡片並切換畫面
                     sendFlexMessageAndClose(serviceName, nameVal, dateVal, timeVal);
                 });
             } else {
+                // 如果不在 LINE 內 (瀏覽器)，顯示成功畫面
                 document.getElementById('main-content').style.display = 'none';
                 document.getElementById('success-screen').style.display = 'block';
             }
 
-            return true;
+            return false; // *** 由於我們手動提交，這裡返回 false 阻止預設提交
         }
 
         function sendFlexMessageAndClose(service, name, date, time) {
