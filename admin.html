@@ -129,7 +129,7 @@
 
     <script>
         // ✅ 這裡填入您在 Make 步驟一中獲得的 Webhook URL
-        const WEBHOOK_URL = '請替換為您的 Make Webhook URL'; 
+        const WEBHOOK_URL = 'https://hook.eu1.make.com/9tp2lxutqb8yeh745hokyu1cofuubghy'; 
 
         // 這裡填入您之前提供的【管理員專用 LIFF ID】
         const LIFF_ID = '2004044468-KFCOlJSB'; 
@@ -242,7 +242,7 @@
             if(btn) btn.classList.add('active');
             
             // 由於 LIFF ID 是常數，這裡直接使用
-            const formula = `=ARRAYFORMULA(IF(ISBLANK(B2:B);"";HYPERLINK("https://liff.line.me/${LIFF_ID}?to="&L2:L&"&oid="&A2:A&"&name="&C2:C&"&service=${serviceName}"&"&date="&R2:R&"&time="&Q2:Q&"&price="&K2:K;"📲 發送通知")))`;
+            const formula = `=ARRAYFORMULA(IF(ISBLANK(B2:B);"";HYPERLINK("https://liff.line.me/${LIFF_ID}?to="&L2:L&"&oid="&A2:A&"&name="&C2:C&"&service=${serviceName}"&"&date="&R2:R&"&time="&Q2:Q&"&&price="&K2:K;"📲 發送通知")))`;
             
             document.getElementById('formula-code').innerText = formula;
         }
