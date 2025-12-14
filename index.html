@@ -14,7 +14,7 @@
             theme: {
                 extend: {
                     colors: {
-                        milu: { gold: '#C69C6D', dark: '#4A4A4A' }
+                        milu: { gold: '#C69C6D', dark: '#4A4A4A', beige: '#F9F7F2' }
                     },
                     fontFamily: {
                         serif: ['"Playfair Display"', 'serif'],
@@ -27,7 +27,7 @@
 
     <style>
         html, body { margin: 0; padding: 0; width: 100%; overflow-x: hidden; background-color: #FFFFFF; font-family: 'Noto Sans TC', sans-serif; color: #4A4A4A; }
-        body { padding-bottom: 40px; } /* 增加底部空間 */
+        body { padding-bottom: 40px; }
         .custom-input { width: 100%; padding: 12px 0; background: transparent; border-bottom: 1px solid #E5E7EB; outline: none; border-radius: 0; font-size: 1rem; color: #111; }
         .custom-input:focus { border-bottom: 1px solid #C69C6D; }
         .input-label { display: block; margin-top: 1rem; color: #4A4A4A; font-size: 0.9rem; font-weight: 700; }
@@ -39,32 +39,74 @@
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         .hidden { display: none; }
         input[type="date"], input[type="time"] { -webkit-appearance: none; min-height: 45px; }
+
+        /* 成功畫面樣式 */
+        #success-screen { display: none; text-align: center; padding-top: 50px; }
+        #main-content { transition: opacity 0.3s; }
     </style>
 </head>
 <body>
 
-    <script>
-        const config = {
-            // ✅ 已填入您的 LIFF ID
-            LIFF_ID: '2004044468-w8s4Ex1k', 
-            
-            // ✅ 已填入您的匯款資訊
-            BANK_INFO: { 
-                CODE: '009 彰化銀行 (汐科分行)', 
-                ACCOUNT: '54320100686300', 
-                NAME: '貴誰日工作室 蔡佳苓' 
-            },
-            
-            DECO: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855' },
-            DELIVERY: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019' }, 
-            TRUNK: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591' },
-            PICKUP: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeGfmaUfKjyhvUcerp1gpXU25-C6TRJBkCMyzGBg7qykSkjYg/formResponse', LINE_ID: '25342459', LOCATION_ID: '1448770209', DATE_ID: '995623192', TIME_ID: '1255688304', NAME_ID: '1307528521', PHONE_ID: '1776788492', TERMS_ID: '178386428' }
-        };
-    </script>
+    <!-- 成功畫面 -->
+    <div id="success-screen" class="px-6">
+        <div class="mb-6 text-6xl text-green-500"><i class="fa-solid fa-circle-check"></i></div>
+        <h2 class="text-2xl font-bold text-gray-800 mb-4">預約已送出！</h2>
+        <p class="text-gray-500 mb-6 text-sm leading-relaxed">感謝您的預約。<br>匯款資訊已發送至您的 LINE 聊天室。<br>請匯款後回傳帳號後五碼。</p>
+        <div class="bg-yellow-50 p-4 rounded-lg text-left text-sm text-gray-600 mb-8 border border-yellow-100">
+            <p class="font-bold text-yellow-800 mb-2">💰 匯款帳號備份</p>
+            <p>銀行：009 彰化銀行</p>
+            <p>帳號：54320100686300</p>
+            <p>戶名：貴誰日工作室 蔡佳苓</p>
+        </div>
+        <button onclick="liff.closeWindow()" class="w-full bg-gray-800 text-white py-3 rounded-lg">關閉視窗</button>
+    </div>
 
-    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(submitted){/* callback handled in JS */}"></iframe>
+    <!-- 主內容 -->
+    <div id="main-content" class="px-5 py-6 max-w-lg mx-auto">
+        
+        <script>
+            const config = {
+                LIFF_ID: '2004044468-w8s4Ex1k', 
+                
+                BANK_INFO: { 
+                    CODE: '009 彰化銀行 (汐科分行)', 
+                    ACCOUNT: '54320100686300', 
+                    NAME: '貴誰日工作室 蔡佳苓' 
+                },
+                
+                // 1. 專人佈置 (ID 已更新 ✅)
+                DECO: { 
+                    ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', 
+                    LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855', 
+                    SYSTEM_ID: '854196062',     // User ID
+                    PAYMENT_ID: '1383504004'    // 付款狀態
+                },
+                // 2. 氣球外送 (ID 已更新 ✅)
+                DELIVERY: { 
+                    ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', 
+                    LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019', 
+                    SYSTEM_ID: '2002313802',     // User ID (新)
+                    PAYMENT_ID: '1973575588'     // 付款狀態 (新)
+                }, 
+                // 3. 後車廂佈置 (ID 已更新 ✅)
+                TRUNK: { 
+                    ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', 
+                    LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591',
+                    SYSTEM_ID: '1545965466',   // User ID
+                    PAYMENT_ID: '352227586'    // 付款狀態
+                },
+                // 4. 工作室自取 (ID 已更新 ✅)
+                PICKUP: { 
+                    ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeGfmaUfKjyhvUcerp1gpXU25-C6TRJBkCMyzGBg7qykSkjYg/formResponse', 
+                    LINE_ID: '25342459', LOCATION_ID: '1448770209', DATE_ID: '995623192', TIME_ID: '1255688304', NAME_ID: '1307528521', PHONE_ID: '1776788492', TERMS_ID: '178386428',
+                    SYSTEM_ID: '1557454594',   // User ID
+                    PAYMENT_ID: '347397920'    // 付款狀態
+                }
+            };
+        </script>
 
-    <div class="px-5 py-6 max-w-lg mx-auto">
+        <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;" onload="if(submitted){/* handled in JS */}"></iframe>
+
         <div class="flex items-center justify-between mb-6">
             <div><h1 class="text-2xl font-bold font-serif text-milu-dark">MILU BALLOONS</h1><p class="text-xs text-gray-400 tracking-widest mt-1">MAKE YOUR MOMENT SPECIAL</p></div>
             <div class="text-2xl">🎈</div>
@@ -185,10 +227,11 @@
                 liff.init({ liffId: config.LIFF_ID })
                     .then(() => {
                         console.log('LIFF initialized');
+                        if (!liff.isLoggedIn()) {
+                            // liff.login(); 
+                        }
                     })
-                    .catch((err) => {
-                        console.error('LIFF Init Error:', err);
-                    });
+                    .catch((err) => { console.error('LIFF Init Error:', err); });
             }
             bindFormInputs();
         };
@@ -255,6 +298,27 @@
             const configEntry = config[type.toUpperCase()];
             form.action = configEntry.ACTION;
 
+            // 1. 自動填入 User ID (如果設定有 SYSTEM_ID)
+            if (configEntry.SYSTEM_ID) {
+                liff.getProfile().then(profile => {
+                    const sysInput = document.createElement('input');
+                    sysInput.type = 'hidden';
+                    sysInput.name = 'entry.' + configEntry.SYSTEM_ID;
+                    sysInput.value = profile.userId;
+                    form.appendChild(sysInput);
+                }).catch(err => console.log('Profile Error (Ignore if not in LINE)', err));
+            }
+
+            // 2. 自動填入 Payment Status = "未付款" (如果設定有 PAYMENT_ID)
+            if (configEntry.PAYMENT_ID) {
+                const payInput = document.createElement('input');
+                payInput.type = 'hidden';
+                payInput.name = 'entry.' + configEntry.PAYMENT_ID;
+                payInput.value = '未付款';
+                form.appendChild(payInput);
+            }
+
+            // 日期處理
             const dateInput = document.getElementById(type + '-date');
             if(dateInput && dateInput.value) {
                 const parts = dateInput.value.split('-');
@@ -264,6 +328,7 @@
                 createHiddenInput(form, 'entry.' + configEntry.DATE_ID, dateInput.value); 
             }
             
+            // 時間處理
             const timeInput = document.getElementById(type + '-time');
             if(timeInput && (type === 'deco' || type === 'trunk')) {
                  if(timeInput.value) {
@@ -274,6 +339,7 @@
                 }
             }
 
+            // 條款處理
             let terms = [];
             if(type === 'deco') {
                 terms = ["我已確認場地允許進行氣球佈置，並已通知場方。", "我了解空飄氣球漂浮時間約 6～8 小時，會安排在活動前 1-2 小時完成佈置以達最佳效果。", "關於殘膠風險： 我了解工作室使用 3M 不易殘膠布膠，並同意於 36 小時內 拆除。", "若超過 36 小時未拆除導致殘膠或漆面脫落，或因牆面材質特殊造成損損，我同意工作室不負修復或賠償責任。"];
@@ -294,32 +360,36 @@
             const serviceName = type === 'deco' ? '專人佈置' : (type === 'delivery' ? '氣球外送' : (type === 'pickup' ? '工作室自取' : '後車廂驚喜'));
 
             // 1. 跳出匯款視窗
-            Swal.fire({
-                title: '預約單已送出！',
-                html: `
-                    <div class="text-left text-sm text-gray-600">
-                        <p class="mb-2">感謝您的填寫！請完成最後一步驟：</p>
-                        <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100 mb-3">
-                            <p class="font-bold text-yellow-800 mb-1">💰 匯款資訊</p>
-                            <p>銀行代碼：<span class="font-bold text-gray-800">${config.BANK_INFO.CODE}</span></p>
-                            <p>銀行帳號：<span class="font-bold text-gray-800">${config.BANK_INFO.ACCOUNT}</span></p>
-                            ${config.BANK_INFO.NAME ? `<p>戶名：<span class="font-bold text-gray-800">${config.BANK_INFO.NAME}</span></p>` : ''}
+            if (liff.isInClient()) {
+                Swal.fire({
+                    title: '預約單已送出！',
+                    html: `
+                        <div class="text-left text-sm text-gray-600">
+                            <p class="mb-2">感謝您的填寫！請完成最後一步驟：</p>
+                            <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100 mb-3">
+                                <p class="font-bold text-yellow-800 mb-1">💰 匯款資訊</p>
+                                <p>銀行代碼：<span class="font-bold text-gray-800">${config.BANK_INFO.CODE}</span></p>
+                                <p>銀行帳號：<span class="font-bold text-gray-800">${config.BANK_INFO.ACCOUNT}</span></p>
+                                ${config.BANK_INFO.NAME ? `<p>戶名：<span class="font-bold text-gray-800">${config.BANK_INFO.NAME}</span></p>` : ''}
+                            </div>
+                            <p class="font-bold text-red-500">⚠️ 匯款後請務必在 LINE 告知「帳號後五碼」</p>
+                            <p class="mt-1">我們查帳確認後，會回傳「預約成功通知」給您，才算完成喔！</p>
                         </div>
-                        <p class="font-bold text-red-500">⚠️ 匯款後請務必在 LINE 告知「帳號後五碼」</p>
-                        <p class="mt-1">我們查帳確認後，會回傳「預約成功通知」給您，才算完成喔！</p>
-                    </div>
-                `,
-                icon: 'info',
-                confirmButtonText: '好的，關閉視窗',
-                confirmButtonColor: '#4A4A4A',
-                background: '#F9F7F2',
-                color: '#4A4A4A',
-                customClass: { title: 'font-serif text-milu-gold', popup: 'rounded-xl border border-milu-light' },
-                allowOutsideClick: false // 強制點擊按鈕
-            }).then(() => {
-                // 2. 使用者點擊「好的」之後，才發送卡片並關閉視窗
-                sendFlexMessageAndClose(serviceName, nameVal, dateVal, timeVal);
-            });
+                    `,
+                    icon: 'info',
+                    confirmButtonText: '好的，關閉視窗',
+                    confirmButtonColor: '#4A4A4A',
+                    background: '#F9F7F2',
+                    color: '#4A4A4A',
+                    customClass: { title: 'font-serif text-milu-gold', popup: 'rounded-xl border border-milu-light' },
+                    allowOutsideClick: false
+                }).then(() => {
+                    sendFlexMessageAndClose(serviceName, nameVal, dateVal, timeVal);
+                });
+            } else {
+                document.getElementById('main-content').style.display = 'none';
+                document.getElementById('success-screen').style.display = 'block';
+            }
 
             return true;
         }
@@ -358,11 +428,10 @@
                     setTimeout(() => { liff.closeWindow(); }, 500);
                 }).catch((err) => {
                     console.log('Msg Error', err);
-                    liff.closeWindow(); // 即使發送失敗也關閉
+                    document.getElementById('main-content').style.display = 'none';
+                    document.getElementById('success-screen').style.display = 'block';
+                    liff.closeWindow(); 
                 });
-            } else {
-                // 如果是瀏覽器，無法自動關閉，顯示提示
-                // window.close() usually fails in modern browsers
             }
         }
 
@@ -376,5 +445,3 @@
     </script>
 </body>
 </html>
-
-
