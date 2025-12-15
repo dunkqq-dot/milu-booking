@@ -242,7 +242,7 @@
             if(btn) btn.classList.add('active');
             
             // 由於 LIFF ID 是常數，這裡直接使用
-            const formula = `=ARRAYFORMULA(IF(ISBLANK(B2:B);"";HYPERLINK("https://liff.line.me/${LIFF_ID}?to="&L2:L&"&oid="&A2:A&"&name="&C2:C&"&service=${serviceName}"&"&date="&R2:R&"&time="&Q2:Q&"&&price="&K2:K;"📲 發送通知")))`;
+            const formula = `=ARRAYFORMULA(IF(ISBLANK(B2:B);"";HYPERLINK("https://liff.line.me/${LIFF_ID}?to="&L2:L&"&oid="&A2:A&"&name="&C2:C&"&service=${serviceName}"&"&date="&R2:R&"&time="&Q2:Q&"&price="&K2:K;"📲 發送通知")))`;
             
             document.getElementById('formula-code').innerText = formula;
         }
@@ -290,10 +290,10 @@
             };
 
             try {
-                // 3. 發送數據到 Make Webhook
+                // *** 關鍵修正：確保 headers 包含 Content-Type ***
                 const response = await fetch(WEBHOOK_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json' }, 
                     body: JSON.stringify(payload)
                 });
 
@@ -312,7 +312,7 @@
                 }
             } catch (error) {
                 console.error("Webhook 發送錯誤:", error);
-                Swal.fire('發送失敗', '請檢查 Make 劇本是否正在運行，或是否有 LINE API 權限問題。', 'error');
+                Swal.fire('發送失敗', '請檢查 Make 劇本是否正在運行，或是否有網路問題。', 'error');
             }
             
             return false;
@@ -327,3 +327,4 @@
     </script>
 </body>
 </html>
+
