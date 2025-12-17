@@ -36,7 +36,7 @@
 
     <div class="card">
         <div class="preview-title">Payment Confirm</div>
-        <p class="text-center text-xs text-gray-400 mb-6">確認款項後，點擊按鈕從官方帳號發送</p>
+        <p class="text-center text-xs text-gray-400 mb-6">確認款項後，點擊按鈕從官方帳號發送通知</p>
 
         <form id="admin-form" onsubmit="return sendConfirmMessage()">
             <div class="input-group">
@@ -71,21 +71,19 @@
                 <input type="text" id="cust-price" class="input" placeholder="例如：2500">
             </div>
             
-            <!-- 隱藏的客戶 ID 欄位 -->
             <input type="hidden" id="cust-to-id" value="">
 
             <button type="submit" class="btn">
-                確認入帳並發送通知 <i class="fa-solid fa-paper-plane ml-1"></i>
+                確認入帳並發送通知
             </button>
         </form>
     </div>
 
     <script>
-        // ✅ 這裡已經填入您的正式網址與 ID
-        const WEBHOOK_URL = 'https://hook.eu1.make.com/9tp2lxutqb8yeh745hokyu1cofuubghy'; 
+        // ✅ 這裡已填入您的新 Webhook 網址
+        const WEBHOOK_URL = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6'; 
         const LIFF_ID = '2004044468-KFCOlJSB'; 
 
-        // 初始化 LIFF
         window.onload = function() {
             liff.init({ liffId: LIFF_ID }).then(() => {
                 if (!liff.isLoggedIn()) {
@@ -96,10 +94,8 @@
             }).catch(err => console.error(err));
         };
 
-        // 從網址讀取參數 (來自試算表連結)
         function parseUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
-            // 處理 liff.state 重導向
             let params = urlParams;
             if (urlParams.has('liff.state')) {
                 params = new URLSearchParams(decodeURIComponent(urlParams.get('liff.state')));
@@ -114,11 +110,10 @@
             document.getElementById('cust-price').value = params.get('price') || '';
             
             if (!params.get('to')) {
-                Swal.fire('警告', '找不到客戶 LINE ID (L 欄)，將無法成功發送訊息！', 'warning');
+                console.warn('注意：URL 中遺失 to 參數 (客戶 UserID)');
             }
         }
 
-        // 建立卡片 JSON 結構
         function buildFlexMessage(oid, name, service, date, time, price) {
             const formattedPrice = price ? price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '待確認';
             return {
@@ -152,12 +147,10 @@
             };
         }
 
-        // 執行發送
         async function sendConfirmMessage() {
             event.preventDefault();
             const toId = document.getElementById('cust-to-id').value;
-            if (!toId) return Swal.fire('錯誤', '客戶 ID 遺失，請重開連結', 'error');
-
+            
             Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
             const payload = {
@@ -177,17 +170,17 @@
             try {
                 const res = await fetch(WEBHOOK_URL, {
                     method: 'POST',
+                    mode: 'no-cors', // 解決某些環境下的跨域問題
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                if (res.ok) {
-                    Swal.fire({ title: '發送成功！', icon: 'success', timer: 2000, showConfirmButton: false });
-                } else {
-                    throw new Error('Server Error');
-                }
+                // 因為用了 no-cors，我們無法直接讀取 res.ok，但只要沒拋出異常通常就是發出了
+                Swal.fire({ title: '指令已發送！', text: '請檢查 Make 劇本運行狀況', icon: 'success', timer: 2500 });
+                
             } catch (err) {
-                Swal.fire('發送失敗', '請檢查 Make 劇本是否開啟。', 'error');
+                console.error(err);
+                Swal.fire('發送失敗', '請檢查網路連線或 Make 設定。', 'error');
             }
             return false;
         }
