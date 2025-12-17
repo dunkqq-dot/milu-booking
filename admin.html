@@ -39,7 +39,6 @@
                 <label class="text-sm font-bold">客人姓名</label>
                 <input type="text" id="cust-name" class="input" required>
             </div>
-            <!-- 新增服務選項下拉選單 -->
             <div class="mb-4">
                 <label class="text-sm font-bold">服務項目</label>
                 <select id="cust-service" class="input" required>
@@ -49,7 +48,6 @@
                     <option value="工作室自取">🛍️ 工作室自取</option>
                 </select>
             </div>
-            <!-- end -->
             <div class="grid grid-cols-2 gap-4 mb-4">
                 <div>
                     <label class="text-sm font-bold">日期</label>
@@ -71,7 +69,7 @@
     </div>
 
     <script>
-        // 您的 Webhook 網址和 LIFF ID
+        // ✅ 已同步您的最新 Webhook URL
         const WEBHOOK_URL = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
         const LIFF_ID = '2004044468-KFCOlJSB';
 
@@ -93,7 +91,7 @@
             document.getElementById('cust-date').value = params.get('date') || '';
             document.getElementById('cust-time').value = params.get('time') || '';
             document.getElementById('cust-price').value = params.get('price') || '';
-            document.getElementById('cust-service').value = params.get('service') || '專人佈置'; // 從URL讀取服務
+            document.getElementById('cust-service').value = params.get('service') || '專人佈置';
         }
 
         function buildFlexMessage(service, date, time, price) {
@@ -133,7 +131,7 @@
         async function handleFormSubmit(e) {
             e.preventDefault();
             const toId = document.getElementById('cust-to-id').value;
-            const serviceVal = document.getElementById('cust-service').value; // 讀取服務類型
+            const serviceVal = document.getElementById('cust-service').value;
 
             Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
@@ -141,10 +139,10 @@
                 to: toId,
                 orderId: document.getElementById('cust-oid').value,
                 clientName: document.getElementById('cust-name').value,
-                service: serviceVal, // 傳送服務類型
+                service: serviceVal,
                 price: document.getElementById('cust-price').value,
                 message: buildFlexMessage(
-                    serviceVal, // 傳遞服務類型給 Flex Builder
+                    serviceVal,
                     document.getElementById('cust-date').value,
                     document.getElementById('cust-time').value,
                     document.getElementById('cust-price').value
