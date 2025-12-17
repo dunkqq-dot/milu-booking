@@ -15,66 +15,47 @@
                 extend: {
                     colors: {
                         milu: { gold: '#C69C6D', dark: '#4A4A4A', green: '#10B981' }
-                    },
-                    fontFamily: {
-                        serif: ['"Playfair Display"', 'serif'],
-                        sans: ['"Noto Sans TC"', 'sans-serif'],
                     }
                 }
             }
         }
     </script>
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; color: #4A4A4A; padding: 20px; padding-bottom: 80px; }
-        .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-width: 500px; margin: 0 auto; margin-bottom: 20px; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; color: #4A4A4A; padding: 20px; }
+        .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-width: 500px; margin: 0 auto; }
         .input-group { margin-bottom: 16px; }
         .label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 0.9rem; color: #374151; }
-        .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 1rem; background-color: #fff; }
+        .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 1rem; }
         .input:focus { border-color: #C69C6D; ring: 2px solid #C69C6D; }
-        .input-readonly { background-color: #f9fafb; color: #6b7280; border-color: #e5e7eb; }
-        .btn { width: 100%; padding: 14px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: bold; font-size: 1rem; margin-top: 10px; transition: all 0.2s; }
+        .btn { width: 100%; padding: 14px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: bold; margin-top: 10px; transition: all 0.2s; }
         .btn:active { transform: scale(0.98); background-color: #333; }
         .preview-title { text-align: center; font-family: 'Playfair Display', serif; color: #C69C6D; font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
-        
-        /* 輔助區塊樣式 */
-        .code-box { background-color: #ffffff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-family: monospace; font-size: 0.75rem; color: #2563eb; word-break: break-all; position: relative; margin-top: 10px; min-height: 60px; display: flex; align-items: center; }
-        .copy-btn { position: absolute; top: 5px; right: 5px; background-color: #e5e7eb; padding: 4px 10px; border-radius: 4px; font-size: 0.7rem; color: #4b5563; cursor: pointer; border: none; font-weight: bold; }
-        .copy-btn:hover { background-color: #d1d5db; }
-        .pill-group { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
-        .pill { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; cursor: pointer; border: 1px solid #C69C6D; color: #C69C6D; background: white; transition: all 0.2s; }
-        .pill.active { background: #C69C6D; color: white; }
     </style>
 </head>
 <body>
 
-    <!-- 發送器主介面 -->
     <div class="card">
         <div class="preview-title">Payment Confirm</div>
-        <p class="text-center text-xs text-gray-400 mb-6">確認款項後，選取客人發送通知</p>
+        <p class="text-center text-xs text-gray-400 mb-6">確認款項後，點擊按鈕從官方帳號發送</p>
 
         <form id="admin-form" onsubmit="return sendConfirmMessage()">
-            
             <div class="input-group">
                 <label class="label">訂單編號 (Order ID)</label>
-                <input type="text" id="cust-oid" class="input input-readonly" placeholder="自動帶入" readonly>
+                <input type="text" id="cust-oid" class="input bg-gray-50 text-gray-500" readonly>
             </div>
-
             <div class="input-group">
                 <label class="label">客人姓名</label>
-                <input type="text" id="cust-name" class="input" placeholder="例如：王小美" required>
+                <input type="text" id="cust-name" class="input" required>
             </div>
-
             <div class="input-group">
                 <label class="label">服務項目</label>
                 <select id="cust-service" class="input" required>
-                    <option value="" disabled selected>請選擇服務</option>
                     <option value="專人佈置">✨ 專人佈置</option>
                     <option value="氣球外送">🚚 氣球外送</option>
                     <option value="後車廂驚喜">🚗 後車廂驚喜</option>
                     <option value="工作室自取">🛍️ 工作室自取</option>
                 </select>
             </div>
-
             <div class="grid grid-cols-2 gap-4">
                 <div class="input-group">
                     <label class="label">日期</label>
@@ -85,60 +66,61 @@
                     <input type="text" id="cust-time" class="input" placeholder="14:30" required>
                 </div>
             </div>
-
             <div class="input-group">
                 <label class="label">確認金額</label>
-                <input type="text" id="cust-price" class="input" placeholder="例如：$2,500 (含運)">
+                <input type="text" id="cust-price" class="input" placeholder="例如：2500">
             </div>
             
-            <!-- 隱藏欄位，用於儲存客戶 ID -->
+            <!-- 隱藏的客戶 ID 欄位 -->
             <input type="hidden" id="cust-to-id" value="">
 
             <button type="submit" class="btn">
-                點此從官方帳號發送 <i class="fa-solid fa-paper-plane ml-1"></i>
+                確認入帳並發送通知 <i class="fa-solid fa-paper-plane ml-1"></i>
             </button>
         </form>
     </div>
 
-    <!-- 試算表公式小幫手 -->
-    <div class="card">
-        <div class="preview-title" style="font-size: 1.2rem;">Google 試算表連動</div>
-        <p class="text-xs text-gray-500 mb-4">
-            請選擇服務類型，複製公式到 Google 試算表的「發送通知」欄：
-        </p>
-
-        <div class="pill-group">
-            <div class="pill active" onclick="setFormula('專人佈置', this)">專人佈置</div>
-            <div class="pill" onclick="setFormula('氣球外送', this)">氣球外送</div>
-            <div class="pill" onclick="setFormula('後車廂驚喜', this)">後車廂</div>
-            <div class="pill" onclick="setFormula('工作室自取', this)">自取</div>
-        </div>
-        
-        <div class="code-box">
-            <code id="formula-code"></code>
-            <button onclick="copyFormula()" class="copy-btn">複製公式</button>
-        </div>
-        
-        <div class="mt-4 p-3 bg-gray-50 rounded-lg text-xs text-gray-500 leading-relaxed border border-gray-100">
-            <p class="font-bold mb-1">💡 如何使用：</p>
-            1. 在試算表新增一欄「發送通知」。<br>
-            2. 貼上公式。<br>
-            3. 確認公式內的儲存格代號 (如 B2, C2) 對應正確。
-        </div>
-    </div>
-
     <script>
-        // ✅ 這裡填入您在 Make 步驟一中獲得的 Webhook URL
+        // ✅ 這裡已經填入您的正式網址與 ID
         const WEBHOOK_URL = 'https://hook.eu1.make.com/9tp2lxutqb8yeh745hokyu1cofuubghy'; 
-
-        // 這裡填入您之前提供的【管理員專用 LIFF ID】
         const LIFF_ID = '2004044468-KFCOlJSB'; 
 
-        // 建立 Flex Message JSON 結構 (包含所有訂單資訊)
-        function buildFlexMessage(oid, name, service, date, time, price) {
-            const statusColor = "#10B981"; // 綠色
-            const formattedPrice = price ? price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '待確認';
+        // 初始化 LIFF
+        window.onload = function() {
+            liff.init({ liffId: LIFF_ID }).then(() => {
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                } else {
+                    parseUrlParams();
+                }
+            }).catch(err => console.error(err));
+        };
+
+        // 從網址讀取參數 (來自試算表連結)
+        function parseUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            // 處理 liff.state 重導向
+            let params = urlParams;
+            if (urlParams.has('liff.state')) {
+                params = new URLSearchParams(decodeURIComponent(urlParams.get('liff.state')));
+            }
+
+            document.getElementById('cust-to-id').value = params.get('to') || '';
+            document.getElementById('cust-oid').value = params.get('oid') || '';
+            document.getElementById('cust-name').value = params.get('name') || '';
+            document.getElementById('cust-service').value = params.get('service') || '專人佈置';
+            document.getElementById('cust-date').value = params.get('date') || '';
+            document.getElementById('cust-time').value = params.get('time') || '';
+            document.getElementById('cust-price').value = params.get('price') || '';
             
+            if (!params.get('to')) {
+                Swal.fire('警告', '找不到客戶 LINE ID (L 欄)，將無法成功發送訊息！', 'warning');
+            }
+        }
+
+        // 建立卡片 JSON 結構
+        function buildFlexMessage(oid, name, service, date, time, price) {
+            const formattedPrice = price ? price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '待確認';
             return {
                 type: 'flex',
                 altText: '✅ 您的預約已確認成功！',
@@ -149,23 +131,8 @@
                         "type": "box",
                         "layout": "vertical",
                         "contents": [
-                            { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" },
-                            { "type": "text", "text": "預約確認成功", "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
-                            { "type": "text", "text": "我們已收到您的款項，期待為您服務！", "size": "xs", "color": "#aaaaaa", "wrap": true, "align": "center", "margin": "sm" },
-                            
-                            // 訂單編號區塊
-                            {
-                                "type": "box",
-                                "layout": "vertical",
-                                "margin": "lg",
-                                "backgroundColor": "#F0FDF4",
-                                "cornerRadius": "md",
-                                "paddingAll": "sm",
-                                "contents": [
-                                    { "type": "text", "text": "ORDER ID: " + oid, "size": "xs", "color": "#10B981", "align": "center", "weight": "bold" }
-                                ]
-                            },
-
+                            { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center" },
+                            { "type": "text", "text": "預約確認成功", "weight": "bold", "size": "xl", "margin": "md", "align": "center" },
                             { "type": "separator", "margin": "xxl" },
                             {
                                 "type": "box",
@@ -173,158 +140,57 @@
                                 "margin": "xxl",
                                 "spacing": "sm",
                                 "contents": [
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "服務項目", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": service, "size": "sm", "color": "#111111", "align": "end" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "時間", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end" } ] }
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "sm", "color": "#999999" }, { "type": "text", "text": name, "size": "sm", "align": "end", "weight": "bold" } ] },
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "服務項目", "size": "sm", "color": "#999999" }, { "type": "text", "text": service, "size": "sm", "align": "end" } ] },
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期時間", "size": "sm", "color": "#999999" }, { "type": "text", "text": date + ' ' + time, "size": "sm", "align": "end" } ] }
                                 ]
                             },
-                            { "type": "box", "layout": "vertical", "margin": "lg", "contents": [ { "type": "separator" } ] },
-                            { "type": "box", "layout": "horizontal", "margin": "lg", "contents": [ { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" }, { "type": "text", "text": "NT$ " + formattedPrice, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" } ] },
-                            { "type": "box", "layout": "vertical", "margin": "xxl", "contents": [ { "type": "image", "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png", "size": "xxs", "aspectMode": "fit" }, { "type": "text", "text": "MILU BALLOONS", "size": "xxxs", "color": "#dddddd", "align": "center", "margin": "xs", "letterSpacing": "2px" } ] }
+                            { "type": "box", "layout": "horizontal", "margin": "lg", "contents": [ { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" }, { "type": "text", "text": "NT$ " + formattedPrice, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" } ] }
                         ]
                     }
                 }
             };
         }
 
-        window.onload = function() {
-            liff.init({ liffId: LIFF_ID })
-                .then(() => {
-                    console.log('LIFF initialized');
-                    if (!liff.isLoggedIn()) liff.login();
-                })
-                .catch((err) => { console.error(err); });
-
-            // *** 處理 LIFF 重導向的參數 (liff.state) ***
-            const urlParams = new URLSearchParams(window.location.search);
-            let params;
-            
-            if (urlParams.has('liff.state')) {
-                const stateValue = decodeURIComponent(urlParams.get('liff.state'));
-                params = new URLSearchParams(stateValue);
-            } else {
-                params = urlParams;
-            }
-            
-            // 讀取所有參數並填入 UI
-            const toId = params.get('to');
-            const oid = params.get('oid');
-            const name = params.get('name');
-            const service = params.get('service');
-            const date = params.get('date'); // YYYY-MM-DD
-            const time = params.get('time');
-            const price = params.get('price');
-
-            // 檢查 'to' 參數是否存在
-            if (toId) {
-                document.getElementById('cust-to-id').value = toId;
-                console.log("Client ID loaded successfully.");
-            } else {
-                Swal.fire('⚠️ 客戶 ID 遺失', '無法精準發送。請確認 Google 試算表 L 欄有 User ID 亂碼！', 'warning');
-            }
-
-            // 自動讀取網址參數，並填入表單
-            if (oid) document.getElementById('cust-oid').value = oid;
-            if (name) document.getElementById('cust-name').value = name;
-            if (service) document.getElementById('cust-service').value = service;
-            if (date) document.getElementById('cust-date').value = date; 
-            if (time) document.getElementById('cust-time').value = time;
-            if (price) document.getElementById('cust-price').value = price;
-
-            // 預設顯示公式
-            setFormula(service || '專人佈置', document.querySelector('.pill.active'));
-        };
-
-        // 產生 Google 試算表公式
-        function setFormula(serviceName, btn) {
-            document.querySelectorAll('.pill').forEach(el => el.classList.remove('active'));
-            if(btn) btn.classList.add('active');
-            
-            // 由於 LIFF ID 是常數，這裡直接使用
-            const formula = `=ARRAYFORMULA(IF(ISBLANK(B2:B);"";HYPERLINK("https://liff.line.me/${LIFF_ID}?to="&L2:L&"&oid="&A2:A&"&name="&C2:C&"&service=${serviceName}"&"&date="&R2:R&"&time="&Q2:Q&"&price="&K2:K;"📲 發送通知")))`;
-            
-            document.getElementById('formula-code').innerText = formula;
-        }
-
-        // 發送卡片邏輯：現在是向 Make Webhook 發送數據
+        // 執行發送
         async function sendConfirmMessage() {
             event.preventDefault();
+            const toId = document.getElementById('cust-to-id').value;
+            if (!toId) return Swal.fire('錯誤', '客戶 ID 遺失，請重開連結', 'error');
 
-            const oid = document.getElementById('cust-oid').value || '#';
-            const name = document.getElementById('cust-name').value;
-            const service = document.getElementById('cust-service').value;
-            const date = document.getElementById('cust-date').value;
-            const time = document.getElementById('cust-time').value;
-            const price = document.getElementById('cust-price').value || '-';
-            const toId = document.getElementById('cust-to-id').value; 
-            
-            if (WEBHOOK_URL.includes('請替換')) {
-                Swal.fire('設定錯誤', '請先將您的 Make Webhook URL 貼到程式碼的 WEBHOOK_URL 變數中。', 'error');
-                return false;
-            }
+            Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-            if (!toId) {
-                Swal.fire('無法發送', '客戶 ID 遺失。請確認 L 欄有 User ID 亂碼，否則無法使用此功能。', 'error');
-                return false;
-            }
-
-            Swal.fire({
-                title: '正在從官方帳號發送...',
-                text: '請稍候，訊息正在透過伺服器傳送。',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
-
-            // 1. 建立 Flex 訊息 JSON
-            const flexMessage = buildFlexMessage(oid, name, service, date, time, price);
-
-            // 2. 建立要傳送給 Make 的 JSON 數據
             const payload = {
-                to: toId, // 客戶的 User ID
-                message: flexMessage, // 完整的 Flex Message JSON
-                orderId: oid,
-                clientName: name
+                to: toId,
+                orderId: document.getElementById('cust-oid').value,
+                clientName: document.getElementById('cust-name').value,
+                message: buildFlexMessage(
+                    document.getElementById('cust-oid').value,
+                    document.getElementById('cust-name').value,
+                    document.getElementById('cust-service').value,
+                    document.getElementById('cust-date').value,
+                    document.getElementById('cust-time').value,
+                    document.getElementById('cust-price').value
+                )
             };
 
             try {
-                // *** 關鍵修正：確保 headers 包含 Content-Type ***
-                const response = await fetch(WEBHOOK_URL, {
+                const res = await fetch(WEBHOOK_URL, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }, 
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                if (response.ok) {
-                    Swal.fire({ 
-                        title: '發送成功！', 
-                        html: '<p>訊息已從 **您的官方帳號** 發出。</p><p class="text-xs text-gray-500 mt-2">請回 LINE 聊天室確認。</p>',
-                        icon: 'success', 
-                        timer: 4000, 
-                        showConfirmButton: false 
-                    }).then(() => { 
-                        liff.closeWindow(); 
-                    });
+                if (res.ok) {
+                    Swal.fire({ title: '發送成功！', icon: 'success', timer: 2000, showConfirmButton: false });
                 } else {
-                    throw new Error(`伺服器錯誤: ${response.status}`);
+                    throw new Error('Server Error');
                 }
-            } catch (error) {
-                console.error("Webhook 發送錯誤:", error);
-                Swal.fire('發送失敗', '請檢查 Make 劇本是否正在運行，或是否有網路問題。', 'error');
+            } catch (err) {
+                Swal.fire('發送失敗', '請檢查 Make 劇本是否開啟。', 'error');
             }
-            
             return false;
-        }
-
-        function copyFormula() {
-            const formula = document.getElementById('formula-code').innerText.trim();
-            navigator.clipboard.writeText(formula).then(() => {
-                Swal.fire({ title: '已複製公式', icon: 'success', toast: true, position: 'top-end', showConfirmButton: false, timer: 1500 });
-            });
         }
     </script>
 </body>
 </html>
-
