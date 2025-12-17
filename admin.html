@@ -8,47 +8,40 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    
     <script>
         tailwind.config = {
             theme: {
                 extend: {
-                    colors: {
-                        milu: { gold: '#C69C6D', dark: '#4A4A4A', green: '#10B981' }
-                    }
+                    colors: { milu: { gold: '#C69C6D', dark: '#4A4A4A', green: '#10B981' } }
                 }
             }
         }
     </script>
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; color: #4A4A4A; padding: 20px; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; padding: 20px; }
         .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-width: 500px; margin: 0 auto; }
-        .input-group { margin-bottom: 16px; }
-        .label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 0.9rem; color: #374151; }
-        .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 1rem; }
-        .input:focus { border-color: #C69C6D; ring: 2px solid #C69C6D; }
-        .btn { width: 100%; padding: 14px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: bold; margin-top: 10px; transition: all 0.2s; }
-        .btn:active { transform: scale(0.98); background-color: #333; }
-        .preview-title { text-align: center; font-family: 'Playfair Display', serif; color: #C69C6D; font-size: 1.5rem; margin-bottom: 20px; font-weight: bold; }
+        .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; margin-top: 4px; }
+        .btn { width: 100%; padding: 14px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: bold; margin-top: 20px; }
     </style>
 </head>
 <body>
 
     <div class="card">
-        <div class="preview-title">Payment Confirm</div>
-        <p class="text-center text-xs text-gray-400 mb-6">確認款項後，點擊按鈕從官方帳號發送通知</p>
+        <h2 class="text-center font-bold text-xl text-milu-gold mb-4">Payment Confirm</h2>
+        <p class="text-center text-xs text-gray-400 mb-6">填寫資訊後點擊按鈕發送 LINE 通知</p>
 
-        <form id="admin-form" onsubmit="return sendConfirmMessage()">
-            <div class="input-group">
-                <label class="label">訂單編號 (Order ID)</label>
-                <input type="text" id="cust-oid" class="input bg-gray-50 text-gray-500" readonly>
+        <form id="admin-form" onsubmit="return handleFormSubmit(event)">
+            <div class="mb-4">
+                <label class="text-sm font-bold">訂單編號</label>
+                <input type="text" id="cust-oid" class="input bg-gray-50" readonly>
             </div>
-            <div class="input-group">
-                <label class="label">客人姓名</label>
+            <div class="mb-4">
+                <label class="text-sm font-bold">客人姓名</label>
                 <input type="text" id="cust-name" class="input" required>
             </div>
-            <div class="input-group">
-                <label class="label">服務項目</label>
+            <!-- 新增服務選項下拉選單 -->
+            <div class="mb-4">
+                <label class="text-sm font-bold">服務項目</label>
                 <select id="cust-service" class="input" required>
                     <option value="專人佈置">✨ 專人佈置</option>
                     <option value="氣球外送">🚚 氣球外送</option>
@@ -56,111 +49,102 @@
                     <option value="工作室自取">🛍️ 工作室自取</option>
                 </select>
             </div>
-            <div class="grid grid-cols-2 gap-4">
-                <div class="input-group">
-                    <label class="label">日期</label>
+            <!-- end -->
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="text-sm font-bold">日期</label>
                     <input type="date" id="cust-date" class="input" required>
                 </div>
-                <div class="input-group">
-                    <label class="label">時間</label>
+                <div>
+                    <label class="text-sm font-bold">時間</label>
                     <input type="text" id="cust-time" class="input" placeholder="14:30" required>
                 </div>
             </div>
-            <div class="input-group">
-                <label class="label">確認金額</label>
+            <div class="mb-4">
+                <label class="text-sm font-bold">確認金額</label>
                 <input type="text" id="cust-price" class="input" placeholder="例如：2500">
             </div>
-            
             <input type="hidden" id="cust-to-id" value="">
 
-            <button type="submit" class="btn">
-                確認入帳並發送通知
-            </button>
+            <button type="submit" class="btn">發送預約成功通知</button>
         </form>
     </div>
 
     <script>
-        // ✅ 這裡已填入您的新 Webhook 網址
-        const WEBHOOK_URL = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6'; 
-        const LIFF_ID = '2004044468-KFCOlJSB'; 
+        // 您的 Webhook 網址和 LIFF ID
+        const WEBHOOK_URL = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
+        const LIFF_ID = '2004044468-KFCOlJSB';
 
         window.onload = function() {
             liff.init({ liffId: LIFF_ID }).then(() => {
-                if (!liff.isLoggedIn()) {
-                    liff.login();
-                } else {
-                    parseUrlParams();
-                }
-            }).catch(err => console.error(err));
+                if (!liff.isLoggedIn()) { liff.login(); } else { parseParams(); }
+            }).catch(err => console.error('LIFF Init Error', err));
         };
 
-        function parseUrlParams() {
+        function parseParams() {
             const urlParams = new URLSearchParams(window.location.search);
             let params = urlParams;
             if (urlParams.has('liff.state')) {
                 params = new URLSearchParams(decodeURIComponent(urlParams.get('liff.state')));
             }
-
             document.getElementById('cust-to-id').value = params.get('to') || '';
             document.getElementById('cust-oid').value = params.get('oid') || '';
             document.getElementById('cust-name').value = params.get('name') || '';
-            document.getElementById('cust-service').value = params.get('service') || '專人佈置';
             document.getElementById('cust-date').value = params.get('date') || '';
             document.getElementById('cust-time').value = params.get('time') || '';
             document.getElementById('cust-price').value = params.get('price') || '';
-            
-            if (!params.get('to')) {
-                console.warn('注意：URL 中遺失 to 參數 (客戶 UserID)');
-            }
+            document.getElementById('cust-service').value = params.get('service') || '專人佈置'; // 從URL讀取服務
         }
 
-        function buildFlexMessage(oid, name, service, date, time, price) {
+        function buildFlexMessage(service, date, time, price) {
             const formattedPrice = price ? price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '待確認';
+            const icon = {
+                '專人佈置': '✨',
+                '氣球外送': '🚚',
+                '後車廂驚喜': '🚗',
+                '工作室自取': '🛍️'
+            }[service] || '✅';
+
             return {
                 type: 'flex',
-                altText: '✅ 您的預約已確認成功！',
+                altText: `${icon} 您的${service}預約已確認成功！`,
                 contents: {
                     "type": "bubble",
-                    "size": "mega",
                     "body": {
                         "type": "box",
                         "layout": "vertical",
                         "contents": [
                             { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center" },
-                            { "type": "text", "text": "預約確認成功", "weight": "bold", "size": "xl", "margin": "md", "align": "center" },
-                            { "type": "separator", "margin": "xxl" },
+                            { "type": "text", "text": `${icon} ${service} 預約確認`, "weight": "bold", "size": "xl", "margin": "md", "align": "center" },
+                            { "type": "separator", "margin": "lg" },
                             {
-                                "type": "box",
-                                "layout": "vertical",
-                                "margin": "xxl",
-                                "spacing": "sm",
+                                "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm",
                                 "contents": [
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "sm", "color": "#999999" }, { "type": "text", "text": name, "size": "sm", "align": "end", "weight": "bold" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "服務項目", "size": "sm", "color": "#999999" }, { "type": "text", "text": service, "size": "sm", "align": "end" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期時間", "size": "sm", "color": "#999999" }, { "type": "text", "text": date + ' ' + time, "size": "sm", "align": "end" } ] }
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "sm", "color": "#aaaaaa" }, { "type": "text", "text": date + ' ' + time, "size": "sm", "align": "end" } ] },
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "確認金額", "size": "sm", "color": "#aaaaaa" }, { "type": "text", "text": "NT$ " + formattedPrice, "size": "sm", "align": "end", "weight": "bold" } ] }
                                 ]
-                            },
-                            { "type": "box", "layout": "horizontal", "margin": "lg", "contents": [ { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" }, { "type": "text", "text": "NT$ " + formattedPrice, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" } ] }
+                            }
                         ]
                     }
                 }
             };
         }
 
-        async function sendConfirmMessage() {
-            event.preventDefault();
+        async function handleFormSubmit(e) {
+            e.preventDefault();
             const toId = document.getElementById('cust-to-id').value;
-            
+            const serviceVal = document.getElementById('cust-service').value; // 讀取服務類型
+
             Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
             const payload = {
                 to: toId,
                 orderId: document.getElementById('cust-oid').value,
                 clientName: document.getElementById('cust-name').value,
+                service: serviceVal, // 傳送服務類型
+                price: document.getElementById('cust-price').value,
                 message: buildFlexMessage(
-                    document.getElementById('cust-oid').value,
-                    document.getElementById('cust-name').value,
-                    document.getElementById('cust-service').value,
+                    serviceVal, // 傳遞服務類型給 Flex Builder
                     document.getElementById('cust-date').value,
                     document.getElementById('cust-time').value,
                     document.getElementById('cust-price').value
@@ -168,21 +152,20 @@
             };
 
             try {
-                const res = await fetch(WEBHOOK_URL, {
+                const response = await fetch(WEBHOOK_URL, {
                     method: 'POST',
-                    mode: 'no-cors', // 解決某些環境下的跨域問題
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
-                // 因為用了 no-cors，我們無法直接讀取 res.ok，但只要沒拋出異常通常就是發出了
-                Swal.fire({ title: '指令已發送！', text: '請檢查 Make 劇本運行狀況', icon: 'success', timer: 2500 });
-                
-            } catch (err) {
-                console.error(err);
-                Swal.fire('發送失敗', '請檢查網路連線或 Make 設定。', 'error');
+                if (response.ok) {
+                    Swal.fire('發送指令成功！', `${serviceVal} 確認通知已送出。`, 'success');
+                } else {
+                    throw new Error('伺服器錯誤');
+                }
+            } catch (error) {
+                Swal.fire('發送失敗', '原因：' + error.message, 'error');
             }
-            return false;
         }
     </script>
 </body>
