@@ -225,7 +225,7 @@
         const { createApp, ref, computed, onMounted } = Vue;
         const MOCK_RESERVATIONS = [{ id: 'mock1', clientName: '範例資料', phone: '-', service: '系統測試', date: '2025-01-01', time: '12:00', status: 'UNPAID', oid: 'M0000', rawPrice: '3000', receivedPrice: '1000', location: '資料讀取失敗' }];
 
-        // 服務對應設定 (移植自 admin.html)
+        // 服務對應設定
         const configMap = {
             '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
             '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
@@ -340,14 +340,12 @@
                     return config[type] || (type === 'time' ? '時間' : '地點');
                 };
 
-                // 建立 Flex 卡片 (新增 receivedPrice, balance 參數)
+                // 建立 Flex 卡片
                 const buildRichFlexMessage = (service, name, oid, date, time, price, received, phone, location, actionType) => {
                     const config = configMap[service] || configMap['專人佈置'];
-                    // 數值轉換
                     const total = parseInt(price) || 0;
                     const paid = parseInt(received) || 0;
                     const balance = total - paid;
-                    
                     const displayTotal = total.toLocaleString();
                     const displayPaid = paid.toLocaleString();
                     const displayBalance = balance.toLocaleString();
@@ -395,7 +393,7 @@
                                     ]
                                 },
                                 { "type": "separator", "margin": "xl" },
-                                // 金額明細區塊
+                                // 金額明細區塊 (已新增)
                                 {
                                     "type": "box",
                                     "layout": "vertical",
@@ -449,11 +447,13 @@
                         phone: order.phone, 
                         location: order.location,
                         status: statusText,
+                        // 這裡將 flexContent 放入 message 中
                         message: { 
                             type: 'flex', 
                             altText: `通知：${order.service} ${statusText}`, 
                             contents: flexContent 
                         },
+                        // 同時傳送 flexContents 以防 Make 需要 (相容舊設定)
                         flexContents: flexContent
                     };
                     
