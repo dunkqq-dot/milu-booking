@@ -3,225 +3,249 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>收款確認發送器 | MILU Admin</title>
+    <title>MILU 專業預約發送器</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        milu: { gold: '#C69C6D', dark: '#4A4A4A', green: '#10B981' }
-                    }
-                }
-            }
-        }
-    </script>
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; color: #4A4A4A; padding: 20px; padding-bottom: 80px; }
-        .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-width: 500px; margin: 0 auto; margin-bottom: 20px; }
-        .input-group { margin-bottom: 16px; }
-        .label { display: block; font-weight: 700; margin-bottom: 8px; font-size: 0.9rem; color: #374151; }
-        .input { width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; outline: none; font-size: 1rem; background-color: #fff; }
-        .input:focus { border-color: #C69C6D; ring: 2px solid #C69C6D; }
-        .input-readonly { background-color: #f9fafb; color: #6b7280; border-color: #e5e7eb; }
-        .btn { width: 100%; padding: 14px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: bold; font-size: 1rem; margin-top: 10px; transition: all 0.2s; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8f9fa; padding: 15px; }
+        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 450px; margin: 0 auto; }
+        .label-text { display: block; font-size: 0.875rem; font-weight: 700; color: #4b5563; margin-bottom: 4px; }
+        .input-style { width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 12px; outline-color: #C69C6D; font-size: 14px; }
+        .btn-send { width: 100%; padding: 15px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: 700; margin-top: 10px; }
+        .section-title { border-left: 4px solid #C69C6D; padding-left: 8px; margin-bottom: 15px; font-weight: bold; color: #4A4A4A; }
     </style>
 </head>
 <body>
 
     <div class="card">
         <div class="text-center mb-6">
-            <h2 class="text-2xl font-bold text-milu-gold">Payment Confirm</h2>
-            <p class="text-xs text-gray-400">確認款項後，點擊按鈕從官方帳號發送</p>
+            <h2 class="text-2xl font-bold text-[#C69C6D]">MILU Reservation</h2>
+            <p class="text-xs text-gray-400">發送客製化預約確認小卡</p>
         </div>
 
-        <form id="admin-form" onsubmit="return sendConfirmMessage()">
-            <div class="input-group">
-                <label class="label">訂單編號</label>
-                <input type="text" id="cust-oid" class="input input-readonly" readonly>
+        <form id="booking-form">
+            <div class="section-title">服務與客戶資訊</div>
+            
+            <label class="label-text">服務項目</label>
+            <select id="cust-service" class="input-style" onchange="updateDynamicLabels()" required>
+                <option value="專人佈置">✨ 專人佈置</option>
+                <option value="門市自取">🛍️ 門市自取</option>
+                <option value="後車廂佈置">🚗 後車廂佈置</option>
+                <option value="氣球外送">🚚 氣球外送</option>
+            </select>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="label-text">LINE 名稱</label>
+                    <input type="text" id="line-name" class="input-style bg-gray-50" readonly placeholder="自動載入">
+                </div>
+                <div>
+                    <label class="label-text">聯絡人姓名</label>
+                    <input type="text" id="cust-name" class="input-style" placeholder="林小姐" required>
+                </div>
             </div>
-            <div class="input-group">
-                <label class="label">服務項目</label>
-                <!-- 加入 onchange 事件，切換服務時自動更新標籤 -->
-                <select id="cust-service" class="input" required onchange="updateLabels()">
-                    <option value="專人佈置">✨ 專人佈置</option>
-                    <option value="氣球外送">🚚 氣球外送</option>
-                    <option value="後車廂驚喜">🚗 後車廂驚喜</option>
-                    <option value="工作室自取">🛍️ 工作室自取</option>
-                </select>
+
+            <label class="label-text">聯絡電話</label>
+            <input type="tel" id="cust-phone" class="input-style" placeholder="0912-345-678" required>
+
+            <div class="section-title">預約細節</div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="label-text">預約日期</label>
+                    <input type="date" id="cust-date" class="input-style" required>
+                </div>
+                <div>
+                    <label id="label-time" class="label-text">進場佈置時間</label>
+                    <input type="text" id="cust-time" class="input-style" placeholder="14:30" required>
+                </div>
+            </div>
+
+            <label id="label-location" class="label-text">佈置地址</label>
+            <input type="text" id="cust-location" class="input-style" placeholder="請輸入完整地址或門市名稱" required>
+
+            <div class="input-group mt-2">
+                <label class="label-text">訂單編號 (自動填入)</label>
+                <input type="text" id="cust-oid" class="input-style bg-gray-50 text-xs" readonly>
             </div>
             
-            <div class="grid grid-cols-2 gap-4">
-                <div class="input-group">
-                    <label class="label">客人姓名</label>
-                    <input type="text" id="cust-name" class="input" required>
-                </div>
-                <div class="input-group">
-                    <label class="label">聯絡電話</label>
-                    <input type="text" id="cust-phone" class="input" placeholder="0912345678" required>
-                </div>
+            <div class="input-group mt-2">
+                 <label class="label-text">確認金額</label>
+                 <input type="number" id="cust-price" class="input-style" placeholder="2500" required>
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div class="input-group">
-                    <label class="label">日期</label>
-                    <input type="date" id="cust-date" class="input" required>
-                </div>
-                <div class="input-group">
-                    <label id="label-time" class="label">時間</label>
-                    <input type="text" id="cust-time" class="input" required>
-                </div>
-            </div>
-
-            <div class="input-group">
-                <label id="label-location" class="label">地點 / 地址</label>
-                <input type="text" id="cust-location" class="input" placeholder="請輸入地址或門市" required>
-            </div>
-
-            <div class="input-group">
-                <label class="label">確認金額</label>
-                <input type="text" id="cust-price" class="input" placeholder="例如：2500">
-            </div>
+            <input type="hidden" id="cust-to-id">
             
-            <input type="hidden" id="cust-to-id" value="">
-
-            <button type="submit" class="btn">
-                發送預約成功通知 <i class="fa-solid fa-paper-plane ml-1"></i>
-            </button>
+            <button type="button" onclick="submitToMake()" class="btn-send">發送確認通知</button>
         </form>
     </div>
 
     <script>
         const WEBHOOK_URL = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
-        const LIFF_ID = '2004044468-KFCOlJSB'; 
+        const LIFF_ID = '2004044468-KFCOlJSB';
 
-        // 定義各服務對應的顯示標籤
-        const SERVICE_CONFIG = {
-            '專人佈置': { time: '進場時間', location: '佈置地址' },
-            '氣球外送': { time: '外送時段', location: '外送地址' },
-            '後車廂驚喜': { time: '抵達時間', location: '施作地點' },
-            '工作室自取': { time: '取貨時間', location: '取貨門市' }
+        const configMap = {
+            '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
+            '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
+            '後車廂佈置': { time: '抵達工作室時間', location: '佈置工作室地點', icon: '🚗' },
+            '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
 
         window.onload = function() {
             liff.init({ liffId: LIFF_ID }).then(() => {
-                if (!liff.isLoggedIn()) { liff.login(); } else { parseUrlParams(); }
-            }).catch(err => console.error(err));
+                if (!liff.isLoggedIn()) { liff.login(); } else { getUrlParams(); }
+            }).catch(err => console.error('LIFF Error', err));
         };
 
-        function parseUrlParams() {
+        function updateDynamicLabels() {
+            const service = document.getElementById('cust-service').value;
+            const config = configMap[service] || configMap['專人佈置'];
+            document.getElementById('label-time').innerText = config.time;
+            document.getElementById('label-location').innerText = config.location;
+        }
+
+        function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
             let params = urlParams;
             if (urlParams.has('liff.state')) {
                 params = new URLSearchParams(decodeURIComponent(urlParams.get('liff.state')));
             }
-
             document.getElementById('cust-to-id').value = params.get('to') || '';
             document.getElementById('cust-oid').value = params.get('oid') || '';
-            document.getElementById('cust-name').value = params.get('name') || '';
-            
-            const service = params.get('service') || '專人佈置';
-            document.getElementById('cust-service').value = service;
-            
+            document.getElementById('line-name').value = params.get('name') || ''; 
+            document.getElementById('cust-name').value = params.get('name') || ''; 
             document.getElementById('cust-date').value = params.get('date') || '';
             document.getElementById('cust-time').value = params.get('time') || '';
             document.getElementById('cust-price').value = params.get('price') || '';
-            document.getElementById('cust-phone').value = params.get('phone') || '';
-            document.getElementById('cust-location').value = params.get('location') || '';
-
-            // 初始化標籤
-            updateLabels();
-        }
-
-        function updateLabels() {
-            const service = document.getElementById('cust-service').value;
-            const config = SERVICE_CONFIG[service] || { time: '時間', location: '地點 / 地址' };
             
-            document.getElementById('label-time').innerText = config.time;
-            document.getElementById('label-location').innerText = config.location;
-        }
+            const serviceFromUrl = params.get('service');
+            // Mapping google sheet service name to dropdown values if needed
+            // For now assuming exact match
+            if (serviceFromUrl) {
+                // Handle cases where sheet might say "工作室自取" vs "門市自取"
+                // Adjust this if your sheet values differ from dropdown values
+                let mappedService = serviceFromUrl;
+                if (serviceFromUrl === '工作室自取') mappedService = '門市自取'; 
+                if (serviceFromUrl === '後車廂驚喜') mappedService = '後車廂佈置';
 
-        function buildFlexMessage(oid, name, service, date, time, price, phone, location) {
-            const formattedPrice = price ? price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '待確認';
-            const icon = { '專人佈置': '✨', '氣球外送': '🚚', '後車廂驚喜': '🚗', '工作室自取': '🛍️' }[service] || '✅';
-            const config = SERVICE_CONFIG[service] || { time: '時間', location: '地點' };
-
-            return {
-                type: 'flex',
-                altText: `✅ 您的${service}預約已確認成功！`,
-                contents: {
-                    "type": "bubble",
-                    "size": "mega",
-                    "body": {
-                        "type": "box",
-                        "layout": "vertical",
-                        "contents": [
-                            { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center", "letterSpacing": "1px" },
-                            { "type": "text", "text": `${icon} ${service} 預約確認`, "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
-                            { "type": "separator", "margin": "lg" },
-                            {
-                                "type": "box",
-                                "layout": "vertical",
-                                "margin": "lg",
-                                "spacing": "sm",
-                                "contents": [
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold", "flex": 4 } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": phone, "size": "sm", "color": "#111111", "align": "end", "flex": 4 } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end", "flex": 4 } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end", "flex": 4 } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.location, "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": location, "size": "sm", "color": "#111111", "align": "end", "wrap": true, "flex": 4 } ] }
-                                ]
-                            },
-                            { "type": "separator", "margin": "lg" },
-                            { "type": "box", "layout": "horizontal", "margin": "lg", "contents": [ { "type": "text", "text": "確認金額", "size": "sm", "color": "#999999" }, { "type": "text", "text": "NT$ " + formattedPrice, "size": "md", "color": "#C69C6D", "align": "end", "weight": "bold" } ] },
-                             { "type": "box", "layout": "vertical", "margin": "xxl", "contents": [ { "type": "image", "url": "https://scdn.line-apps.com/n/channel_devcenter/img/fx/review_gold_star_28.png", "size": "xxs", "aspectMode": "fit" }, { "type": "text", "text": "MILU BALLOONS", "size": "xxxs", "color": "#dddddd", "align": "center", "margin": "xs", "letterSpacing": "2px" } ] }
-                        ]
+                // Check if mappedService exists in options
+                const select = document.getElementById('cust-service');
+                for(let i=0; i<select.options.length; i++) {
+                    if(select.options[i].value === mappedService) {
+                        select.value = mappedService;
+                        break;
                     }
                 }
+                updateDynamicLabels();
+            }
+        }
+
+        function buildProfessionalFlex(service, lineName, contactName, phone, date, time, location, oid, price) {
+            const config = configMap[service] || configMap['專人佈置'];
+            const displayPrice = price ? parseInt(price).toLocaleString() : '0';
+            
+            return {
+                "type": "bubble",
+                "size": "mega",
+                "header": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
+                        { "type": "text", "text": "RESERVATION CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center" }
+                    ],
+                    "paddingBottom": "none"
+                },
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
+                        { "type": "text", "text": `${config.icon} ${service}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A" },
+                        { "type": "separator", "margin": "md" },
+                        {
+                            "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
+                            "contents": [
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "LINE名稱", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": lineName, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡姓名", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": contactName, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": phone, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": date, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold", "color": "#C69C6D" } ] },
+                                { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ 
+                                    { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" },
+                                    { "type": "text", "text": location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } 
+                                ] }
+                            ]
+                        },
+                         { "type": "separator", "margin": "xl" },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "xl",
+                            "contents": [
+                                { "type": "text", "text": "總計金額", "size": "md", "color": "#4A4A4A", "gravity": "center", "weight": "bold" },
+                                { "type": "text", "text": `NT$ ${displayPrice}`, "size": "xl", "align": "end", "color": "#C69C6D", "weight": "bold" }
+                            ]
+                        }
+                    ]
+                },
+                "footer": {
+                    "type": "box", "layout": "vertical", "contents": [
+                        { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" }
+                    ]
+                },
+                "styles": { "footer": { "separator": true } }
             };
         }
 
-        async function sendConfirmMessage() {
-            event.preventDefault();
-            const toId = document.getElementById('cust-to-id').value;
-            if (!toId) return Swal.fire('錯誤', '客戶 ID 遺失', 'error');
+        async function submitToMake() {
+            const fields = ['cust-service', 'line-name', 'cust-name', 'cust-phone', 'cust-date', 'cust-time', 'cust-location', 'cust-price'];
+            for (const f of fields) {
+                if (!document.getElementById(f).value) return Swal.fire('請填寫完整', '所有欄位均為必填', 'warning');
+            }
 
             Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
+            const service = document.getElementById('cust-service').value;
+            const flexContent = buildProfessionalFlex(
+                service,
+                document.getElementById('line-name').value,
+                document.getElementById('cust-name').value,
+                document.getElementById('cust-phone').value,
+                document.getElementById('cust-date').value,
+                document.getElementById('cust-time').value,
+                document.getElementById('cust-location').value,
+                document.getElementById('cust-oid').value,
+                document.getElementById('cust-price').value
+            );
+
             const payload = {
-                to: toId,
-                orderId: document.getElementById('cust-oid').value,
+                to: document.getElementById('cust-to-id').value,
+                service: service,
                 clientName: document.getElementById('cust-name').value,
-                service: document.getElementById('cust-service').value,
-                price: document.getElementById('cust-price').value,
-                message: buildFlexMessage(
-                    document.getElementById('cust-oid').value,
-                    document.getElementById('cust-name').value,
-                    document.getElementById('cust-service').value,
-                    document.getElementById('cust-date').value,
-                    document.getElementById('cust-time').value,
-                    document.getElementById('cust-price').value,
-                    document.getElementById('cust-phone').value,
-                    document.getElementById('cust-location').value
-                )
+                message: {
+                    type: 'flex',
+                    altText: `🛎️ 您的${service}預約已確認成功！`,
+                    contents: flexContent
+                }
             };
 
             try {
                 const response = await fetch(WEBHOOK_URL, {
                     method: 'POST',
+                    mode: 'cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
-                if (response.ok) Swal.fire('發送成功', '通知已送達', 'success');
-                else throw new Error('Server Error');
+
+                if (response.ok) {
+                    Swal.fire('發送成功！', '預約確認小卡已送出。', 'success');
+                } else {
+                    throw new Error('伺服器回傳錯誤');
+                }
             } catch (error) {
-                Swal.fire('發送失敗', error.message, 'error');
+                Swal.fire('發送失敗', '原因: ' + error.message, 'error');
             }
-            return false;
         }
     </script>
 </body>
