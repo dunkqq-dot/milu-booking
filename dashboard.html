@@ -26,6 +26,8 @@
         .active-item { background-color: #FDFbf7; border-left: 4px solid #C69C6D; }
         [v-cloak] { display: none; }
         .debug-modal pre { white-space: pre-wrap; word-wrap: break-word; font-size: 11px; color: #333; max-height: 400px; overflow-y: auto; background: #f1f1f1; padding: 15px; border-radius: 5px; text-align: left; }
+        /* 輸入框聚焦效果 */
+        .price-input:focus { border-color: #C69C6D; background-color: #fff; }
     </style>
 </head>
 <body id="app" v-cloak>
@@ -48,10 +50,11 @@
                 <div v-if="errorMsg" class="mt-2 p-2 bg-red-50 text-red-500 text-xs rounded border border-red-100 break-words">{{ errorMsg }}</div>
             </div>
 
-            <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0">
-                <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all">全部</button>
-                <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all">未付款</button>
-                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all">已確認</button>
+            <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto">
+                <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">全部</button>
+                <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">未付款</button>
+                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已確認</button>
+                <button @click="filter = 'CANCELED'" :class="filter === 'CANCELED' ? 'bg-white text-gray-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已取消</button>
             </div>
 
             <div class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
@@ -64,8 +67,13 @@
                     <div class="flex justify-between items-start mb-2">
                         <span class="text-xs font-mono text-gray-400 bg-gray-100 px-1 rounded">#{{ order.oid }}</span>
                         <span class="text-[10px] px-2 py-1 rounded-full font-bold"
-                              :class="order.status === 'CONFIRMED' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'">
-                            {{ order.status === 'CONFIRMED' ? '已確認' : '未付款' }}
+                              :class="{
+                                  'bg-green-100 text-green-600': order.status === 'CONFIRMED',
+                                  'bg-red-100 text-red-500': order.status === 'UNPAID',
+                                  'bg-gray-200 text-gray-600': order.status === 'CANCELED',
+                                  'bg-yellow-100 text-yellow-600': order.status === 'REFUNDED'
+                              }">
+                            {{ getStatusText(order.status) }}
                         </span>
                     </div>
                     <div class="flex justify-between items-center">
@@ -75,6 +83,13 @@
                     <div class="flex items-center text-xs text-gray-500 mt-2 gap-3">
                         <span class="flex items-center gap-1">📅 {{ order.date }}</span>
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
+                    </div>
+                    <!-- 列表顯示尾款狀態 -->
+                    <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.rawPrice > 0 && order.status !== 'CANCELED'">
+                        <span class="text-xs text-gray-400">總額: ${{order.rawPrice}}</span>
+                        <span class="text-xs font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500'">
+                            {{ (order.rawPrice - order.receivedPrice) > 0 ? `尚欠: $${order.rawPrice - order.receivedPrice}` : '已付清' }}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -91,21 +106,37 @@
                 <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-md">
                     
                     <div class="h-28 flex items-center justify-center transition-colors duration-300"
-                         :class="selectedOrder.status === 'CONFIRMED' ? 'bg-[#10B981]' : 'bg-[#EF4444]'">
+                         :class="{
+                             'bg-[#10B981]': selectedOrder.status === 'CONFIRMED',
+                             'bg-[#EF4444]': selectedOrder.status === 'UNPAID',
+                             'bg-gray-500': selectedOrder.status === 'CANCELED',
+                             'bg-yellow-500': selectedOrder.status === 'REFUNDED'
+                         }">
                         <div class="text-center text-white">
-                            <div class="text-4xl mb-1">{{ selectedOrder.status === 'CONFIRMED' ? '✓' : '!' }}</div>
+                            <div class="text-4xl mb-1">
+                                <i v-if="selectedOrder.status === 'CONFIRMED'" class="fa-solid fa-circle-check"></i>
+                                <i v-else-if="selectedOrder.status === 'CANCELED'" class="fa-solid fa-circle-xmark"></i>
+                                <i v-else-if="selectedOrder.status === 'REFUNDED'" class="fa-solid fa-money-bill-transfer"></i>
+                                <i v-else class="fa-solid fa-circle-exclamation"></i>
+                            </div>
                             <h2 class="text-lg font-bold tracking-widest opacity-90">
-                                {{ selectedOrder.status === 'CONFIRMED' ? 'PAYMENT CONFIRMED' : 'WAITING FOR PAYMENT' }}
+                                {{ getStatusText(selectedOrder.status, true) }}
                             </h2>
                         </div>
                     </div>
 
                     <div class="p-8 space-y-6">
+                        <!-- 客戶資訊 -->
                         <div class="flex justify-between border-b border-gray-100 pb-4">
                             <div>
                                 <p class="text-xs text-gray-400 mb-1">CUSTOMER</p>
                                 <p class="font-bold text-xl text-gray-800">{{ selectedOrder.clientName }}</p>
-                                <p class="text-xs text-gray-500 mt-1 font-mono">{{ selectedOrder.userId ? 'ID已綁定' : '未綁定ID (無法自動發送)' }}</p>
+                                <div class="flex flex-col gap-1 mt-1">
+                                    <p class="text-xs text-gray-600 flex items-center gap-1">
+                                        <i class="fa-solid fa-phone"></i> {{ selectedOrder.phone }}
+                                    </p>
+                                    <p class="text-xs text-gray-400 font-mono">{{ selectedOrder.userId ? 'ID已綁定' : '未綁定ID' }}</p>
+                                </div>
                             </div>
                             <div class="text-right">
                                 <p class="text-xs text-gray-400 mb-1">SERVICE</p>
@@ -113,6 +144,7 @@
                             </div>
                         </div>
 
+                        <!-- 時間日期 -->
                         <div class="grid grid-cols-2 gap-4">
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                 <p class="text-xs text-gray-400 mb-1">DATE</p>
@@ -124,37 +156,59 @@
                             </div>
                         </div>
                         
-                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center transition-colors focus-within:border-milu-gold focus-within:ring-1 focus-within:ring-milu-gold">
-                             <div>
-                                <p class="text-xs text-gray-400 mb-1">TOTAL (填寫金額)</p>
+                        <!-- 款項明細 -->
+                        <div class="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <p class="text-xs text-gray-500 font-bold">總金額</p>
                                 <div class="flex items-center">
-                                    <span class="font-bold text-xl text-gray-800 mr-1">NT$</span>
+                                    <span class="text-xs text-gray-400 mr-1">NT$</span>
                                     <input type="number" v-model="selectedOrder.rawPrice" 
-                                           class="font-bold text-xl text-gray-800 bg-transparent border-b border-gray-300 w-28 focus:outline-none focus:border-milu-gold placeholder-gray-300" 
+                                           class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none" 
                                            placeholder="0">
-                                    <!-- 新增：金額旁的儲存按鈕 -->
-                                    <button @click.stop="confirmPaymentAndSend" class="ml-2 text-xs bg-white border border-gray-300 text-gray-500 hover:text-milu-gold hover:border-milu-gold px-3 py-1 rounded-lg transition-colors shadow-sm" title="更新金額並發送通知">
-                                        <i class="fa-solid fa-floppy-disk"></i> 儲存
-                                    </button>
                                 </div>
-                             </div>
-                             <div class="text-right">
-                                <p class="text-xs text-gray-400 mb-1">PHONE</p>
-                                <p class="font-bold text-gray-600 text-sm">{{ selectedOrder.phone }}</p>
-                             </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <p class="text-xs text-green-600 font-bold">已收款</p>
+                                <div class="flex items-center">
+                                    <span class="text-xs text-green-600 mr-1">NT$</span>
+                                    <input type="number" v-model="selectedOrder.receivedPrice" 
+                                           class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" 
+                                           placeholder="0">
+                                </div>
+                            </div>
+                            <div class="border-t border-yellow-200 pt-2 flex justify-between items-center">
+                                <p class="text-xs text-red-500 font-bold">尚欠尾款</p>
+                                <p class="font-bold text-xl text-red-500">
+                                    NT$ {{ selectedOrder.rawPrice - selectedOrder.receivedPrice }}
+                                </p>
+                            </div>
                         </div>
                         
+                        <!-- 地址 -->
                         <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                              <p class="text-xs text-gray-400 mb-1">ADDRESS / STORE</p>
                              <p class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
                         </div>
 
+                        <!-- 按鈕區塊 (主要操作) -->
                         <div class="pt-2 space-y-3">
-                            <button @click="confirmPaymentAndSend" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-3.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg active:scale-95">
+                            <!-- 1. 確認收款 -->
+                            <button @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-3.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg active:scale-95">
                                 <i class="fa-solid fa-check-circle"></i> 確認收款並發送通知
                             </button>
+                            
+                            <!-- 2. 其他操作 (取消/退款) -->
+                            <div class="flex gap-2">
+                                <button @click="updateOrderStatus('REFUND')" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
+                                    <i class="fa-solid fa-money-bill-transfer"></i> 辦理退款
+                                </button>
+                                <button @click="updateOrderStatus('CANCEL')" class="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
+                                    <i class="fa-solid fa-ban"></i> 取消訂單
+                                </button>
+                            </div>
+
                             <p class="text-center text-xs text-gray-400 pt-2">
-                                * 點擊按鈕將：更新試算表(金額/狀態) + 發送 LINE 通知
+                                * 點擊按鈕將同步更新試算表與發送 LINE 通知
                             </p>
                         </div>
                     </div>
@@ -170,7 +224,7 @@
 
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
-        const MOCK_RESERVATIONS = [{ id: 'mock1', clientName: '範例資料', phone: '-', service: '系統測試', date: '2025-01-01', time: '12:00', status: 'UNPAID', oid: 'M0000', rawPrice: '0', location: '資料讀取失敗' }];
+        const MOCK_RESERVATIONS = [{ id: 'mock1', clientName: '範例資料', phone: '-', service: '系統測試', date: '2025-01-01', time: '12:00', status: 'UNPAID', oid: 'M0000', rawPrice: '3000', receivedPrice: '1000', location: '資料讀取失敗' }];
 
         createApp({
             setup() {
@@ -211,7 +265,10 @@
 
                         const formattedData = data.map((item, index) => {
                             const rawStatus = getKey(item, ['11', 'K', 'Column K', 'status']);
-                            const isConfirmed = rawStatus.includes('已確認') || rawStatus.includes('已付款') || rawStatus.includes('OK');
+                            let status = 'UNPAID';
+                            if (rawStatus.includes('已確認') || rawStatus.includes('已付款') || rawStatus.includes('OK')) status = 'CONFIRMED';
+                            else if (rawStatus.includes('取消')) status = 'CANCELED';
+                            else if (rawStatus.includes('退款')) status = 'REFUNDED';
 
                             return {
                                 id: index.toString(), 
@@ -222,8 +279,9 @@
                                 time: getKey(item, ['16', '5', 'Q', 'time']) || '',          
                                 phone: getKey(item, ['9', 'G', 'phone']) || '',         
                                 userId: getKey(item, ['10', 'L', 'userId']) || '',        
-                                status: isConfirmed ? 'CONFIRMED' : 'UNPAID', 
-                                rawPrice: getKey(item, ['12', 'M', 'price']) || '0',
+                                status: status, 
+                                rawPrice: getKey(item, ['12', 'M', 'price']) || '0', 
+                                receivedPrice: getKey(item, ['13', 'N', 'received']) || '0', 
                                 location: getKey(item, ['6', 'F', 'address', 'location']) || '無地址'
                             };
                         }).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -247,11 +305,58 @@
                     loading.value = false;
                 };
 
-                const confirmPaymentAndSend = async () => {
+                const getStatusText = (status, isEnglish = false) => {
+                    if (isEnglish) {
+                        switch(status) {
+                            case 'CONFIRMED': return 'PAYMENT CONFIRMED';
+                            case 'CANCELED': return 'ORDER CANCELED';
+                            case 'REFUNDED': return 'ORDER REFUNDED';
+                            default: return 'WAITING FOR PAYMENT';
+                        }
+                    }
+                    switch(status) {
+                        case 'CONFIRMED': return '已確認';
+                        case 'CANCELED': return '已取消';
+                        case 'REFUNDED': return '已退款';
+                        default: return '未付款';
+                    }
+                };
+
+                // 統一發送函式：支援 確認、取消、退款
+                const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
                     if (!order || !order.userId) return Swal.fire('錯誤', '無 User ID', 'error');
+
+                    let statusText = '';
+                    let statusColor = '';
+                    let altText = '';
+                    let titleText = '';
+                    let descText = '';
+
+                    // 定義不同狀態的參數
+                    if (actionType === 'CONFIRM') {
+                        statusText = '✅ 已付款';
+                        statusColor = '#10B981'; // Green
+                        altText = `✅ 您的${order.service}預約已確認！`;
+                        titleText = 'PAYMENT CONFIRMED';
+                        descText = '預約確認成功';
+                    } else if (actionType === 'CANCEL') {
+                        statusText = '❌ 已取消';
+                        statusColor = '#EF4444'; // Red
+                        altText = `❌ 您的${order.service}預約已取消`;
+                        titleText = 'ORDER CANCELED';
+                        descText = '預約已取消';
+                    } else if (actionType === 'REFUND') {
+                        statusText = '💸 已退款';
+                        statusColor = '#EAB308'; // Yellow
+                        altText = `💸 您的${order.service}退款已完成`;
+                        titleText = 'REFUND COMPLETED';
+                        descText = '退款辦理完成';
+                    }
                     
-                    Swal.fire({ title: '處理中...', text: '正在更新試算表並發送通知', didOpen: () => Swal.showLoading() });
+                    Swal.fire({ title: '處理中...', text: `正在變更狀態為：${statusText}`, didOpen: () => Swal.showLoading() });
+
+                    const balance = order.rawPrice - order.receivedPrice;
 
                     const payload = {
                         to: order.userId, 
@@ -259,21 +364,50 @@
                         clientName: order.clientName, 
                         service: order.service, 
                         price: order.rawPrice, 
+                        received: order.receivedPrice,
+                        balance: balance,
                         date: order.date, 
                         time: order.time, 
                         phone: order.phone, 
                         location: order.location,
-                        status: '✅ 已付款', // 新增狀態
-                        message: { type: 'flex', altText: `✅ 您的${order.service}預約已確認！`, contents: {} } 
+                        status: statusText, // 傳送給 Make 用於更新試算表
+                        // Flex Message 結構
+                        message: { 
+                            type: 'flex', 
+                            altText: altText, 
+                            contents: {
+                                "type": "bubble",
+                                "size": "mega",
+                                "body": {
+                                    "type": "box",
+                                    "layout": "vertical",
+                                    "contents": [
+                                        { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" },
+                                        { "type": "text", "text": descText, "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
+                                        { "type": "separator", "margin": "xxl" },
+                                        {
+                                            "type": "box", "layout": "vertical", "margin": "xxl", "spacing": "sm",
+                                            "contents": [
+                                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "姓名", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": order.clientName, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" } ] },
+                                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "項目", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": order.service, "size": "sm", "color": "#111111", "align": "end" } ] },
+                                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": order.date, "size": "sm", "color": "#111111", "align": "end" } ] }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            } 
+                        } 
                     };
                     
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         
                         // 樂觀更新 UI
-                        order.status = 'CONFIRMED';
+                        if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
+                        else if (actionType === 'CANCEL') order.status = 'CANCELED';
+                        else if (actionType === 'REFUND') order.status = 'REFUNDED';
                         
-                        Swal.fire('成功', `已確認收款 NT$${order.rawPrice} 並發送通知！`, 'success');
+                        Swal.fire('成功', `${descText} 通知已發送！`, 'success');
                     } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
                 };
 
@@ -288,11 +422,16 @@
                 const selectOrder = (order) => { selectedOrder.value = order; };
                 const filteredList = computed(() => {
                     if (filter.value === 'ALL') return reservations.value;
-                    return reservations.value.filter(r => r.status === filter.value);
+                    return reservations.value.filter(r => {
+                        if (filter.value === 'UNPAID') return r.status === 'UNPAID';
+                        if (filter.value === 'CONFIRMED') return r.status === 'CONFIRMED';
+                        if (filter.value === 'CANCELED') return r.status === 'CANCELED' || r.status === 'REFUNDED';
+                        return true;
+                    });
                 });
 
                 onMounted(() => { fetchData(); setInterval(fetchData, 300000); });
-                return { reservations, selectedOrder, filter, loading, errorMsg, filteredList, selectOrder, fetchData, confirmPaymentAndSend, showDebug };
+                return { reservations, selectedOrder, filter, loading, errorMsg, filteredList, selectOrder, fetchData, confirmPaymentAndSend: () => updateOrderStatus('CONFIRM'), updateOrderStatus, getStatusText, showDebug };
             }
         }).mount('#app');
     </script>
