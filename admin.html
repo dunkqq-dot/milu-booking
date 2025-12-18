@@ -32,7 +32,7 @@
             <select id="cust-service" class="input-style" onchange="updateDynamicLabels()" required>
                 <option value="專人佈置">✨ 專人佈置</option>
                 <option value="門市自取">🛍️ 門市自取</option>
-                <option value="後車廂佈置">🚗 後車廂佈置</option>
+                <option value="後車廂驚喜">🚗 後車廂驚喜</option>
                 <option value="氣球外送">🚚 氣球外送</option>
             </select>
 
@@ -89,7 +89,7 @@
         const configMap = {
             '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
             '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
-            '後車廂佈置': { time: '抵達工作室時間', location: '佈置工作室地點', icon: '🚗' },
+            '後車廂驚喜': { time: '抵達工作室時間', location: '佈置工作室地點', icon: '🚗' },
             '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
 
@@ -124,7 +124,7 @@
             if (serviceFromUrl) {
                 let mappedService = serviceFromUrl;
                 if (serviceFromUrl === '工作室自取') mappedService = '門市自取'; 
-                if (serviceFromUrl === '後車廂驚喜') mappedService = '後車廂佈置';
+                if (serviceFromUrl === '後車廂佈置') mappedService = '後車廂驚喜'; // 修正對應
 
                 const select = document.getElementById('cust-service');
                 for(let i=0; i<select.options.length; i++) {
@@ -185,10 +185,13 @@
                     ]
                 },
                 "footer": {
-                    "type": "box", "layout": "vertical", "contents": [
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
                         { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" }
                     ]
-                }
+                },
+                "styles": { "footer": { "separator": true } }
             };
         }
 
@@ -217,8 +220,7 @@
                 to: document.getElementById('cust-to-id').value,
                 service: service,
                 clientName: document.getElementById('cust-name').value,
-                // ✅ 關鍵修改：將 flexContent 放在這裡傳給 Make，方便 Make 抓取
-                flexContents: flexContent,
+                flexContents: flexContent, // 確保傳送 flexContents 讓 Make 更容易抓取
                 price: document.getElementById('cust-price').value,
                 message: {
                     type: 'flex',
@@ -247,45 +249,3 @@
     </script>
 </body>
 </html>
-```
-
----
-
-### ⚠️ 更新後，請務必修改 Make 設定
-
-因為我們在 JSON 裡新增了一個變數 `flexContents`，您需要告訴 Make 去抓這個變數。
-
-**請依照以下步驟修改 Make：**
-
-#### 1. 更新 Parse JSON (模組 2) 的資料結構
-1.  點開模組 2。
-2.  點擊 **Data structure** > **Edit** > **Generate**。
-3.  貼入這段新的 JSON (加入了 `flexContents`)：
-
-```json
-{
-  "to": "U12345...",
-  "service": "專人佈置",
-  "clientName": "王小美",
-  "flexContents": {},  // 👈 這就是我們新增的欄位
-  "message": { "type": "flex", "altText": "msg", "contents": {} }
-}
-```
-
-#### 2. 更新 HTTP (模組 3) 的 Request content
-1.  點開 HTTP 模組。
-2.  修改 **Request content** 欄位。
-3.  將 `contents` 的值，改成選取 **`2. flexContents`** 變數。
-
-**JSON 應該長這樣：**
-```json
-{
-  "to": "{{2.to}}",
-  "messages": [
-    {
-      "type": "flex",
-      "altText": "{{2.message.altText}}",
-      "contents": {{2.flexContents}}  // 👈 這裡改成選 flexContents
-    }
-  ]
-}
