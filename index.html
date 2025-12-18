@@ -52,7 +52,7 @@
             <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto">
                 <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">全部</button>
                 <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">未付款</button>
-                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已付款</button>
+                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已確認</button>
                 <button @click="filter = 'CANCELED'" :class="filter === 'CANCELED' ? 'bg-white text-gray-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已取消</button>
             </div>
 
@@ -328,9 +328,9 @@
                         }
                     }
                     switch(status) {
-                        case 'CONFIRMED': return '已付款'; // 修改為 '已付款'
+                        case 'CONFIRMED': return '已付款'; 
                         case 'CANCELED': return '已取消';
-                        case 'REFUNDED': return '已退款';
+                        case 'REFUND': return '已退款';
                         default: return '未付款';
                     }
                 };
@@ -340,13 +340,20 @@
                     return config[type] || (type === 'time' ? '時間' : '地點');
                 };
 
-                // 建立 Flex 卡片 (已移除 letterSpacing)
-                const buildRichFlexMessage = (service, name, oid, date, time, price, phone, location, actionType) => {
+                // 建立 Flex 卡片 (新增 receivedPrice, balance 參數)
+                const buildRichFlexMessage = (service, name, oid, date, time, price, received, phone, location, actionType) => {
                     const config = configMap[service] || configMap['專人佈置'];
-                    const displayPrice = parseInt(price).toLocaleString();
+                    // 數值轉換
+                    const total = parseInt(price) || 0;
+                    const paid = parseInt(received) || 0;
+                    const balance = total - paid;
+                    
+                    const displayTotal = total.toLocaleString();
+                    const displayPaid = paid.toLocaleString();
+                    const displayBalance = balance.toLocaleString();
                     
                     let titleText = 'PAYMENT CONFIRMED';
-                    let descText = '預約與款項已確認'; // 修改為 '預約與款項已確認'
+                    let descText = '預約與款項已確認'; 
                     let statusColor = '#10B981';
 
                     if (actionType === 'CANCEL') {
@@ -370,12 +377,14 @@
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
-                                { "type": "text", "text": `${config.icon} ${service} ${descText}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A", "wrap": true },
+                                { "type": "text", "text": `${config.icon} ${service}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A", "wrap": true },
+                                { "type": "text", "text": descText, "size": "sm", "color": "#999999", "align": "center", "margin": "xs" },
                                 { "type": "separator", "margin": "md" },
                                 {
                                     "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
                                     "contents": [
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": name, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "服務項目", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": service, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": phone, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": date, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold", "color": "#C69C6D" } ] },
@@ -386,13 +395,16 @@
                                     ]
                                 },
                                 { "type": "separator", "margin": "xl" },
+                                // 金額明細區塊
                                 {
                                     "type": "box",
-                                    "layout": "horizontal",
-                                    "margin": "xl",
+                                    "layout": "vertical",
+                                    "margin": "lg",
+                                    "spacing": "xs",
                                     "contents": [
-                                        { "type": "text", "text": "總計金額", "size": "md", "color": "#4A4A4A", "gravity": "center", "weight": "bold" },
-                                        { "type": "text", "text": `NT$ ${displayPrice}`, "size": "xl", "align": "end", "color": "#C69C6D", "weight": "bold" }
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "總計金額", "size": "sm", "color": "#aaaaaa" }, { "type": "text", "text": `NT$ ${displayTotal}`, "size": "sm", "color": "#666666", "align": "end" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "已收款", "size": "sm", "color": "#10B981" }, { "type": "text", "text": `NT$ ${displayPaid}`, "size": "sm", "color": "#10B981", "align": "end", "weight": "bold" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "尚欠尾款", "size": "md", "color": "#EF4444", "weight": "bold" }, { "type": "text", "text": `NT$ ${displayBalance}`, "size": "xl", "color": "#EF4444", "align": "end", "weight": "bold" } ] }
                                     ]
                                 }
                             ]
@@ -411,7 +423,7 @@
                     if (!order || !order.userId) return Swal.fire('錯誤', '無 User ID', 'error');
 
                     let statusText = '';
-                    if (actionType === 'CONFIRM') statusText = '✅ 已付款'; // 修改為 '✅ 已付款'
+                    if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
                     else if (actionType === 'CANCEL') statusText = '❌ 已取消';
                     else if (actionType === 'REFUND') statusText = '💸 已退款';
                     
@@ -420,7 +432,7 @@
                     const balance = order.rawPrice - order.receivedPrice;
 
                     // 使用 buildRichFlexMessage 產生卡片
-                    const flexContent = buildRichFlexMessage(order.service, order.clientName, order.oid, order.date, order.time, order.rawPrice, order.phone, order.location, actionType);
+                    const flexContent = buildRichFlexMessage(order.service, order.clientName, order.oid, order.date, order.time, order.rawPrice, order.receivedPrice, order.phone, order.location, actionType);
 
                     const payload = {
                         to: order.userId, 
@@ -435,13 +447,11 @@
                         phone: order.phone, 
                         location: order.location,
                         status: statusText,
-                        // 這裡將 flexContent 放入 message 中
                         message: { 
                             type: 'flex', 
                             altText: `通知：${order.service} ${statusText}`, 
                             contents: flexContent 
                         },
-                        // 同時傳送 flexContents 以防 Make 需要 (相容舊設定)
                         flexContents: flexContent
                     };
                     
