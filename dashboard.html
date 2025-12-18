@@ -49,17 +49,16 @@
                         <p class="text-xs text-gray-400 mt-1">即時預約管理系統</p>
                     </div>
                     <div class="flex gap-2">
-                        <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷資料</button>
+                        <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
                         <div class="text-xs px-2 py-1 bg-white rounded text-gray-400 border" v-if="loading">更新中...</div>
-                        <button @click="fetchData" v-else class="text-gray-400 hover:text-milu-gold transition"><i class="fa-solid fa-rotate-right"></i></button>
+                        <button @click="fetchData" v-else class="text-gray-400 hover:text-milu-gold transition" title="手動刷新"><i class="fa-solid fa-rotate-right"></i></button>
                     </div>
                 </div>
                 
                 <!-- 錯誤訊息提示區 -->
                 <div v-if="errorMsg" class="mt-2 p-2 bg-red-50 text-red-500 text-xs rounded border border-red-100 break-words">
-                    <p class="font-bold mb-1">⚠️ 連線狀況：</p>
+                    <p class="font-bold mb-1">⚠️ 資料讀取失敗：</p>
                     {{ errorMsg }}
-                    <p class="mt-1 text-gray-400">(目前顯示範例資料)</p>
                 </div>
             </div>
 
@@ -74,7 +73,8 @@
             <div class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
                 <div v-if="filteredList.length === 0" class="text-center py-10 text-gray-400 text-sm">
                     沒有相關訂單<br>
-                    <span class="text-xs opacity-50">(請確認 Make 回傳資料是否為空)</span>
+                    <span class="text-xs opacity-50" v-if="!errorMsg">(請確認 Google Sheets 是否有資料)</span>
+                    <span class="text-xs text-red-400" v-else>(目前顯示範例資料模式)</span>
                 </div>
 
                 <div v-for="order in filteredList" :key="order.oid" @click="selectOrder(order)" 
@@ -194,15 +194,17 @@
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
 
-        // Mock Data
+        // Mock Data: 確保介面在出錯時仍有東西顯示
         const MOCK_RESERVATIONS = [
             { id: 'mock1', clientName: '王小美 (範例)', phone: '0912-345-678', service: '專人佈置', date: '2025-12-25', time: '14:30', status: 'UNPAID', oid: 'M0001', rawPrice: '3000', location: '台北市信義區...' },
+            { id: 'mock2', clientName: '陳大明 (範例)', phone: '0988-111-222', service: '氣球外送', date: '2025-12-26', time: '10:00', status: 'CONFIRMED', oid: 'M0002', rawPrice: '1500', location: '新北市板橋區...' },
         ];
 
         createApp({
             setup() {
                 // ✅ Make API Webhook URL
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
+                // ✅ 發送通知用的 Webhook (Make: OA Sender)
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
 
                 const reservations = ref([]);
@@ -210,9 +212,8 @@
                 const filter = ref('ALL');
                 const loading = ref(true);
                 const errorMsg = ref(null);
-                const rawJsonData = ref(null); // 儲存原始資料供診斷
+                const rawJsonData = ref(null);
 
-                // 讀取資料
                 const fetchData = async () => {
                     loading.value = true;
                     errorMsg.value = null;
@@ -230,25 +231,27 @@
                         try {
                             data = JSON.parse(textData);
                         } catch (e) {
-                            if (textData.trim() === "Accepted") throw new Error("Make 回傳 'Accepted'。請檢查 Make 劇本是否已開啟 (ON)。");
+                            if (textData.trim() === "Accepted") {
+                                throw new Error("Make 回傳 'Accepted' (無資料)。請檢查 Make 劇本是否 ON，且最後一個模組是 'Webhook Response'。");
+                            }
                             throw new Error("Make 回傳格式錯誤 (非 JSON)。");
                         }
                         
-                        rawJsonData.value = data; // 儲存原始資料以便診斷
+                        rawJsonData.value = data;
 
-                        // 🔄 資料轉換 (重要：請檢查這裡的欄位對應)
+                        // 🔄 資料轉換
                         const formattedData = data.map((item, index) => ({
                             id: index.toString(), 
                             oid: item['A'] || `M-${index}`,      
-                            clientName: item['D'] || item['Name'] || '未知', 
-                            service: item['C'] || item['Service'] || '服務',    
-                            date: (item['P'] || item['Date'] || '').split('T')[0],
-                            time: item['Q'] || item['Time'] || '',          
-                            phone: item['G'] || item['Phone'] || '',         
-                            userId: item['L'] || item['UserID'] || '',        
-                            status: (JSON.stringify(item).includes('已付款')) ? 'CONFIRMED' : 'UNPAID', // 寬鬆判斷狀態
-                            rawPrice: item['M'] || item['Price'] || '0',
-                            location: item['F'] || item['Address'] || '無地址'
+                            clientName: item['D'] || item['C'] || '未知客戶', 
+                            service: item['C'] || item['D'] || '服務',    
+                            date: (item['P'] || '').split('T')[0],
+                            time: item['Q'] || '',          
+                            phone: item['G'] || '',         
+                            userId: item['L'] || '',        
+                            status: (JSON.stringify(item).includes('已付款')) ? 'CONFIRMED' : 'UNPAID', 
+                            rawPrice: item['M'] || '0',
+                            location: item['F'] || '無地址'
                         })).sort((a, b) => new Date(b.date) - new Date(a.date));
 
                         reservations.value = formattedData;
@@ -258,6 +261,7 @@
                         }
                     } catch (e) {
                         console.error("Fetch Error:", e);
+                        // 載入失敗時顯示範例資料
                         reservations.value = MOCK_RESERVATIONS;
                         if (!selectedOrder.value) selectedOrder.value = MOCK_RESERVATIONS[0];
                         
@@ -270,7 +274,6 @@
                     loading.value = false;
                 };
 
-                // 發送通知
                 const sendNotification = async () => {
                     const order = selectedOrder.value;
                     if (!order || !order.userId) return Swal.fire('錯誤', '無 User ID', 'error');
@@ -320,7 +323,7 @@
 
                 onMounted(() => {
                     fetchData();
-                    setInterval(fetchData, 30000); 
+                    setInterval(fetchData, 300000); 
                 });
 
                 return {
