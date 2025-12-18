@@ -225,7 +225,7 @@
         const { createApp, ref, computed, onMounted } = Vue;
         const MOCK_RESERVATIONS = [{ id: 'mock1', clientName: '範例資料', phone: '-', service: '系統測試', date: '2025-01-01', time: '12:00', status: 'UNPAID', oid: 'M0000', rawPrice: '3000', receivedPrice: '1000', location: '資料讀取失敗' }];
 
-        // 服務對應設定 (移植自 admin.html)
+        // 服務對應設定
         const configMap = {
             '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
             '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
@@ -340,7 +340,7 @@
                     return config[type] || (type === 'time' ? '時間' : '地點');
                 };
 
-                // 建立 Flex 卡片 (移植自 admin.html)
+                // 建立 Flex 卡片 (移除 letterSpacing)
                 const buildRichFlexMessage = (service, name, oid, date, time, price, phone, location, actionType) => {
                     const config = configMap[service] || configMap['專人佈置'];
                     const displayPrice = parseInt(price).toLocaleString();
@@ -364,7 +364,7 @@
                         "size": "mega",
                         "header": {
                             "type": "box", "layout": "vertical",
-                            "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ],
+                            "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ],
                             "paddingBottom": "none"
                         },
                         "body": {
@@ -401,8 +401,7 @@
                             "type": "box", "layout": "vertical", "contents": [
                                 { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" }
                             ]
-                        },
-                        "styles": { "footer": { "separator": true } }
+                        }
                     };
                 };
 
@@ -419,7 +418,6 @@
 
                     const balance = order.rawPrice - order.receivedPrice;
 
-                    // 使用 buildRichFlexMessage 產生卡片
                     const flexContent = buildRichFlexMessage(order.service, order.clientName, order.oid, order.date, order.time, order.rawPrice, order.phone, order.location, actionType);
 
                     const payload = {
@@ -435,20 +433,17 @@
                         phone: order.phone, 
                         location: order.location,
                         status: statusText,
-                        // 這裡將 flexContent 放入 message 中
                         message: { 
                             type: 'flex', 
                             altText: `通知：${order.service} ${statusText}`, 
                             contents: flexContent 
                         },
-                        // 同時傳送 flexContents 以防 Make 需要 (相容舊設定)
                         flexContents: flexContent
                     };
                     
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         
-                        // 樂觀更新 UI
                         if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                         else if (actionType === 'CANCEL') order.status = 'CANCELED';
                         else if (actionType === 'REFUND') order.status = 'REFUNDED';
