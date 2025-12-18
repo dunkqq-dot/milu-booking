@@ -129,6 +129,7 @@
                                 <p class="text-xs text-gray-400 mb-1">TOTAL (填寫金額)</p>
                                 <div class="flex items-center">
                                     <span class="font-bold text-xl text-gray-800 mr-1">NT$</span>
+                                    <!-- 這裡改成了輸入框 -->
                                     <input type="number" v-model="selectedOrder.rawPrice" 
                                            class="font-bold text-xl text-gray-800 bg-transparent border-b border-gray-300 w-32 focus:outline-none focus:border-milu-gold placeholder-gray-300" 
                                            placeholder="0">
@@ -171,7 +172,8 @@
         createApp({
             setup() {
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
-                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
+                // ✅ 更新後的 Webhook URL (發送+更新試算表)
+                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/obyt3xy5jp4mp9lousp12kkaq4xcvakf';
 
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
@@ -220,9 +222,7 @@
                                 userId: getKey(item, ['10', 'L', 'userId']) || '',        
                                 status: isConfirmed ? 'CONFIRMED' : 'UNPAID', 
                                 rawPrice: getKey(item, ['12', 'M', 'price']) || '0',
-                                location: getKey(item, ['6', 'F', 'address', 'location']) || '無地址',
-                                // 保留原始 row number 以便回寫 (假設它是隱含的索引或需要 Make 搜尋)
-                                // 這裡我們傳送 oid 讓 Make 去搜尋比較保險
+                                location: getKey(item, ['6', 'F', 'address', 'location']) || '無地址'
                             };
                         }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
@@ -230,14 +230,12 @@
                         
                         if (selectedOrder.value) {
                              const updated = formattedData.find(r => r.oid === selectedOrder.value.oid);
-                             // 若正在編輯金額，不要覆蓋，否則用新資料
                              if (updated && document.activeElement.tagName !== 'INPUT') {
                                  selectedOrder.value = updated;
                              }
                         } else if (formattedData.length > 0) {
                              selectedOrder.value = formattedData[0];
                         }
-
                     } catch (e) {
                         console.error("Fetch Error:", e);
                         reservations.value = MOCK_RESERVATIONS;
@@ -258,12 +256,12 @@
                         orderId: order.oid, 
                         clientName: order.clientName, 
                         service: order.service, 
-                        price: order.rawPrice, // 傳送編輯後的金額
+                        price: order.rawPrice, 
                         date: order.date, 
                         time: order.time, 
                         phone: order.phone, 
                         location: order.location,
-                        status: '✅ 已付款', // 指示 Make 更新狀態
+                        status: '✅ 已付款', // 新增狀態
                         message: { type: 'flex', altText: `✅ 您的${order.service}預約已確認！`, contents: {} } 
                     };
                     
