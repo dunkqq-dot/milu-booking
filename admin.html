@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>收款確認發送器 | MILU Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     
@@ -46,7 +46,8 @@
             </div>
             <div class="input-group">
                 <label class="label">服務項目</label>
-                <select id="cust-service" class="input" required>
+                <!-- 加入 onchange 事件，切換服務時自動更新標籤 -->
+                <select id="cust-service" class="input" required onchange="updateLabels()">
                     <option value="專人佈置">✨ 專人佈置</option>
                     <option value="氣球外送">🚚 氣球外送</option>
                     <option value="後車廂驚喜">🚗 後車廂驚喜</option>
@@ -71,13 +72,13 @@
                     <input type="date" id="cust-date" class="input" required>
                 </div>
                 <div class="input-group">
-                    <label class="label">時間</label>
+                    <label id="label-time" class="label">時間</label>
                     <input type="text" id="cust-time" class="input" required>
                 </div>
             </div>
 
             <div class="input-group">
-                <label class="label">地點 / 地址</label>
+                <label id="label-location" class="label">地點 / 地址</label>
                 <input type="text" id="cust-location" class="input" placeholder="請輸入地址或門市" required>
             </div>
 
@@ -98,6 +99,14 @@
         const WEBHOOK_URL = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
         const LIFF_ID = '2004044468-KFCOlJSB'; 
 
+        // 定義各服務對應的顯示標籤
+        const SERVICE_CONFIG = {
+            '專人佈置': { time: '進場時間', location: '佈置地址' },
+            '氣球外送': { time: '外送時段', location: '外送地址' },
+            '後車廂驚喜': { time: '抵達時間', location: '施作地點' },
+            '工作室自取': { time: '取貨時間', location: '取貨門市' }
+        };
+
         window.onload = function() {
             liff.init({ liffId: LIFF_ID }).then(() => {
                 if (!liff.isLoggedIn()) { liff.login(); } else { parseUrlParams(); }
@@ -114,19 +123,32 @@
             document.getElementById('cust-to-id').value = params.get('to') || '';
             document.getElementById('cust-oid').value = params.get('oid') || '';
             document.getElementById('cust-name').value = params.get('name') || '';
-            document.getElementById('cust-service').value = params.get('service') || '專人佈置';
+            
+            const service = params.get('service') || '專人佈置';
+            document.getElementById('cust-service').value = service;
+            
             document.getElementById('cust-date').value = params.get('date') || '';
             document.getElementById('cust-time').value = params.get('time') || '';
             document.getElementById('cust-price').value = params.get('price') || '';
-            
-            // 新增：電話與地點
             document.getElementById('cust-phone').value = params.get('phone') || '';
             document.getElementById('cust-location').value = params.get('location') || '';
+
+            // 初始化標籤
+            updateLabels();
+        }
+
+        function updateLabels() {
+            const service = document.getElementById('cust-service').value;
+            const config = SERVICE_CONFIG[service] || { time: '時間', location: '地點 / 地址' };
+            
+            document.getElementById('label-time').innerText = config.time;
+            document.getElementById('label-location').innerText = config.location;
         }
 
         function buildFlexMessage(oid, name, service, date, time, price, phone, location) {
             const formattedPrice = price ? price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '待確認';
             const icon = { '專人佈置': '✨', '氣球外送': '🚚', '後車廂驚喜': '🚗', '工作室自取': '🛍️' }[service] || '✅';
+            const config = SERVICE_CONFIG[service] || { time: '時間', location: '地點' };
 
             return {
                 type: 'flex',
@@ -142,12 +164,16 @@
                             { "type": "text", "text": `${icon} ${service} 預約確認`, "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
                             { "type": "separator", "margin": "lg" },
                             {
-                                "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm",
+                                "type": "box",
+                                "layout": "vertical",
+                                "margin": "lg",
+                                "spacing": "sm",
                                 "contents": [
                                     { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": name, "size": "sm", "color": "#111111", "align": "end", "weight": "bold", "flex": 4 } ] },
                                     { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": phone, "size": "sm", "color": "#111111", "align": "end", "flex": 4 } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期時間", "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": date + ' ' + time, "size": "sm", "color": "#111111", "align": "end", "flex": 4 } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "地點", "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": location, "size": "sm", "color": "#111111", "align": "end", "wrap": true, "flex": 4 } ] }
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": date, "size": "sm", "color": "#111111", "align": "end", "flex": 4 } ] },
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": time, "size": "sm", "color": "#111111", "align": "end", "flex": 4 } ] },
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.location, "size": "sm", "color": "#999999", "flex": 2 }, { "type": "text", "text": location, "size": "sm", "color": "#111111", "align": "end", "wrap": true, "flex": 4 } ] }
                                 ]
                             },
                             { "type": "separator", "margin": "lg" },
@@ -172,7 +198,6 @@
                 clientName: document.getElementById('cust-name').value,
                 service: document.getElementById('cust-service').value,
                 price: document.getElementById('cust-price').value,
-                // 傳遞所有欄位給 Make 和 Flex Builder
                 message: buildFlexMessage(
                     document.getElementById('cust-oid').value,
                     document.getElementById('cust-name').value,
