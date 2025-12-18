@@ -52,7 +52,7 @@
             <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto">
                 <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">全部</button>
                 <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">未付款</button>
-                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已確認</button>
+                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已付款</button>
                 <button @click="filter = 'CANCELED'" :class="filter === 'CANCELED' ? 'bg-white text-gray-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已取消</button>
             </div>
 
@@ -167,7 +167,7 @@
                                 </div>
                             </div>
                             <div class="flex justify-between items-center">
-                                <p class="text-xs text-green-600 font-bold">已收款</p>
+                                <p class="text-xs text-green-600 font-bold">已收款 (訂金)</p>
                                 <div class="flex items-center">
                                     <span class="text-xs text-green-600 mr-1">NT$</span>
                                     <input type="number" v-model="selectedOrder.receivedPrice" 
@@ -225,7 +225,7 @@
         const { createApp, ref, computed, onMounted } = Vue;
         const MOCK_RESERVATIONS = [{ id: 'mock1', clientName: '範例資料', phone: '-', service: '系統測試', date: '2025-01-01', time: '12:00', status: 'UNPAID', oid: 'M0000', rawPrice: '3000', receivedPrice: '1000', location: '資料讀取失敗' }];
 
-        // 服務對應設定
+        // 服務對應設定 (移植自 admin.html)
         const configMap = {
             '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
             '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
@@ -410,7 +410,9 @@
                             ]
                         },
                         "footer": {
-                            "type": "box", "layout": "vertical", "contents": [
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
                                 { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" }
                             ]
                         },
