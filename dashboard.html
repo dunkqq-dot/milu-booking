@@ -26,7 +26,6 @@
         .active-item { background-color: #FDFbf7; border-left: 4px solid #C69C6D; }
         [v-cloak] { display: none; }
         .debug-modal pre { white-space: pre-wrap; word-wrap: break-word; font-size: 11px; color: #333; max-height: 400px; overflow-y: auto; background: #f1f1f1; padding: 15px; border-radius: 5px; text-align: left; }
-        /* 輸入框聚焦效果 */
         .price-input:focus { border-color: #C69C6D; background-color: #fff; }
     </style>
 </head>
@@ -151,7 +150,7 @@
                                 <p class="font-bold text-gray-700">{{ selectedOrder.date }}</p>
                             </div>
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                <p class="text-xs text-gray-400 mb-1">TIME</p>
+                                <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
                                 <p class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                             </div>
                         </div>
@@ -186,7 +185,7 @@
                         
                         <!-- 地址 -->
                         <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                             <p class="text-xs text-gray-400 mb-1">ADDRESS / STORE</p>
+                             <p class="text-xs text-gray-400 mb-1">{{ getLabel('location', selectedOrder.service) }}</p>
                              <p class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
                         </div>
 
@@ -225,6 +224,14 @@
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
         const MOCK_RESERVATIONS = [{ id: 'mock1', clientName: '範例資料', phone: '-', service: '系統測試', date: '2025-01-01', time: '12:00', status: 'UNPAID', oid: 'M0000', rawPrice: '3000', receivedPrice: '1000', location: '資料讀取失敗' }];
+
+        // 服務對應設定 (移植自 admin.html)
+        const configMap = {
+            '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
+            '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
+            '後車廂驚喜': { time: '抵達工作室時間', location: '佈置工作室地點', icon: '🚗' },
+            '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
+        };
 
         createApp({
             setup() {
@@ -270,11 +277,18 @@
                             else if (rawStatus.includes('取消')) status = 'CANCELED';
                             else if (rawStatus.includes('退款')) status = 'REFUNDED';
 
+                            let serviceName = getKey(item, ['2', 'C', 'Column C', 'service']) || '服務';
+                            // 模糊比對修正服務名稱
+                            if (serviceName.includes('自取')) serviceName = '門市自取'; 
+                            else if (serviceName.includes('後車廂') || serviceName.includes('後車箱')) serviceName = '後車廂驚喜';
+                            else if (serviceName.includes('外送')) serviceName = '氣球外送';
+                            else if (serviceName.includes('佈置')) serviceName = '專人佈置';
+
                             return {
                                 id: index.toString(), 
                                 oid: getKey(item, ['0', 'A', 'Column A', 'oid']) || `M-${index}`,      
                                 clientName: getKey(item, ['8', 'D', 'Column D', '3', 'C', 'name']) || '未知客戶', 
-                                service: getKey(item, ['2', 'C', 'Column C', 'service']) || '服務',    
+                                service: serviceName,    
                                 date: (getKey(item, ['15', '4', 'P', 'date']) || '').split('T')[0],
                                 time: getKey(item, ['16', '5', 'Q', 'time']) || '',          
                                 phone: getKey(item, ['9', 'G', 'phone']) || '',         
@@ -322,41 +336,91 @@
                     }
                 };
 
-                // 統一發送函式：支援 確認、取消、退款
+                const getLabel = (type, service) => {
+                    const config = configMap[service] || configMap['專人佈置'];
+                    return config[type] || (type === 'time' ? '時間' : '地點');
+                };
+
+                // 建立 Flex 卡片 (移植自 admin.html)
+                const buildRichFlexMessage = (service, name, oid, date, time, price, phone, location, actionType) => {
+                    const config = configMap[service] || configMap['專人佈置'];
+                    const displayPrice = parseInt(price).toLocaleString();
+                    
+                    let titleText = 'PAYMENT CONFIRMED';
+                    let descText = '預約確認成功';
+                    let statusColor = '#10B981';
+
+                    if (actionType === 'CANCEL') {
+                        titleText = 'ORDER CANCELED';
+                        descText = '預約已取消';
+                        statusColor = '#EF4444';
+                    } else if (actionType === 'REFUND') {
+                        titleText = 'REFUND COMPLETED';
+                        descText = '退款辦理完成';
+                        statusColor = '#EAB308';
+                    }
+
+                    return {
+                        "type": "bubble",
+                        "size": "mega",
+                        "header": {
+                            "type": "box", "layout": "vertical",
+                            "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ],
+                            "paddingBottom": "none"
+                        },
+                        "body": {
+                            "type": "box", "layout": "vertical",
+                            "contents": [
+                                { "type": "text", "text": `${config.icon} ${service} ${descText}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A", "wrap": true },
+                                { "type": "separator", "margin": "md" },
+                                {
+                                    "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
+                                    "contents": [
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": name, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": phone, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": date, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold", "color": "#C69C6D" } ] },
+                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ 
+                                            { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" },
+                                            { "type": "text", "text": location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } 
+                                        ] }
+                                    ]
+                                },
+                                { "type": "separator", "margin": "xl" },
+                                {
+                                    "type": "box",
+                                    "layout": "horizontal",
+                                    "margin": "xl",
+                                    "contents": [
+                                        { "type": "text", "text": "總計金額", "size": "md", "color": "#4A4A4A", "gravity": "center", "weight": "bold" },
+                                        { "type": "text", "text": `NT$ ${displayPrice}`, "size": "xl", "align": "end", "color": "#C69C6D", "weight": "bold" }
+                                    ]
+                                }
+                            ]
+                        },
+                        "footer": {
+                            "type": "box", "layout": "vertical", "contents": [
+                                { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" }
+                            ]
+                        }
+                    };
+                };
+
                 const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
                     if (!order || !order.userId) return Swal.fire('錯誤', '無 User ID', 'error');
 
                     let statusText = '';
-                    let statusColor = '';
-                    let altText = '';
-                    let titleText = '';
-                    let descText = '';
-
-                    // 定義不同狀態的參數
-                    if (actionType === 'CONFIRM') {
-                        statusText = '✅ 已付款';
-                        statusColor = '#10B981'; // Green
-                        altText = `✅ 您的${order.service}預約已確認！`;
-                        titleText = 'PAYMENT CONFIRMED';
-                        descText = '預約確認成功';
-                    } else if (actionType === 'CANCEL') {
-                        statusText = '❌ 已取消';
-                        statusColor = '#EF4444'; // Red
-                        altText = `❌ 您的${order.service}預約已取消`;
-                        titleText = 'ORDER CANCELED';
-                        descText = '預約已取消';
-                    } else if (actionType === 'REFUND') {
-                        statusText = '💸 已退款';
-                        statusColor = '#EAB308'; // Yellow
-                        altText = `💸 您的${order.service}退款已完成`;
-                        titleText = 'REFUND COMPLETED';
-                        descText = '退款辦理完成';
-                    }
+                    if (actionType === 'CONFIRM') statusText = '✅ 已付款';
+                    else if (actionType === 'CANCEL') statusText = '❌ 已取消';
+                    else if (actionType === 'REFUND') statusText = '💸 已退款';
                     
                     Swal.fire({ title: '處理中...', text: `正在變更狀態為：${statusText}`, didOpen: () => Swal.showLoading() });
 
                     const balance = order.rawPrice - order.receivedPrice;
+
+                    // 使用 buildRichFlexMessage 產生卡片
+                    const flexContent = buildRichFlexMessage(order.service, order.clientName, order.oid, order.date, order.time, order.rawPrice, order.phone, order.location, actionType);
 
                     const payload = {
                         to: order.userId, 
@@ -370,44 +434,25 @@
                         time: order.time, 
                         phone: order.phone, 
                         location: order.location,
-                        status: statusText, // 傳送給 Make 用於更新試算表
-                        // Flex Message 結構
+                        status: statusText,
+                        // 這裡將 flexContent 放入 message 中
                         message: { 
                             type: 'flex', 
-                            altText: altText, 
-                            contents: {
-                                "type": "bubble",
-                                "size": "mega",
-                                "body": {
-                                    "type": "box",
-                                    "layout": "vertical",
-                                    "contents": [
-                                        { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" },
-                                        { "type": "text", "text": descText, "weight": "bold", "size": "xl", "margin": "md", "align": "center", "color": "#4A4A4A" },
-                                        { "type": "separator", "margin": "xxl" },
-                                        {
-                                            "type": "box", "layout": "vertical", "margin": "xxl", "spacing": "sm",
-                                            "contents": [
-                                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "姓名", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": order.clientName, "size": "sm", "color": "#111111", "align": "end", "weight": "bold" } ] },
-                                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "項目", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": order.service, "size": "sm", "color": "#111111", "align": "end" } ] },
-                                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "日期", "size": "sm", "color": "#999999", "flex": 0 }, { "type": "text", "text": order.date, "size": "sm", "color": "#111111", "align": "end" } ] }
-                                            ]
-                                        }
-                                    ]
-                                }
-                            } 
-                        } 
+                            altText: `通知：${order.service} ${statusText}`, 
+                            contents: flexContent 
+                        },
+                        // 同時傳送 flexContents 以防 Make 需要 (相容舊設定)
+                        flexContents: flexContent
                     };
                     
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         
-                        // 樂觀更新 UI
                         if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                         else if (actionType === 'CANCEL') order.status = 'CANCELED';
                         else if (actionType === 'REFUND') order.status = 'REFUNDED';
                         
-                        Swal.fire('成功', `${descText} 通知已發送！`, 'success');
+                        Swal.fire('成功', `通知已發送！`, 'success');
                     } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
                 };
 
@@ -431,7 +476,7 @@
                 });
 
                 onMounted(() => { fetchData(); setInterval(fetchData, 300000); });
-                return { reservations, selectedOrder, filter, loading, errorMsg, filteredList, selectOrder, fetchData, confirmPaymentAndSend: () => updateOrderStatus('CONFIRM'), updateOrderStatus, getStatusText, showDebug };
+                return { reservations, selectedOrder, filter, loading, errorMsg, filteredList, selectOrder, fetchData, confirmPaymentAndSend: () => updateOrderStatus('CONFIRM'), updateOrderStatus, getStatusText, getLabel, showDebug };
             }
         }).mount('#app');
     </script>
