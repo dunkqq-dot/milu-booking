@@ -150,7 +150,7 @@
                                 <p class="font-bold text-gray-700">{{ selectedOrder.date }}</p>
                             </div>
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                <p class="text-xs text-gray-400 mb-1">TIME</p>
+                                <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
                                 <p class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                             </div>
                         </div>
@@ -236,7 +236,6 @@
         createApp({
             setup() {
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
-                // ✅ 您的專屬發送 Webhook
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/obyt3xy5jp4mp9lousp12kkaq4xcvakf';
 
                 const reservations = ref([]);
@@ -399,12 +398,11 @@
                             ]
                         },
                         "footer": {
-                            "type": "box",
-                            "layout": "vertical",
-                            "contents": [
+                            "type": "box", "layout": "vertical", "contents": [
                                 { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" }
                             ]
-                        }
+                        },
+                        "styles": { "footer": { "separator": true } }
                     };
                 };
 
@@ -437,25 +435,25 @@
                         phone: order.phone, 
                         location: order.location,
                         status: statusText,
+                        // 這裡將 flexContent 放入 message 中
                         message: { 
                             type: 'flex', 
                             altText: `通知：${order.service} ${statusText}`, 
                             contents: flexContent 
                         },
+                        // 同時傳送 flexContents 以防 Make 需要 (相容舊設定)
                         flexContents: flexContent
                     };
                     
                     try {
-                        // ✅ 更新：使用標準的 POST 請求，移除 mode: 'no-cors' 以便接收錯誤，但需要 Make 端設定 CORS Header
-                        // 若您的 Make 沒設定 CORS Header，這裡可能會報錯但實際已發送
-                        // 建議保持 no-cors 如果您不確定 Make 的 Response 設定
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         
+                        // 樂觀更新 UI
                         if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                         else if (actionType === 'CANCEL') order.status = 'CANCELED';
                         else if (actionType === 'REFUND') order.status = 'REFUNDED';
                         
-                        Swal.fire('成功', `通知已發送！`, 'success');
+                        Swal.fire('成功', `${statusText} 通知已發送！`, 'success');
                     } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
                 };
 
