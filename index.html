@@ -28,7 +28,7 @@
     <style>
         html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow-x: hidden; background-color: #FFFFFF; font-family: 'Noto Sans TC', sans-serif; color: #4A4A4A; }
         body { padding-bottom: 40px; }
-        .custom-input { width: 100%; padding: 12px 0; background: transparent; border-bottom: 1px solid #E5E7EB; outline: none; border-radius: 0; font-size: 1rem; color: #111; }
+        .custom-input { width: 100%; padding: 12px 0; background: transparent; border-bottom: 1px solid #E5E7EB; outline: none; border-radius: 0; font-size: 16px; color: #111; -webkit-appearance: none; }
         .custom-input:focus { border-bottom: 1px solid #C69C6D; }
         .input-label { display: block; margin-top: 1rem; color: #4A4A4A; font-size: 0.9rem; font-weight: 700; }
         .checkbox-item { display: flex; align-items: flex-start; gap: 0.8rem; margin-top: 0.8rem; font-size: 0.9rem; color: #666; cursor: pointer; line-height: 1.5; }
@@ -56,6 +56,7 @@
                 NAME: '貴誰日工作室 蔡佳苓' 
             },
             
+            // ⚠️ 請檢查以下 SYSTEM_ID 是否正確對應到 Google 表單的「系統專用 ID」欄位
             DECO: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855', SYSTEM_ID: '854196062', PAYMENT_ID: '1383504004' },
             DELIVERY: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019', SYSTEM_ID: '2002313802', PAYMENT_ID: '1973575588' }, 
             TRUNK: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591', SYSTEM_ID: '1545965466', PAYMENT_ID: '352227586' },
@@ -102,7 +103,6 @@
 
         <!-- 1. 專人佈置 -->
         <form id="form-deco" class="space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(event, this, 'deco')">
-            <!-- ✨ 新增：readonly 屬性與自動帶入邏輯 -->
             <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="deco-line" class="custom-input" placeholder="自動帶入" readonly></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">佈置日期</label><input type="date" id="deco-date" class="custom-input" required></div>
@@ -123,12 +123,23 @@
             <div class="mt-8 mb-4"><button type="submit" class="w-full bg-[#4A4A4A] text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-gray-800 transition transform active:scale-95">提交預約 (下一步：匯款)</button></div>
         </form>
 
-        <!-- 2. 氣球外送 -->
+        <!-- 2. 氣球外送 (時段更新) -->
         <form id="form-delivery" class="hidden space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(event, this, 'delivery')">
             <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="delivery-line" class="custom-input" placeholder="自動帶入" readonly></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">外送日期</label><input type="date" id="delivery-date" class="custom-input" required></div>
-                <div><label class="input-label">送達時段</label><select id="delivery-time" class="custom-input" required><option value="" disabled selected>請選擇時段</option><option>10:00 - 11:00</option><option>11:00 - 12:00</option><option>12:00 - 13:00</option><option>13:00 - 14:00</option><option>14:00 - 15:00</option><option>15:00 - 16:00</option><option>16:00 - 17:00</option><option>17:00 - 18:00</option></select></div>
+                <div><label class="input-label">送達時段</label>
+                    <select id="delivery-time" class="custom-input" required>
+                        <option value="" disabled selected>請選擇時段</option>
+                        <option value="12:30 - 13:00">12:30 - 13:00</option>
+                        <option value="13:00 - 14:00">13:00 - 14:00</option>
+                        <option value="14:00 - 15:00">14:00 - 15:00</option>
+                        <option value="15:00 - 16:00">15:00 - 16:00</option>
+                        <option value="16:00 - 17:00">16:00 - 17:00</option>
+                        <option value="17:00 - 18:00">17:00 - 18:00</option>
+                        <option value="18:00 - 19:00">18:00 - 19:00</option>
+                    </select>
+                </div>
             </div>
             <div><label class="input-label">外送地點 (限一樓/管理室)</label><input type="text" id="delivery-address" class="custom-input" placeholder="完整地址" required></div>
             <div class="grid grid-cols-2 gap-4">
@@ -145,9 +156,9 @@
             <div class="mt-8 mb-4"><button type="submit" class="w-full bg-[#4A4A4A] text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-gray-800 transition transform active:scale-95">提交預約 (下一步：匯款)</button></div>
         </form>
 
-        <!-- 3. 工作室自取 -->
+        <!-- 3. 工作室自取 (時段更新) -->
         <form id="form-pickup" class="hidden space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(event, this, 'pickup')">
-            <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="pickup-line" class="custom-input" placeholder="自動帶入" readonly></div>
+            <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="pickup-line" class="custom-input" placeholder="請填寫" required></div>
             <div><label class="input-label">取貨地點</label><div class="flex gap-3 mt-2">
                 <label class="flex-1 border border-gray-200 p-3 text-center cursor-pointer rounded-lg hover:border-milu-gold transition-colors has-[:checked]:bg-gray-800 has-[:checked]:text-white"><input type="radio" name="pickup-location-temp" value="板橋工作室（江子翠）" class="hidden" required onclick="document.getElementById('pickup-location').value=this.value"><span class="text-sm">板橋工作室</span></label>
                 <label class="flex-1 border border-gray-200 p-3 text-center cursor-pointer rounded-lg hover:border-milu-gold transition-colors has-[:checked]:bg-gray-800 has-[:checked]:text-white"><input type="radio" name="pickup-location-temp" value="台中工作室（太平區）" class="hidden" onclick="document.getElementById('pickup-location').value=this.value"><span class="text-sm">台中工作室</span></label>
@@ -155,7 +166,18 @@
             </div></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">取貨日期</label><input type="date" id="pickup-date" class="custom-input" required></div>
-                <div><label class="input-label">取貨時間</label><select id="pickup-time" class="custom-input" required><option value="" disabled selected>請選擇時段</option><option>12:30 - 13:00</option><option>13:00 - 14:00</option><option>14:00 - 15:00</option><option>15:00 - 16:00</option><option>16:00 - 17:00</option><option>17:00 - 18:00</option></select></div>
+                <div><label class="input-label">取貨時間</label>
+                    <select id="pickup-time" class="custom-input" required>
+                        <option value="" disabled selected>請選擇時段</option>
+                        <option value="12:30 - 13:00">12:30 - 13:00</option>
+                        <option value="13:00 - 14:00">13:00 - 14:00</option>
+                        <option value="14:00 - 15:00">14:00 - 15:00</option>
+                        <option value="15:00 - 16:00">15:00 - 16:00</option>
+                        <option value="16:00 - 17:00">16:00 - 17:00</option>
+                        <option value="17:00 - 18:00">17:00 - 18:00</option>
+                        <option value="18:00 - 19:00">18:00 - 19:00</option>
+                    </select>
+                </div>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">取貨人姓名</label><input type="text" id="pickup-name" class="custom-input" required></div>
@@ -173,7 +195,7 @@
 
         <!-- 4. 後車廂佈置 -->
         <form id="form-trunk" class="hidden space-y-4" method="POST" target="hidden_iframe" onsubmit="return handleFormSubmit(event, this, 'trunk')">
-            <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="trunk-line" class="custom-input" placeholder="自動帶入" readonly></div>
+            <div><label class="input-label">訂購人 LINE 名稱</label><input type="text" id="trunk-line" class="custom-input" placeholder="請填寫" required></div>
             <div><label class="input-label">施作地點</label><div class="flex gap-3 mt-2">
                 <label class="flex-1 border border-gray-200 p-3 text-center cursor-pointer rounded-lg hover:border-milu-gold transition-colors has-[:checked]:bg-gray-800 has-[:checked]:text-white"><input type="radio" name="trunk-location-temp" value="板橋工作室（江子翠）" class="hidden" required onclick="document.getElementById('trunk-location').value=this.value"><span class="text-sm">板橋工作室</span></label>
                 <label class="flex-1 border border-gray-200 p-3 text-center cursor-pointer rounded-lg hover:border-milu-gold transition-colors has-[:checked]:bg-gray-800 has-[:checked]:text-white"><input type="radio" name="trunk-location-temp" value="台中工作室（太平區）" class="hidden" onclick="document.getElementById('trunk-location').value=this.value"><span class="text-sm">台中工作室</span></label>
@@ -203,31 +225,30 @@
     </div>
 
     <script>
+        // 初始化 LIFF
         window.onload = function() {
             if (config.LIFF_ID) {
-                liff.init({ liffId: config.LIFF_ID })
-                    .then(() => {
-                        // 1. LIFF 初始化後，先檢查登入狀態
-                        if (!liff.isLoggedIn()) {
-                            liff.login(); 
-                        } else {
-                            // 2. 已登入，抓取 Profile 並填入
-                            liff.getProfile().then(profile => {
-                                const displayName = profile.displayName;
-                                document.getElementById('deco-line').value = displayName;
-                                document.getElementById('delivery-line').value = displayName;
-                                document.getElementById('pickup-line').value = displayName;
-                                document.getElementById('trunk-line').value = displayName;
-                            }).catch(e => console.log('Profile Error', e));
-                        }
-                    })
-                    .catch(err => console.error('LIFF Init Error:', err));
+                liff.init({ liffId: config.LIFF_ID }).then(() => {
+                    // 1. LIFF 初始化後，先檢查登入狀態
+                    if (!liff.isLoggedIn()) {
+                        liff.login(); 
+                    } else {
+                        // 2. 已登入，抓取 Profile 並填入
+                        liff.getProfile().then(profile => {
+                            const displayName = profile.displayName;
+                            document.getElementById('deco-line').value = displayName;
+                            document.getElementById('delivery-line').value = displayName;
+                            document.getElementById('pickup-line').value = displayName;
+                            document.getElementById('trunk-line').value = displayName;
+                        }).catch(e => console.log('Profile Error', e));
+                    }
+                }).catch(err => console.error('LIFF Init Error:', err));
             }
             bindFormInputs();
         };
 
-        // ... (其餘 bindFormInputs, switchTab, handleFormSubmit, processDateTime, createHiddenInput 函數保持不變) ...
         function bindFormInputs() {
+            // DECO
             const decoForm = document.getElementById('form-deco');
             decoForm.action = config.DECO.ACTION;
             document.getElementById('deco-line').name = 'entry.' + config.DECO.LINE_ID;
@@ -235,8 +256,10 @@
             document.getElementById('deco-location').name = 'entry.' + config.DECO.LOCATION_ID;
             document.getElementById('deco-name').name = 'entry.' + config.DECO.NAME_ID;
             document.getElementById('deco-phone').name = 'entry.' + config.DECO.PHONE_ID;
+            // 創建隱藏欄位來接收 LIFF User ID
             if(config.DECO.SYSTEM_ID) createHiddenInput(decoForm, 'entry.' + config.DECO.SYSTEM_ID, '');
 
+            // DELIVERY
             const deliveryForm = document.getElementById('form-delivery');
             if (config.DELIVERY.ACTION) {
                 deliveryForm.action = config.DELIVERY.ACTION;
@@ -248,6 +271,7 @@
                 if(config.DELIVERY.SYSTEM_ID) createHiddenInput(deliveryForm, 'entry.' + config.DELIVERY.SYSTEM_ID, '');
             }
 
+            // PICKUP
             const pickupForm = document.getElementById('form-pickup');
             if (config.PICKUP.ACTION) {
                 pickupForm.action = config.PICKUP.ACTION;
@@ -259,6 +283,7 @@
                 if(config.PICKUP.SYSTEM_ID) createHiddenInput(pickupForm, 'entry.' + config.PICKUP.SYSTEM_ID, '');
             }
 
+            // TRUNK
             const trunkForm = document.getElementById('form-trunk');
             trunkForm.action = config.TRUNK.ACTION;
             document.getElementById('trunk-line').name = 'entry.' + config.TRUNK.LINE_ID;
@@ -285,13 +310,15 @@
         }
 
         var submitted = false;
-        async function handleFormSubmit(event, form, type) {
-            event.preventDefault(); 
+        async function handleFormSubmit(event, form, type) { // *** 已改為 async 函數
+            event.preventDefault(); // *** 阻止表單預設提交
+
             const configEntry = config[type.toUpperCase()];
             form.action = configEntry.ACTION;
 
             let sysInput = null;
             if (configEntry.SYSTEM_ID) {
+                // 嘗試找尋或創建隱藏欄位
                 sysInput = form.querySelector(`input[name="entry.${configEntry.SYSTEM_ID}"]`);
                 if (!sysInput) {
                     sysInput = document.createElement('input');
@@ -300,6 +327,7 @@
                     form.appendChild(sysInput);
                 }
                 
+                // *** 關鍵：等待 User ID 載入
                 if(liff.isInClient() && liff.isLoggedIn()) {
                     try {
                         const profile = await liff.getProfile();
@@ -357,6 +385,7 @@
             const timeVal = timeInput ? timeInput.value : '-';
             const serviceName = type === 'deco' ? '專人佈置' : (type === 'delivery' ? '氣球外送' : (type === 'pickup' ? '工作室自取' : '後車廂驚喜'));
 
+            // 1. 跳出匯款視窗
             if (liff.isInClient()) {
                 Swal.fire({
                     title: '預約單已送出！',
@@ -381,14 +410,16 @@
                     customClass: { title: 'font-serif text-milu-gold', popup: 'rounded-xl border border-milu-light' },
                     allowOutsideClick: false
                 }).then(() => {
+                    // 按下關閉後，發送卡片並切換畫面
                     sendFlexMessageAndClose(serviceName, nameVal, dateVal, timeVal);
                 });
             } else {
+                // 如果不在 LINE 內 (瀏覽器)，顯示成功畫面
                 document.getElementById('main-content').style.display = 'none';
                 document.getElementById('success-screen').style.display = 'block';
             }
 
-            return true;
+            return false; // *** 由於我們手動提交，這裡返回 false 阻止預設提交
         }
 
         function sendFlexMessageAndClose(service, name, date, time) {
