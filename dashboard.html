@@ -124,14 +124,13 @@
                             </div>
                         </div>
                         
-                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center">
+                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center transition-colors focus-within:border-milu-gold focus-within:ring-1 focus-within:ring-milu-gold">
                              <div>
-                                <p class="text-xs text-gray-400 mb-1">TOTAL (可修改)</p>
+                                <p class="text-xs text-gray-400 mb-1">TOTAL (填寫金額)</p>
                                 <div class="flex items-center">
                                     <span class="font-bold text-xl text-gray-800 mr-1">NT$</span>
-                                    <!-- ⚠️ 這裡改成了輸入框，讓您可以直接輸入金額 -->
                                     <input type="number" v-model="selectedOrder.rawPrice" 
-                                           class="font-bold text-xl text-gray-800 bg-transparent border-b border-gray-300 w-24 focus:outline-none focus:border-milu-gold" 
+                                           class="font-bold text-xl text-gray-800 bg-transparent border-b border-gray-300 w-32 focus:outline-none focus:border-milu-gold placeholder-gray-300" 
                                            placeholder="0">
                                 </div>
                              </div>
@@ -147,10 +146,12 @@
                         </div>
 
                         <div class="pt-2 space-y-3">
-                            <button @click="sendNotification" class="w-full bg-milu-dark text-white py-3.5 rounded-xl font-bold hover:bg-black transition flex items-center justify-center gap-2 shadow-lg active:scale-95">
-                                📲 發送預約確認通知
+                            <button @click="confirmPaymentAndSend" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-3.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg active:scale-95">
+                                <i class="fa-solid fa-check-circle"></i> 確認收款並發送通知
                             </button>
-                            <p class="text-center text-xs text-gray-400 pt-2">* 在此修改金額僅影響發送的通知，不會寫回試算表</p>
+                            <p class="text-center text-xs text-gray-400 pt-2">
+                                * 點擊後將：更新試算表(金額/狀態) + 發送 LINE 通知
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -159,6 +160,9 @@
             <div v-else class="flex-1 flex flex-col items-center justify-center text-gray-300"><div class="text-6xl mb-4">📂</div><p>請從左側選擇一筆訂單查看詳情</p></div>
         </div>
     </div>
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
@@ -215,24 +219,20 @@
                                 phone: getKey(item, ['9', 'G', 'phone']) || '',         
                                 userId: getKey(item, ['10', 'L', 'userId']) || '',        
                                 status: isConfirmed ? 'CONFIRMED' : 'UNPAID', 
-                                // 修正：將 key 統一命名為 rawPrice，並對應 Google Sheets 的 12 (M欄)
                                 rawPrice: getKey(item, ['12', 'M', 'price']) || '0',
-                                location: getKey(item, ['6', 'F', 'address', 'location']) || '無地址'
+                                location: getKey(item, ['6', 'F', 'address', 'location']) || '無地址',
+                                // 保留原始 row number 以便回寫 (假設它是隱含的索引或需要 Make 搜尋)
+                                // 這裡我們傳送 oid 讓 Make 去搜尋比較保險
                             };
                         }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
                         reservations.value = formattedData;
                         
-                        // 保持當前選中的訂單狀態，但更新資料
                         if (selectedOrder.value) {
                              const updated = formattedData.find(r => r.oid === selectedOrder.value.oid);
-                             // 如果找到更新，保留 rawPrice (如果使用者正在編輯，這裡可能會覆蓋，簡單起見先覆蓋)
-                             // 若要更優化，可以檢查是否正在編輯。這裡簡單處理：每次更新都用新的。
-                             if (updated) {
-                                 // 如果使用者沒在輸入，就更新
-                                 if (document.activeElement.tagName !== 'INPUT') {
-                                     selectedOrder.value = updated;
-                                 }
+                             // 若正在編輯金額，不要覆蓋，否則用新資料
+                             if (updated && document.activeElement.tagName !== 'INPUT') {
+                                 selectedOrder.value = updated;
                              }
                         } else if (formattedData.length > 0) {
                              selectedOrder.value = formattedData[0];
@@ -247,22 +247,33 @@
                     loading.value = false;
                 };
 
-                const sendNotification = async () => {
+                const confirmPaymentAndSend = async () => {
                     const order = selectedOrder.value;
                     if (!order || !order.userId) return Swal.fire('錯誤', '無 User ID', 'error');
                     
-                    Swal.fire({ title: '發送中...', didOpen: () => Swal.showLoading() });
+                    Swal.fire({ title: '處理中...', text: '正在更新試算表並發送通知', didOpen: () => Swal.showLoading() });
 
                     const payload = {
-                        to: order.userId, orderId: order.oid, clientName: order.clientName, service: order.service, 
-                        price: order.rawPrice, // 這裡會使用輸入框當下的值
-                        date: order.date, time: order.time, phone: order.phone, location: order.location,
+                        to: order.userId, 
+                        orderId: order.oid, 
+                        clientName: order.clientName, 
+                        service: order.service, 
+                        price: order.rawPrice, // 傳送編輯後的金額
+                        date: order.date, 
+                        time: order.time, 
+                        phone: order.phone, 
+                        location: order.location,
+                        status: '✅ 已付款', // 指示 Make 更新狀態
                         message: { type: 'flex', altText: `✅ 您的${order.service}預約已確認！`, contents: {} } 
                     };
                     
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                        Swal.fire('已發送', `已發送確認通知 (金額: $${order.rawPrice})`, 'success');
+                        
+                        // 樂觀更新 UI
+                        order.status = 'CONFIRMED';
+                        
+                        Swal.fire('成功', `已確認收款 NT$${order.rawPrice} 並發送通知！`, 'success');
                     } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
                 };
 
@@ -281,7 +292,7 @@
                 });
 
                 onMounted(() => { fetchData(); setInterval(fetchData, 300000); });
-                return { reservations, selectedOrder, filter, loading, errorMsg, filteredList, selectOrder, fetchData, sendNotification, showDebug };
+                return { reservations, selectedOrder, filter, loading, errorMsg, filteredList, selectOrder, fetchData, confirmPaymentAndSend, showDebug };
             }
         }).mount('#app');
     </script>
