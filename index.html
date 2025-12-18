@@ -52,7 +52,7 @@
             <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto">
                 <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">全部</button>
                 <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">未付款</button>
-                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已確認</button>
+                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已付款</button>
                 <button @click="filter = 'CANCELED'" :class="filter === 'CANCELED' ? 'bg-white text-gray-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已取消</button>
             </div>
 
@@ -328,7 +328,7 @@
                         }
                     }
                     switch(status) {
-                        case 'CONFIRMED': return '已確認';
+                        case 'CONFIRMED': return '已付款'; // 修改為 '已付款'
                         case 'CANCELED': return '已取消';
                         case 'REFUNDED': return '已退款';
                         default: return '未付款';
@@ -346,7 +346,7 @@
                     const displayPrice = parseInt(price).toLocaleString();
                     
                     let titleText = 'PAYMENT CONFIRMED';
-                    let descText = '預約確認成功';
+                    let descText = '預約與款項已確認'; // 修改為 '預約與款項已確認'
                     let statusColor = '#10B981';
 
                     if (actionType === 'CANCEL') {
@@ -411,7 +411,7 @@
                     if (!order || !order.userId) return Swal.fire('錯誤', '無 User ID', 'error');
 
                     let statusText = '';
-                    if (actionType === 'CONFIRM') statusText = '✅ 已確認';
+                    if (actionType === 'CONFIRM') statusText = '✅ 已付款'; // 修改為 '✅ 已付款'
                     else if (actionType === 'CANCEL') statusText = '❌ 已取消';
                     else if (actionType === 'REFUND') statusText = '💸 已退款';
                     
