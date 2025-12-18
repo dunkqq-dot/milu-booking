@@ -8,10 +8,10 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- 引入 Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-    <!-- 引入 SweetAlert2 -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- 引入 Vue.js (讓我們能輕鬆處理資料顯示) -->
+    <!-- 引入 Vue.js -->
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- 引入 SweetAlert2 (用於發送成功的提示，若無會使用 fallback) -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
     <script>
         tailwind.config = {
@@ -49,6 +49,13 @@
                     <div class="text-xs px-2 py-1 bg-white rounded text-gray-400 border" v-if="loading">更新中...</div>
                     <button @click="fetchData" v-else class="text-gray-400 hover:text-milu-gold transition"><i class="fa-solid fa-rotate-right"></i> 刷新</button>
                 </div>
+                
+                <!-- 錯誤訊息提示區 -->
+                <div v-if="errorMsg" class="mt-2 p-2 bg-red-50 text-red-500 text-xs rounded border border-red-100 break-words">
+                    <p class="font-bold mb-1">⚠️ 連線狀況：</p>
+                    {{ errorMsg }}
+                    <p class="mt-1 text-gray-400">(目前顯示範例資料)</p>
+                </div>
             </div>
 
             <!-- Filter Tabs -->
@@ -80,8 +87,8 @@
                         <span class="text-xs text-gray-400">{{ order.service }}</span>
                     </div>
                     <div class="flex items-center text-xs text-gray-500 mt-2 gap-3">
-                        <span class="flex items-center gap-1"><i class="fa-regular fa-calendar"></i> {{ order.date }}</span>
-                        <span class="flex items-center gap-1"><i class="fa-regular fa-clock"></i> {{ order.time }}</span>
+                        <span class="flex items-center gap-1">📅 {{ order.date }}</span>
+                        <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
                 </div>
             </div>
@@ -93,7 +100,7 @@
             <!-- 手機版返回按鈕 -->
             <div class="md:hidden absolute top-4 left-4 z-20">
                 <button @click="selectedOrder = null" class="bg-white p-2 rounded-full shadow text-gray-500">
-                    <i class="fa-solid fa-arrow-left"></i>
+                    ⬅
                 </button>
             </div>
 
@@ -105,7 +112,7 @@
                          :class="selectedOrder.status === 'CONFIRMED' ? 'bg-[#10B981]' : 'bg-[#EF4444]'">
                         <div class="text-center text-white">
                             <div class="text-4xl mb-1">
-                                <i :class="selectedOrder.status === 'CONFIRMED' ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-exclamation'"></i>
+                                {{ selectedOrder.status === 'CONFIRMED' ? '✓' : '!' }}
                             </div>
                             <h2 class="text-lg font-bold tracking-widest opacity-90">
                                 {{ selectedOrder.status === 'CONFIRMED' ? 'PAYMENT CONFIRMED' : 'WAITING FOR PAYMENT' }}
@@ -152,7 +159,7 @@
                         <!-- 動作按鈕 -->
                         <div class="pt-2 space-y-3">
                             <button @click="sendNotification" class="w-full bg-milu-dark text-white py-3.5 rounded-xl font-bold hover:bg-black transition flex items-center justify-center gap-2 shadow-lg active:scale-95">
-                                <i class="fa-brands fa-line text-xl"></i> 發送預約確認通知
+                                📲 發送預約確認通知
                             </button>
                             
                             <p class="text-center text-xs text-gray-400 pt-2">
@@ -164,62 +171,91 @@
             </div>
 
             <div v-else class="flex-1 flex flex-col items-center justify-center text-gray-300">
-                <i class="fa-regular fa-folder-open text-6xl mb-4"></i>
+                <div class="text-6xl mb-4">📂</div>
                 <p>請從左側選擇一筆訂單查看詳情</p>
             </div>
         </div>
     </div>
 
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
 
+        // Mock Data structure (當 fetch 失敗時顯示的範例資料)
+        const MOCK_RESERVATIONS = [
+            { id: 'mock1', clientName: '王小美 (範例)', phone: '0912-345-678', service: '專人佈置', date: '2025-12-25', time: '14:30', status: 'UNPAID', oid: 'M0001', rawPrice: '3000' },
+            { id: 'mock2', clientName: '陳大明 (範例)', phone: '0988-111-222', service: '氣球外送', date: '2025-12-26', time: '10:00', status: 'CONFIRMED', oid: 'M0002', rawPrice: '1500' },
+        ];
+
         createApp({
             setup() {
-                // ⚠️ 設定：請填入您的 Make Webhook 網址
+                // ✅ 讀取資料用的 Webhook (Make: Dashboard Data API)
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
+                // ✅ 發送通知用的 Webhook (Make: OA Sender)
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
 
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
                 const filter = ref('ALL');
                 const loading = ref(true);
+                const errorMsg = ref(null);
 
                 // 讀取資料
                 const fetchData = async () => {
                     loading.value = true;
+                    errorMsg.value = null;
                     try {
-                        const res = await fetch(DATA_API_URL);
-                        if (!res.ok) throw new Error('API Error');
-                        const data = await res.json();
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15秒超時
+
+                        const res = await fetch(DATA_API_URL, { signal: controller.signal });
+                        clearTimeout(timeoutId);
                         
-                        // 轉換資料格式 (Mapping)
-                        const formatted = data.map((item, idx) => ({
-                            oid: item['A'] || `M-${idx}`,
-                            clientName: item['D'] || item['C'] || '未知客戶', // 假設姓名在 D 欄 (請依實際調整)
-                            service: item['C'] || item['D'] || '服務',    // 假設服務在 C 欄
-                            date: (item['P'] || '').split('T')[0],
-                            time: item['Q'] || '',
-                            phone: item['G'] || '',
-                            userId: item['L'] || '',
-                            price: item['M'] || '0',
-                            // 判斷狀態：若付款狀態欄位包含"已付款"則為 CONFIRMED
+                        if (!res.ok) {
+                            throw new Error(`HTTP Error: ${res.status}`);
+                        }
+
+                        const textData = await res.text();
+                        let data;
+                        try {
+                            data = JSON.parse(textData);
+                        } catch (e) {
+                            if (textData.trim() === "Accepted") {
+                                throw new Error("Make 回傳 'Accepted'。請檢查 Make 劇本是否已開啟 (ON)，並且最後有 'Webhook Response' 模組。");
+                            }
+                            throw new Error("Make 回傳格式錯誤 (非 JSON)。");
+                        }
+                        
+                        // 資料轉換
+                        const formattedData = data.map((item, index) => ({
+                            id: index.toString(), 
+                            oid: item['A'] || `M-${index}`,
+                            clientName: item['D'] || item['C'] || '未知客戶', 
+                            service: item['C'] || item['D'] || '服務',    
+                            date: (item['P'] || item['date'] || '').split('T')[0],
+                            time: item['Q'] || item['time'] || '',
+                            phone: item['G'] || item['phone'] || '',
+                            userId: item['L'] || item['userId'] || '',
                             status: (item['付款狀態'] && item['付款狀態'].includes('已付款')) ? 'CONFIRMED' : 'UNPAID',
-                            location: item['F'] || '無地址' // 假設地址在 F 欄
+                            rawPrice: item['M'] || item['price'] || '0',
+                            location: item['F'] || '無地址'
                         })).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-                        reservations.value = formatted;
+                        reservations.value = formattedData;
                         
-                        // 如果有選中的訂單，更新它
-                        if (selectedOrder.value) {
-                            const updated = formatted.find(r => r.oid === selectedOrder.value.oid);
-                            if (updated) selectedOrder.value = updated;
+                        if (formattedData.length > 0 && !selectedOrder.value) {
+                             selectedOrder.value = formattedData[0];
                         }
                     } catch (e) {
-                        console.error(e);
-                        Swal.fire('連線錯誤', '無法讀取 Google Sheets 資料，請檢查 Make。', 'error');
+                        console.error("Fetch Error:", e);
+                        // 顯示範例資料以免畫面全白
+                        reservations.value = MOCK_RESERVATIONS;
+                        if (!selectedOrder.value) selectedOrder.value = MOCK_RESERVATIONS[0];
+                        
+                        let msg = e.message;
+                        if (e.name === 'AbortError') msg = "連線逾時，Make 回應太慢。";
+                        if (msg.includes('Failed to fetch')) msg = "連線失敗 (可能為 CORS 跨域阻擋)。請在 Make 'Webhook Response' 模組新增 Header: 'Access-Control-Allow-Origin' = '*'。";
+                        
+                        errorMsg.value = msg;
                     }
                     loading.value = false;
                 };
@@ -227,41 +263,37 @@
                 // 發送通知
                 const sendNotification = async () => {
                     const order = selectedOrder.value;
-                    if (!order || !order.userId) return Swal.fire('錯誤', '找不到此客戶的 LINE ID', 'error');
-
+                    if (!order || !order.userId) {
+                        return Swal.fire('無法發送', '此訂單沒有 User ID (可能是舊訂單或權限未開)', 'error');
+                    }
+                    
                     Swal.fire({ title: '發送中...', didOpen: () => Swal.showLoading() });
 
-                    // 這裡的 payload 要跟 admin.html 裡的一樣
                     const payload = {
                         to: order.userId,
                         orderId: order.oid,
                         clientName: order.clientName,
                         service: order.service,
-                        price: order.price,
-                        // 讓 Make 去組裝卡片
-                        message: { 
-                            type: 'flex', 
-                            altText: `✅ 您的${order.service}預約已確認！`, 
-                            contents: {} 
-                        },
-                        // 如果您的 admin.html 有用 buildProfessionalFlex，Make 端需要這些變數
-                        // 這裡傳送純資料，Make 需設定好接收變數
+                        price: order.rawPrice,
                         date: order.date,
                         time: order.time,
                         phone: order.phone,
-                        location: order.location
+                        location: order.location,
+                        // 簡化版 message，實際內容由 Make 決定
+                        message: { type: 'flex', altText: `✅ 您的${order.service}預約已確認！`, contents: {} } 
                     };
-
+                    
                     try {
                         await fetch(SEND_MSG_WEBHOOK, {
                             method: 'POST',
-                            mode: 'no-cors',
+                            mode: 'no-cors', 
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
                         });
-                        Swal.fire('成功', '發送指令已送出', 'success');
+                        
+                        Swal.fire('已發送', '指令已發送至 Make，請檢查 LINE', 'success');
                     } catch (e) {
-                        Swal.fire('失敗', e.message, 'error');
+                        Swal.fire('錯誤', e.message, 'error');
                     }
                 };
 
@@ -276,7 +308,8 @@
 
                 onMounted(() => {
                     fetchData();
-                    setInterval(fetchData, 30000); // 每30秒自動更新
+                    // 每 30 秒自動刷新
+                    setInterval(fetchData, 30000); 
                 });
 
                 return {
@@ -284,6 +317,7 @@
                     selectedOrder,
                     filter,
                     loading,
+                    errorMsg,
                     filteredList,
                     selectOrder,
                     fetchData,
