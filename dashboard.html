@@ -126,8 +126,14 @@
                         
                         <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center">
                              <div>
-                                <p class="text-xs text-gray-400 mb-1">TOTAL</p>
-                                <p class="font-bold text-xl text-gray-800">NT$ {{ selectedOrder.price }}</p>
+                                <p class="text-xs text-gray-400 mb-1">TOTAL (可修改)</p>
+                                <div class="flex items-center">
+                                    <span class="font-bold text-xl text-gray-800 mr-1">NT$</span>
+                                    <!-- ⚠️ 這裡改成了輸入框，讓您可以直接輸入金額 -->
+                                    <input type="number" v-model="selectedOrder.rawPrice" 
+                                           class="font-bold text-xl text-gray-800 bg-transparent border-b border-gray-300 w-24 focus:outline-none focus:border-milu-gold" 
+                                           placeholder="0">
+                                </div>
                              </div>
                              <div class="text-right">
                                 <p class="text-xs text-gray-400 mb-1">PHONE</p>
@@ -140,49 +146,28 @@
                              <p class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
                         </div>
 
-                        <!-- 狀態更新與發送按鈕 -->
-                        <div class="pt-4 border-t border-gray-100">
-                            <div class="flex gap-2 mb-3">
-                                <button v-if="selectedOrder.status !== 'CONFIRMED'" @click="updateStatus('✅ 已付款')" class="flex-1 bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 transition shadow">
-                                    確認收款
-                                </button>
-                                <button v-if="selectedOrder.status === 'CONFIRMED'" @click="updateStatus('❌ 未付款')" class="flex-1 bg-gray-400 text-white py-3 rounded-xl font-bold hover:bg-gray-500 transition shadow">
-                                    取消收款
-                                </button>
-                            </div>
-
+                        <div class="pt-2 space-y-3">
                             <button @click="sendNotification" class="w-full bg-milu-dark text-white py-3.5 rounded-xl font-bold hover:bg-black transition flex items-center justify-center gap-2 shadow-lg active:scale-95">
                                 📲 發送預約確認通知
                             </button>
+                            <p class="text-center text-xs text-gray-400 pt-2">* 在此修改金額僅影響發送的通知，不會寫回試算表</p>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div v-else class="flex-1 flex flex-col items-center justify-center text-gray-300">
-                <div class="text-6xl mb-4">📂</div>
-                <p>請從左側選擇一筆訂單查看詳情</p>
-            </div>
+            <div v-else class="flex-1 flex flex-col items-center justify-center text-gray-300"><div class="text-6xl mb-4">📂</div><p>請從左側選擇一筆訂單查看詳情</p></div>
         </div>
     </div>
 
-    <!-- FontAwesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
-
         const MOCK_RESERVATIONS = [{ id: 'mock1', clientName: '範例資料', phone: '-', service: '系統測試', date: '2025-01-01', time: '12:00', status: 'UNPAID', oid: 'M0000', rawPrice: '0', location: '資料讀取失敗' }];
 
         createApp({
             setup() {
-                // ✅ 讀取資料 API
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
-                // ✅ 發送通知 API
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
-                
-                // ⚠️ [請在此填入] 更新狀態專用 Webhook URL (需在 Make 建立新劇本)
-                const UPDATE_STATUS_WEBHOOK = '請填入您的更新專用Webhook網址'; 
 
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
@@ -210,7 +195,7 @@
                         const textData = await res.text();
                         let data;
                         try { data = JSON.parse(textData); } catch (e) {
-                            if (textData.trim() === "Accepted") throw new Error("Make 回傳 'Accepted'。請檢查 Make 劇本是否 ON。");
+                            if (textData.trim() === "Accepted") throw new Error("Make 回傳 'Accepted' (無資料)。請檢查 Make 劇本是否 ON。");
                             throw new Error("Make 回傳格式錯誤 (非 JSON)。");
                         }
                         
@@ -230,18 +215,29 @@
                                 phone: getKey(item, ['9', 'G', 'phone']) || '',         
                                 userId: getKey(item, ['10', 'L', 'userId']) || '',        
                                 status: isConfirmed ? 'CONFIRMED' : 'UNPAID', 
+                                // 修正：將 key 統一命名為 rawPrice，並對應 Google Sheets 的 12 (M欄)
                                 rawPrice: getKey(item, ['12', 'M', 'price']) || '0',
                                 location: getKey(item, ['6', 'F', 'address', 'location']) || '無地址'
                             };
                         }).sort((a, b) => new Date(b.date) - new Date(a.date));
 
                         reservations.value = formattedData;
-                        if (formattedData.length > 0 && !selectedOrder.value) selectedOrder.value = formattedData[0];
-                        // Update selected order details if it exists in new data
+                        
+                        // 保持當前選中的訂單狀態，但更新資料
                         if (selectedOrder.value) {
                              const updated = formattedData.find(r => r.oid === selectedOrder.value.oid);
-                             if (updated) selectedOrder.value = updated;
+                             // 如果找到更新，保留 rawPrice (如果使用者正在編輯，這裡可能會覆蓋，簡單起見先覆蓋)
+                             // 若要更優化，可以檢查是否正在編輯。這裡簡單處理：每次更新都用新的。
+                             if (updated) {
+                                 // 如果使用者沒在輸入，就更新
+                                 if (document.activeElement.tagName !== 'INPUT') {
+                                     selectedOrder.value = updated;
+                                 }
+                             }
+                        } else if (formattedData.length > 0) {
+                             selectedOrder.value = formattedData[0];
                         }
+
                     } catch (e) {
                         console.error("Fetch Error:", e);
                         reservations.value = MOCK_RESERVATIONS;
@@ -251,55 +247,6 @@
                     loading.value = false;
                 };
 
-                // 更新狀態邏輯
-                const updateStatus = async (newStatusText) => {
-                    const order = selectedOrder.value;
-                    if (!order || !order.oid) return Swal.fire('錯誤', '無法識別訂單', 'error');
-
-                    if (UPDATE_STATUS_WEBHOOK.includes('請填入')) {
-                        return Swal.fire('尚未設定', '請先建立 Make 更新狀態專用劇本，並填入程式碼中的 UPDATE_STATUS_WEBHOOK 網址。', 'info');
-                    }
-
-                    // 顯示 Loading
-                    Swal.fire({
-                        title: '更新中...',
-                        text: `正在將訂單狀態更新為：${newStatusText}`,
-                        allowOutsideClick: false,
-                        didOpen: () => Swal.showLoading()
-                    });
-
-                    const payload = {
-                        oid: order.oid,
-                        service: order.service, // 用來讓 Make 判斷要更新哪個分頁
-                        status: newStatusText   // "✅ 已付款" 或 "❌ 未付款"
-                    };
-
-                    try {
-                        await fetch(UPDATE_STATUS_WEBHOOK, {
-                            method: 'POST',
-                            mode: 'no-cors',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload)
-                        });
-
-                        // 樂觀更新 (Optimistic UI Update)
-                        // 因為 no-cors 拿不到回應，我們先假設成功並更新介面
-                        const isConfirmed = newStatusText.includes('已付款');
-                        const updatedOrder = { ...order, status: isConfirmed ? 'CONFIRMED' : 'UNPAID' };
-                        
-                        // 更新列表資料
-                        const index = reservations.value.findIndex(r => r.oid === order.oid);
-                        if (index !== -1) {
-                            reservations.value[index] = updatedOrder;
-                        }
-                        selectedOrder.value = updatedOrder;
-
-                        Swal.fire('指令已發送', 'Google 試算表將在背景更新 (約需數秒)', 'success');
-                    } catch (e) {
-                        Swal.fire('錯誤', e.message, 'error');
-                    }
-                };
-
                 const sendNotification = async () => {
                     const order = selectedOrder.value;
                     if (!order || !order.userId) return Swal.fire('錯誤', '無 User ID', 'error');
@@ -307,13 +254,15 @@
                     Swal.fire({ title: '發送中...', didOpen: () => Swal.showLoading() });
 
                     const payload = {
-                        to: order.userId, orderId: order.oid, clientName: order.clientName, service: order.service, price: order.rawPrice, date: order.date, time: order.time, phone: order.phone, location: order.location,
+                        to: order.userId, orderId: order.oid, clientName: order.clientName, service: order.service, 
+                        price: order.rawPrice, // 這裡會使用輸入框當下的值
+                        date: order.date, time: order.time, phone: order.phone, location: order.location,
                         message: { type: 'flex', altText: `✅ 您的${order.service}預約已確認！`, contents: {} } 
                     };
                     
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                        Swal.fire('已發送', '指令已發出', 'success');
+                        Swal.fire('已發送', `已發送確認通知 (金額: $${order.rawPrice})`, 'success');
                     } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
                 };
 
@@ -332,7 +281,7 @@
                 });
 
                 onMounted(() => { fetchData(); setInterval(fetchData, 300000); });
-                return { reservations, selectedOrder, filter, loading, errorMsg, filteredList, selectOrder, fetchData, sendNotification, updateStatus, showDebug };
+                return { reservations, selectedOrder, filter, loading, errorMsg, filteredList, selectOrder, fetchData, sendNotification, showDebug };
             }
         }).mount('#app');
     </script>
