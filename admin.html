@@ -43,12 +43,12 @@
                 </div>
                 <div>
                     <label class="label-text">聯絡人姓名</label>
-                    <input type="text" id="cust-name" class="input-style" placeholder="林小姐" required>
+                    <input type="text" id="cust-name" class="input-style" placeholder="自動載入" required>
                 </div>
             </div>
 
             <label class="label-text">聯絡電話</label>
-            <input type="tel" id="cust-phone" class="input-style" placeholder="0912-345-678" required>
+            <input type="tel" id="cust-phone" class="input-style" placeholder="自動載入" required>
 
             <div class="section-title">預約細節</div>
 
@@ -59,12 +59,12 @@
                 </div>
                 <div>
                     <label id="label-time" class="label-text">進場佈置時間</label>
-                    <input type="text" id="cust-time" class="input-style" placeholder="14:30" required>
+                    <input type="text" id="cust-time" class="input-style" placeholder="自動載入" required>
                 </div>
             </div>
 
             <label id="label-location" class="label-text">佈置地址</label>
-            <input type="text" id="cust-location" class="input-style" placeholder="請輸入完整地址或門市名稱" required>
+            <input type="text" id="cust-location" class="input-style" placeholder="自動載入" required>
 
             <div class="input-group mt-2">
                 <label class="label-text">訂單編號 (自動填入)</label>
@@ -73,7 +73,7 @@
             
             <div class="input-group mt-2">
                  <label class="label-text">確認金額</label>
-                 <input type="number" id="cust-price" class="input-style" placeholder="2500" required>
+                 <input type="number" id="cust-price" class="input-style" placeholder="自動載入" required>
             </div>
 
             <input type="hidden" id="cust-to-id">
@@ -93,10 +93,19 @@
             '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
 
+        // 優先執行：一開啟網頁立刻解析網址填入資料 (不等待 LIFF)
         window.onload = function() {
-            liff.init({ liffId: LIFF_ID }).then(() => {
-                if (!liff.isLoggedIn()) { liff.login(); } else { getUrlParams(); }
-            }).catch(err => console.error('LIFF Error', err));
+            // 1. 先填資料
+            getUrlParams(); 
+            
+            // 2. 再連線 LIFF
+            if (LIFF_ID) {
+                liff.init({ liffId: LIFF_ID }).then(() => {
+                    if (!liff.isLoggedIn()) { 
+                        // liff.login(); // 視需求開啟自動登入
+                    }
+                }).catch(err => console.error('LIFF Error', err));
+            }
         };
 
         function updateDynamicLabels() {
@@ -109,27 +118,48 @@
         function getUrlParams() {
             const urlParams = new URLSearchParams(window.location.search);
             let params = urlParams;
-            if (urlParams.has('liff.state')) {
-                params = new URLSearchParams(decodeURIComponent(urlParams.get('liff.state')));
-            }
-            document.getElementById('cust-to-id').value = params.get('to') || '';
-            document.getElementById('cust-oid').value = params.get('oid') || '';
-            document.getElementById('line-name').value = params.get('name') || ''; 
-            document.getElementById('cust-name').value = params.get('name') || ''; 
-            document.getElementById('cust-date').value = params.get('date') || '';
-            document.getElementById('cust-time').value = params.get('time') || '';
-            document.getElementById('cust-price').value = params.get('price') || '';
-            // 新增：帶入電話與地點
-            document.getElementById('cust-phone').value = params.get('phone') || '';
-            document.getElementById('cust-location').value = params.get('location') || '';
             
+            // 如果是從 LINE 內部跳轉，參數會被包在 liff.state 裡
+            if (urlParams.has('liff.state')) {
+                // 有時候 liff.state 會有多層編碼，嘗試解碼
+                const stateStr = decodeURIComponent(urlParams.get('liff.state'));
+                // 如果 state 包含 ? (例如 /admin.html?name=...)，重新解析
+                if (stateStr.includes('?')) {
+                    const queryString = stateStr.split('?')[1];
+                    params = new URLSearchParams(queryString);
+                } else {
+                    params = new URLSearchParams(stateStr);
+                }
+            }
+
+            // 填入資料
+            const setVal = (id, key) => {
+                const val = params.get(key);
+                if (val) document.getElementById(id).value = val;
+            };
+
+            setVal('cust-to-id', 'to');
+            setVal('cust-oid', 'oid');
+            setVal('line-name', 'name');
+            setVal('cust-name', 'name'); // 預設聯絡人同 LINE 名稱
+            setVal('cust-date', 'date');
+            setVal('cust-time', 'time');
+            setVal('cust-price', 'price');
+            setVal('cust-phone', 'phone');
+            setVal('cust-location', 'location');
+            
+            // 服務項目特殊處理 (因為有中文對應)
             const serviceFromUrl = params.get('service');
             if (serviceFromUrl) {
                 let mappedService = serviceFromUrl;
-                if (serviceFromUrl === '工作室自取') mappedService = '門市自取'; 
-                if (serviceFromUrl === '後車廂佈置') mappedService = '後車廂驚喜'; // 修正對應
+                // 容錯對應
+                if (serviceFromUrl.includes('自取')) mappedService = '門市自取'; 
+                if (serviceFromUrl.includes('後車')) mappedService = '後車廂驚喜';
+                if (serviceFromUrl.includes('外送')) mappedService = '氣球外送';
+                if (serviceFromUrl.includes('佈置')) mappedService = '專人佈置';
 
                 const select = document.getElementById('cust-service');
+                // 嘗試選取
                 for(let i=0; i<select.options.length; i++) {
                     if(select.options[i].value === mappedService) {
                         select.value = mappedService;
@@ -182,73 +212,3 @@
                             "margin": "xl",
                             "contents": [
                                 { "type": "text", "text": "總計金額", "size": "md", "color": "#4A4A4A", "gravity": "center", "weight": "bold" },
-                                { "type": "text", "text": `NT$ ${displayPrice}`, "size": "xl", "align": "end", "color": "#C69C6D", "weight": "bold" }
-                            ]
-                        }
-                    ]
-                },
-                "footer": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" }
-                    ]
-                },
-                "styles": { "footer": { "separator": true } }
-            };
-        }
-
-        async function submitToMake() {
-            const fields = ['cust-service', 'line-name', 'cust-name', 'cust-phone', 'cust-date', 'cust-time', 'cust-location', 'cust-price'];
-            for (const f of fields) {
-                if (!document.getElementById(f).value) return Swal.fire('請填寫完整', '所有欄位均為必填', 'warning');
-            }
-
-            Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-
-            const service = document.getElementById('cust-service').value;
-            const flexContent = buildProfessionalFlex(
-                service,
-                document.getElementById('line-name').value,
-                document.getElementById('cust-name').value,
-                document.getElementById('cust-phone').value,
-                document.getElementById('cust-date').value,
-                document.getElementById('cust-time').value,
-                document.getElementById('cust-location').value,
-                document.getElementById('cust-oid').value,
-                document.getElementById('cust-price').value
-            );
-
-            const payload = {
-                to: document.getElementById('cust-to-id').value,
-                service: service,
-                clientName: document.getElementById('cust-name').value,
-                flexContents: flexContent, // 確保傳送 flexContents 讓 Make 更容易抓取
-                price: document.getElementById('cust-price').value,
-                message: {
-                    type: 'flex',
-                    altText: `🛎️ 您的${service}預約已確認成功！`,
-                    contents: flexContent
-                }
-            };
-
-            try {
-                const response = await fetch(WEBHOOK_URL, {
-                    method: 'POST',
-                    mode: 'cors',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (response.ok) {
-                    Swal.fire('發送成功！', '預約確認小卡已送出。', 'success');
-                } else {
-                    throw new Error('伺服器回傳錯誤');
-                }
-            } catch (error) {
-                Swal.fire('發送失敗', '原因: ' + error.message, 'error');
-            }
-        }
-    </script>
-</body>
-</html>
