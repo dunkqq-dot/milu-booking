@@ -55,4 +55,246 @@
             </div>
 
             <div class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
-                <div v-if="filteredList.length === 0" class="text-center py-10 text-
+                <div v-if="filteredList.length === 0" class="text-center py-10 text-gray-400 text-sm">沒有相關訂單</div>
+
+                <div v-for="order in filteredList" :key="order.oid" @click="selectOrder(order)" 
+                     class="p-4 rounded-xl cursor-pointer transition-all bg-white border border-transparent hover:border-gray-200 card-shadow"
+                     :class="{'active-item': selectedOrder && selectedOrder.oid === order.oid}">
+                    
+                    <div class="flex justify-between items-start mb-2">
+                        <span class="text-xs font-mono text-gray-400 bg-gray-100 px-1 rounded">#{{ order.oid }}</span>
+                        <span class="text-[10px] px-2 py-1 rounded-full font-bold"
+                              :class="order.status === 'CONFIRMED' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'">
+                            {{ order.status === 'CONFIRMED' ? '已確認' : '未付款' }}
+                        </span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <h3 class="font-bold text-gray-800">{{ order.clientName }}</h3>
+                        <span class="text-xs text-gray-400">{{ order.service }}</span>
+                    </div>
+                    <div class="flex items-center text-xs text-gray-500 mt-2 gap-3">
+                        <span class="flex items-center gap-1">📅 {{ order.date }}</span>
+                        <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側詳情 -->
+        <div class="w-full md:w-2/3 bg-[#F9F9F9] flex flex-col relative h-full" :class="{'hidden md:flex': !selectedOrder}">
+            
+            <div class="md:hidden absolute top-4 left-4 z-20">
+                <button @click="selectedOrder = null" class="bg-white p-2 rounded-full shadow text-gray-500">⬅</button>
+            </div>
+
+            <div v-if="selectedOrder" class="flex-1 overflow-y-auto p-4 md:p-10 flex items-center justify-center">
+                <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-md">
+                    
+                    <div class="h-28 flex items-center justify-center transition-colors duration-300"
+                         :class="selectedOrder.status === 'CONFIRMED' ? 'bg-[#10B981]' : 'bg-[#EF4444]'">
+                        <div class="text-center text-white">
+                            <div class="text-4xl mb-1">{{ selectedOrder.status === 'CONFIRMED' ? '✓' : '!' }}</div>
+                            <h2 class="text-lg font-bold tracking-widest opacity-90">
+                                {{ selectedOrder.status === 'CONFIRMED' ? 'PAYMENT CONFIRMED' : 'WAITING FOR PAYMENT' }}
+                            </h2>
+                        </div>
+                    </div>
+
+                    <div class="p-8 space-y-6">
+                        <div class="flex justify-between border-b border-gray-100 pb-4">
+                            <div>
+                                <p class="text-xs text-gray-400 mb-1">CUSTOMER</p>
+                                <p class="font-bold text-xl text-gray-800">{{ selectedOrder.clientName }}</p>
+                                <p class="text-xs text-gray-500 mt-1 font-mono">{{ selectedOrder.userId ? 'ID已綁定' : '未綁定ID (無法自動發送)' }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-xs text-gray-400 mb-1">SERVICE</p>
+                                <p class="font-bold text-lg text-milu-gold">{{ selectedOrder.service }}</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                <p class="text-xs text-gray-400 mb-1">DATE</p>
+                                <p class="font-bold text-gray-700">{{ selectedOrder.date }}</p>
+                            </div>
+                            <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                <p class="text-xs text-gray-400 mb-1">TIME</p>
+                                <p class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 flex justify-between items-center transition-colors focus-within:border-milu-gold focus-within:ring-1 focus-within:ring-milu-gold">
+                             <div>
+                                <p class="text-xs text-gray-400 mb-1">TOTAL (填寫金額)</p>
+                                <div class="flex items-center">
+                                    <span class="font-bold text-xl text-gray-800 mr-1">NT$</span>
+                                    <input type="number" v-model="selectedOrder.rawPrice" 
+                                           class="font-bold text-xl text-gray-800 bg-transparent border-b border-gray-300 w-28 focus:outline-none focus:border-milu-gold placeholder-gray-300" 
+                                           placeholder="0">
+                                    <!-- 新增：金額旁的儲存按鈕 -->
+                                    <button @click.stop="confirmPaymentAndSend" class="ml-2 text-xs bg-white border border-gray-300 text-gray-500 hover:text-milu-gold hover:border-milu-gold px-3 py-1 rounded-lg transition-colors shadow-sm" title="更新金額並發送通知">
+                                        <i class="fa-solid fa-floppy-disk"></i> 儲存
+                                    </button>
+                                </div>
+                             </div>
+                             <div class="text-right">
+                                <p class="text-xs text-gray-400 mb-1">PHONE</p>
+                                <p class="font-bold text-gray-600 text-sm">{{ selectedOrder.phone }}</p>
+                             </div>
+                        </div>
+                        
+                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                             <p class="text-xs text-gray-400 mb-1">ADDRESS / STORE</p>
+                             <p class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
+                        </div>
+
+                        <div class="pt-2 space-y-3">
+                            <button @click="confirmPaymentAndSend" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-3.5 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow-lg active:scale-95">
+                                <i class="fa-solid fa-check-circle"></i> 確認收款並發送通知
+                            </button>
+                            <p class="text-center text-xs text-gray-400 pt-2">
+                                * 點擊按鈕將：更新試算表(金額/狀態) + 發送 LINE 通知
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div v-else class="flex-1 flex flex-col items-center justify-center text-gray-300"><div class="text-6xl mb-4">📂</div><p>請從左側選擇一筆訂單查看詳情</p></div>
+        </div>
+    </div>
+
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <script>
+        const { createApp, ref, computed, onMounted } = Vue;
+        const MOCK_RESERVATIONS = [{ id: 'mock1', clientName: '範例資料', phone: '-', service: '系統測試', date: '2025-01-01', time: '12:00', status: 'UNPAID', oid: 'M0000', rawPrice: '0', location: '資料讀取失敗' }];
+
+        createApp({
+            setup() {
+                const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
+                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/obyt3xy5jp4mp9lousp12kkaq4xcvakf';
+
+                const reservations = ref([]);
+                const selectedOrder = ref(null);
+                const filter = ref('ALL');
+                const loading = ref(true);
+                const errorMsg = ref(null);
+                const rawJsonData = ref(null);
+
+                const getKey = (item, keys) => {
+                    for (const k of keys) {
+                        if (item[k] !== undefined && item[k] !== null && item[k] !== '') return item[k];
+                    }
+                    return '';
+                };
+
+                const fetchData = async () => {
+                    loading.value = true; errorMsg.value = null;
+                    try {
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 15000); 
+                        const res = await fetch(DATA_API_URL, { signal: controller.signal });
+                        clearTimeout(timeoutId);
+                        
+                        if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+                        const textData = await res.text();
+                        let data;
+                        try { data = JSON.parse(textData); } catch (e) {
+                            if (textData.trim() === "Accepted") throw new Error("Make 回傳 'Accepted' (無資料)。請檢查 Make 劇本是否 ON。");
+                            throw new Error("Make 回傳格式錯誤 (非 JSON)。");
+                        }
+                        
+                        rawJsonData.value = data;
+
+                        const formattedData = data.map((item, index) => {
+                            const rawStatus = getKey(item, ['11', 'K', 'Column K', 'status']);
+                            const isConfirmed = rawStatus.includes('已確認') || rawStatus.includes('已付款') || rawStatus.includes('OK');
+
+                            return {
+                                id: index.toString(), 
+                                oid: getKey(item, ['0', 'A', 'Column A', 'oid']) || `M-${index}`,      
+                                clientName: getKey(item, ['8', 'D', 'Column D', '3', 'C', 'name']) || '未知客戶', 
+                                service: getKey(item, ['2', 'C', 'Column C', 'service']) || '服務',    
+                                date: (getKey(item, ['15', '4', 'P', 'date']) || '').split('T')[0],
+                                time: getKey(item, ['16', '5', 'Q', 'time']) || '',          
+                                phone: getKey(item, ['9', 'G', 'phone']) || '',         
+                                userId: getKey(item, ['10', 'L', 'userId']) || '',        
+                                status: isConfirmed ? 'CONFIRMED' : 'UNPAID', 
+                                rawPrice: getKey(item, ['12', 'M', 'price']) || '0',
+                                location: getKey(item, ['6', 'F', 'address', 'location']) || '無地址'
+                            };
+                        }).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+                        reservations.value = formattedData;
+                        
+                        if (selectedOrder.value) {
+                             const updated = formattedData.find(r => r.oid === selectedOrder.value.oid);
+                             if (updated && document.activeElement.tagName !== 'INPUT') {
+                                 selectedOrder.value = updated;
+                             }
+                        } else if (formattedData.length > 0) {
+                             selectedOrder.value = formattedData[0];
+                        }
+                    } catch (e) {
+                        console.error("Fetch Error:", e);
+                        reservations.value = MOCK_RESERVATIONS;
+                        if (!selectedOrder.value) selectedOrder.value = MOCK_RESERVATIONS[0];
+                        errorMsg.value = e.message;
+                    }
+                    loading.value = false;
+                };
+
+                const confirmPaymentAndSend = async () => {
+                    const order = selectedOrder.value;
+                    if (!order || !order.userId) return Swal.fire('錯誤', '無 User ID', 'error');
+                    
+                    Swal.fire({ title: '處理中...', text: '正在更新試算表並發送通知', didOpen: () => Swal.showLoading() });
+
+                    const payload = {
+                        to: order.userId, 
+                        orderId: order.oid, 
+                        clientName: order.clientName, 
+                        service: order.service, 
+                        price: order.rawPrice, 
+                        date: order.date, 
+                        time: order.time, 
+                        phone: order.phone, 
+                        location: order.location,
+                        status: '✅ 已付款', // 新增狀態
+                        message: { type: 'flex', altText: `✅ 您的${order.service}預約已確認！`, contents: {} } 
+                    };
+                    
+                    try {
+                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        
+                        // 樂觀更新 UI
+                        order.status = 'CONFIRMED';
+                        
+                        Swal.fire('成功', `已確認收款 NT$${order.rawPrice} 並發送通知！`, 'success');
+                    } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
+                };
+
+                const showDebug = () => {
+                    Swal.fire({
+                        title: '原始資料診斷',
+                        html: `<div class="debug-modal text-left"><p class="mb-2 text-xs font-bold">Make 回傳的前 2 筆:</p><pre>${JSON.stringify(rawJsonData.value ? rawJsonData.value.slice(0, 2) : '無資料', null, 2)}</pre></div>`,
+                        width: '600px'
+                    });
+                };
+
+                const selectOrder = (order) => { selectedOrder.value = order; };
+                const filteredList = computed(() => {
+                    if (filter.value === 'ALL') return reservations.value;
+                    return reservations.value.filter(r => r.status === filter.value);
+                });
+
+                onMounted(() => { fetchData(); setInterval(fetchData, 300000); });
+                return { reservations, selectedOrder, filter, loading, errorMsg, filteredList, selectOrder, fetchData, confirmPaymentAndSend, showDebug };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
