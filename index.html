@@ -364,7 +364,7 @@
                         "size": "mega",
                         "header": {
                             "type": "box", "layout": "vertical",
-                            "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ],
+                            "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ],
                             "paddingBottom": "none"
                         },
                         "body": {
@@ -411,7 +411,7 @@
                     if (!order || !order.userId) return Swal.fire('錯誤', '無 User ID', 'error');
 
                     let statusText = '';
-                    if (actionType === 'CONFIRM') statusText = '✅ 已付款';
+                    if (actionType === 'CONFIRM') statusText = '✅ 已確認';
                     else if (actionType === 'CANCEL') statusText = '❌ 已取消';
                     else if (actionType === 'REFUND') statusText = '💸 已退款';
                     
@@ -452,7 +452,7 @@
                         else if (actionType === 'CANCEL') order.status = 'CANCELED';
                         else if (actionType === 'REFUND') order.status = 'REFUNDED';
                         
-                        Swal.fire('成功', `${statusText} 通知已發送！`, 'success');
+                        Swal.fire('成功', `通知已發送！`, 'success');
                     } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
                 };
 
