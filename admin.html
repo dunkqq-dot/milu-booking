@@ -119,6 +119,9 @@
             document.getElementById('cust-date').value = params.get('date') || '';
             document.getElementById('cust-time').value = params.get('time') || '';
             document.getElementById('cust-price').value = params.get('price') || '';
+            // 新增：帶入電話與地點
+            document.getElementById('cust-phone').value = params.get('phone') || '';
+            document.getElementById('cust-location').value = params.get('location') || '';
             
             const serviceFromUrl = params.get('service');
             if (serviceFromUrl) {
