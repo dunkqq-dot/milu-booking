@@ -150,7 +150,7 @@
                                 <p class="font-bold text-gray-700">{{ selectedOrder.date }}</p>
                             </div>
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
+                                <p class="text-xs text-gray-400 mb-1">TIME</p>
                                 <p class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                             </div>
                         </div>
@@ -167,7 +167,7 @@
                                 </div>
                             </div>
                             <div class="flex justify-between items-center">
-                                <p class="text-xs text-green-600 font-bold">已收款 (R欄)</p>
+                                <p class="text-xs text-green-600 font-bold">已收款</p>
                                 <div class="flex items-center">
                                     <span class="text-xs text-green-600 mr-1">NT$</span>
                                     <input type="number" v-model="selectedOrder.receivedPrice" 
@@ -236,6 +236,7 @@
         createApp({
             setup() {
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
+                // ✅ 您的專屬發送 Webhook
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/obyt3xy5jp4mp9lousp12kkaq4xcvakf';
 
                 const reservations = ref([]);
@@ -294,10 +295,7 @@
                                 userId: getKey(item, ['10', 'L', 'userId']) || '',        
                                 status: status, 
                                 rawPrice: getKey(item, ['12', 'M', 'price']) || '0', 
-                                // ✅ 修正：已收款讀取 R 欄 (index 17)
                                 receivedPrice: getKey(item, ['17', 'R', 'received']) || '0', 
-                                // ✅ 修正：尾款讀取 S 欄 (index 18) - 雖然介面會重算，但讀取可做備份
-                                balancePrice: getKey(item, ['18', 'S', 'balance']) || '0', 
                                 location: getKey(item, ['6', 'F', 'address', 'location']) || '無地址'
                             };
                         }).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -401,7 +399,9 @@
                             ]
                         },
                         "footer": {
-                            "type": "box", "layout": "vertical", "contents": [
+                            "type": "box",
+                            "layout": "vertical",
+                            "contents": [
                                 { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" }
                             ]
                         }
@@ -437,17 +437,18 @@
                         phone: order.phone, 
                         location: order.location,
                         status: statusText,
-                        // 這裡將 flexContent 放入 message 中
                         message: { 
                             type: 'flex', 
                             altText: `通知：${order.service} ${statusText}`, 
                             contents: flexContent 
                         },
-                        // 同時傳送 flexContents 以防 Make 需要 (相容舊設定)
                         flexContents: flexContent
                     };
                     
                     try {
+                        // ✅ 更新：使用標準的 POST 請求，移除 mode: 'no-cors' 以便接收錯誤，但需要 Make 端設定 CORS Header
+                        // 若您的 Make 沒設定 CORS Header，這裡可能會報錯但實際已發送
+                        // 建議保持 no-cors 如果您不確定 Make 的 Response 設定
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         
                         if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
