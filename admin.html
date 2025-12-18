@@ -5,18 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>收款確認發送器 | MILU Admin</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: { milu: { gold: '#C69C6D', dark: '#4A4A4A', green: '#10B981' } }
-                }
-            }
-        }
-    </script>
     <style>
         body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; padding: 20px; }
         .card { background: white; padding: 24px; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); max-width: 500px; margin: 0 auto; }
@@ -28,7 +19,7 @@
 
     <div class="card">
         <h2 class="text-center font-bold text-xl text-milu-gold mb-4">Payment Confirm</h2>
-        <p class="text-center text-xs text-gray-400 mb-6">填寫資訊後點擊按鈕發送 LINE 通知</p>
+        <p class="text-center text-xs text-gray-400 mb-6">偵錯版本：若發送失敗請查看彈窗訊息</p>
 
         <form id="admin-form" onsubmit="return handleFormSubmit(event)">
             <div class="mb-4">
@@ -69,7 +60,7 @@
     </div>
 
     <script>
-        // ✅ 已同步您的最新 Webhook URL
+        // ✅ 再次確認您的 Webhook URL
         const WEBHOOK_URL = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
         const LIFF_ID = '2004044468-KFCOlJSB';
 
@@ -96,12 +87,7 @@
 
         function buildFlexMessage(service, date, time, price) {
             const formattedPrice = price ? price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",") : '待確認';
-            const icon = {
-                '專人佈置': '✨',
-                '氣球外送': '🚚',
-                '後車廂驚喜': '🚗',
-                '工作室自取': '🛍️'
-            }[service] || '✅';
+            const icon = { '專人佈置': '✨', '氣球外送': '🚚', '後車廂驚喜': '🚗', '工作室自取': '🛍️' }[service] || '✅';
 
             return {
                 type: 'flex',
@@ -109,8 +95,7 @@
                 contents: {
                     "type": "bubble",
                     "body": {
-                        "type": "box",
-                        "layout": "vertical",
+                        "type": "box", "layout": "vertical",
                         "contents": [
                             { "type": "text", "text": "PAYMENT CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center" },
                             { "type": "text", "text": `${icon} ${service} 預約確認`, "weight": "bold", "size": "xl", "margin": "md", "align": "center" },
@@ -130,13 +115,12 @@
 
         async function handleFormSubmit(e) {
             e.preventDefault();
-            const toId = document.getElementById('cust-to-id').value;
             const serviceVal = document.getElementById('cust-service').value;
 
-            Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            Swal.fire({ title: '正在發送指令...', text: '目標網址：' + WEBHOOK_URL, allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
             const payload = {
-                to: toId,
+                to: document.getElementById('cust-to-id').value,
                 orderId: document.getElementById('cust-oid').value,
                 clientName: document.getElementById('cust-name').value,
                 service: serviceVal,
@@ -150,19 +134,36 @@
             };
 
             try {
+                // 強制加上 mode: 'cors' 確保跨域請求被允許
                 const response = await fetch(WEBHOOK_URL, {
                     method: 'POST',
+                    mode: 'cors',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
 
                 if (response.ok) {
-                    Swal.fire('發送指令成功！', `${serviceVal} 確認通知已送出。`, 'success');
+                    Swal.fire('成功！', 'Make 已接收到指令。', 'success');
                 } else {
-                    throw new Error('伺服器錯誤');
+                    // 如果 Make 回傳錯誤 (如 4xx 或 5xx)
+                    const errText = await response.text();
+                    throw new Error(`伺服器回傳錯誤代碼 ${response.status}: ${errText}`);
                 }
             } catch (error) {
-                Swal.fire('發送失敗', '原因：' + error.message, 'error');
+                // 如果是網路斷掉或網址錯誤
+                console.error('Fetch Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: '發送完全失敗',
+                    html: `<div class="text-left text-xs bg-gray-100 p-2 rounded">
+                            <b>錯誤原因：</b>${error.message}<br><br>
+                            <b>檢查建議：</b><br>
+                            1. Make 劇本是否有點擊 "Run once"？<br>
+                            2. 您的手機網路是否正常？<br>
+                            3. Webhook URL 是否正確？
+                          </div>`,
+                    confirmButtonText: '知道了'
+                });
             }
         }
     </script>
