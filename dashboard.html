@@ -167,7 +167,7 @@
                                 </div>
                             </div>
                             <div class="flex justify-between items-center">
-                                <p class="text-xs text-green-600 font-bold">已收款</p>
+                                <p class="text-xs text-green-600 font-bold">已收款 (R欄)</p>
                                 <div class="flex items-center">
                                     <span class="text-xs text-green-600 mr-1">NT$</span>
                                     <input type="number" v-model="selectedOrder.receivedPrice" 
@@ -278,7 +278,6 @@
                             else if (rawStatus.includes('退款')) status = 'REFUNDED';
 
                             let serviceName = getKey(item, ['2', 'C', 'Column C', 'service']) || '服務';
-                            // 模糊比對修正服務名稱
                             if (serviceName.includes('自取')) serviceName = '門市自取'; 
                             else if (serviceName.includes('後車廂') || serviceName.includes('後車箱')) serviceName = '後車廂驚喜';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
@@ -295,7 +294,10 @@
                                 userId: getKey(item, ['10', 'L', 'userId']) || '',        
                                 status: status, 
                                 rawPrice: getKey(item, ['12', 'M', 'price']) || '0', 
-                                receivedPrice: getKey(item, ['13', 'N', 'received']) || '0', 
+                                // ✅ 修正：已收款讀取 R 欄 (index 17)
+                                receivedPrice: getKey(item, ['17', 'R', 'received']) || '0', 
+                                // ✅ 修正：尾款讀取 S 欄 (index 18) - 雖然介面會重算，但讀取可做備份
+                                balancePrice: getKey(item, ['18', 'S', 'balance']) || '0', 
                                 location: getKey(item, ['6', 'F', 'address', 'location']) || '無地址'
                             };
                         }).sort((a, b) => new Date(b.date) - new Date(a.date));
