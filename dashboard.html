@@ -26,7 +26,8 @@
         .active-item { background-color: #FDFbf7; border-left: 4px solid #C69C6D; }
         [v-cloak] { display: none; }
         .debug-modal pre { white-space: pre-wrap; word-wrap: break-word; font-size: 11px; color: #333; max-height: 400px; overflow-y: auto; background: #f1f1f1; padding: 15px; border-radius: 5px; text-align: left; }
-        .price-input:focus { border-color: #C69C6D; background-color: #fff; }
+        .price-input:focus, .edit-input:focus { border-color: #C69C6D; background-color: #fff; outline: none; }
+        .edit-input { width: 100%; border-bottom: 1px solid #ddd; background: transparent; padding: 2px 0; font-weight: bold; color: #4A4A4A; }
     </style>
 </head>
 <body id="app" v-cloak>
@@ -46,23 +47,31 @@
                         <button @click="fetchData" v-else class="text-gray-400 hover:text-milu-gold transition"><i class="fa-solid fa-rotate-right"></i></button>
                     </div>
                 </div>
+                <div v-if="errorMsg" class="mt-2 p-2 bg-red-50 text-red-500 text-xs rounded border border-red-100 break-words">{{ errorMsg }}</div>
             </div>
 
             <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto">
                 <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">全部</button>
                 <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">未付款</button>
                 <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已付款</button>
-                <button @click="filter = 'CANCELED'" :class="filter === 'CANCELED' ? 'bg-white text-gray-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已取消</button>
             </div>
 
             <div class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
+                <div v-if="filteredList.length === 0" class="text-center py-10 text-gray-400 text-sm">沒有相關訂單</div>
+
                 <div v-for="order in filteredList" :key="order.oid" @click="selectOrder(order)" 
                      class="p-4 rounded-xl cursor-pointer transition-all bg-white border border-transparent hover:border-gray-200 card-shadow"
                      :class="{'active-item': selectedOrder && selectedOrder.oid === order.oid}">
+                    
                     <div class="flex justify-between items-start mb-2">
                         <span class="text-xs font-mono text-gray-400 bg-gray-100 px-1 rounded">#{{ order.oid }}</span>
                         <span class="text-[10px] px-2 py-1 rounded-full font-bold"
-                              :class="{'bg-green-100 text-green-600': order.status === 'CONFIRMED', 'bg-red-100 text-red-500': order.status === 'UNPAID'}">
+                              :class="{
+                                  'bg-green-100 text-green-600': order.status === 'CONFIRMED',
+                                  'bg-red-100 text-red-500': order.status === 'UNPAID',
+                                  'bg-gray-200 text-gray-600': order.status === 'CANCELED',
+                                  'bg-yellow-100 text-yellow-600': order.status === 'REFUNDED'
+                              }">
                             {{ getStatusText(order.status) }}
                         </span>
                     </div>
@@ -71,8 +80,14 @@
                         <span class="text-xs text-gray-400">{{ order.service }}</span>
                     </div>
                     <div class="flex items-center text-xs text-gray-500 mt-2 gap-3">
-                        <span>📅 {{ order.date }}</span>
-                        <span>⏰ {{ order.time }}</span>
+                        <span class="flex items-center gap-1">📅 {{ order.date }}</span>
+                        <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.rawPrice > 0 && order.status !== 'CANCELED'">
+                        <span class="text-xs text-gray-400">總額: NT$ {{order.rawPrice.toLocaleString()}}</span>
+                        <span class="text-xs font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500'">
+                            {{ (order.rawPrice - order.receivedPrice) > 0 ? `尚欠: NT$ ${(order.rawPrice - order.receivedPrice).toLocaleString()}` : '已付清' }}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -80,61 +95,159 @@
 
         <!-- 右側詳情 -->
         <div class="w-full md:w-2/3 bg-[#F9F9F9] flex flex-col relative h-full" :class="{'hidden md:flex': !selectedOrder}">
+            
+            <div class="md:hidden absolute top-4 left-4 z-20">
+                <button @click="selectedOrder = null" class="bg-white p-2 rounded-full shadow text-gray-500">⬅</button>
+            </div>
+
             <div v-if="selectedOrder" class="flex-1 overflow-y-auto p-4 md:p-10 flex items-center justify-center">
                 <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-md">
-                    <div class="h-24 flex items-center justify-center" :class="{'bg-[#10B981]': selectedOrder.status === 'CONFIRMED', 'bg-[#EF4444]': selectedOrder.status === 'UNPAID'}">
-                        <h2 class="text-lg font-bold text-white tracking-widest">{{ getStatusText(selectedOrder.status, true) }}</h2>
+                    
+                    <div class="h-28 flex items-center justify-center transition-colors duration-300 relative"
+                         :class="{
+                             'bg-[#10B981]': selectedOrder.status === 'CONFIRMED',
+                             'bg-[#EF4444]': selectedOrder.status === 'UNPAID',
+                             'bg-gray-500': selectedOrder.status === 'CANCELED',
+                             'bg-yellow-500': selectedOrder.status === 'REFUNDED'
+                         }">
+                        
+                        <!-- 編輯模式按鈕 -->
+                        <button v-if="!isEditing" @click="startEdit" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition backdrop-blur-sm" title="編輯資料">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        <div v-else class="absolute top-4 right-4 flex gap-2">
+                            <button @click="saveEdit" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm shadow font-bold">
+                                <i class="fa-solid fa-floppy-disk"></i> 儲存
+                            </button>
+                            <button @click="cancelEdit" class="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm backdrop-blur-sm">
+                                取消
+                            </button>
+                        </div>
+
+                        <div class="text-center text-white">
+                            <div class="text-4xl mb-1">
+                                <i v-if="selectedOrder.status === 'CONFIRMED'" class="fa-solid fa-circle-check"></i>
+                                <i v-else-if="selectedOrder.status === 'CANCELED'" class="fa-solid fa-circle-xmark"></i>
+                                <i v-else-if="selectedOrder.status === 'REFUNDED'" class="fa-solid fa-money-bill-transfer"></i>
+                                <i v-else class="fa-solid fa-circle-exclamation"></i>
+                            </div>
+                            <h2 class="text-lg font-bold tracking-widest opacity-90">
+                                {{ getStatusText(selectedOrder.status, true) }}
+                            </h2>
+                        </div>
                     </div>
 
-                    <div class="p-8 space-y-6">
+                    <div class="p-8 space-y-6 relative">
+                        <!-- 編輯模式遮罩提示 -->
+                        <div v-if="isEditing" class="absolute top-0 left-0 w-full h-1 bg-yellow-400 animate-pulse"></div>
+
+                        <!-- 客戶資訊 -->
                         <div class="flex justify-between border-b border-gray-100 pb-4">
-                            <div>
-                                <p class="text-xs text-gray-400">CUSTOMER</p>
-                                <p class="font-bold text-xl text-gray-800">{{ selectedOrder.clientName }}</p>
-                                <p class="text-xs text-gray-500">{{ selectedOrder.phone }}</p>
+                            <div class="flex-1 mr-4">
+                                <p class="text-xs text-gray-400 mb-1">CUSTOMER</p>
+                                <div v-if="isEditing">
+                                    <input v-model="editForm.clientName" class="edit-input text-xl" placeholder="姓名">
+                                    <input v-model="editForm.phone" class="edit-input text-sm mt-2" placeholder="電話">
+                                </div>
+                                <div v-else>
+                                    <p class="font-bold text-xl text-gray-800">{{ selectedOrder.clientName }}</p>
+                                    <p class="text-xs text-gray-600 mt-1"><i class="fa-solid fa-phone mr-1"></i>{{ selectedOrder.phone }}</p>
+                                </div>
+                                <p class="text-xs text-gray-400 font-mono mt-1" v-if="!isEditing">{{ selectedOrder.userId ? 'ID已綁定' : '未綁定ID' }}</p>
                             </div>
                             <div class="text-right">
-                                <p class="text-xs text-gray-400">SERVICE</p>
+                                <p class="text-xs text-gray-400 mb-1">SERVICE</p>
                                 <p class="font-bold text-lg text-milu-gold">{{ selectedOrder.service }}</p>
                             </div>
                         </div>
 
+                        <!-- 時間日期 -->
                         <div class="grid grid-cols-2 gap-4">
-                            <div class="bg-gray-50 p-3 rounded-xl border">
-                                <p class="text-xs text-gray-400">DATE</p>
-                                <p class="font-bold">{{ selectedOrder.date }}</p>
+                            <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                <p class="text-xs text-gray-400 mb-1">DATE</p>
+                                <input v-if="isEditing" type="date" v-model="editForm.date" class="edit-input">
+                                <p v-else class="font-bold text-gray-700">{{ selectedOrder.date }}</p>
                             </div>
-                            <div class="bg-gray-50 p-3 rounded-xl border">
-                                <p class="text-xs text-gray-400">{{ getLabel('time', selectedOrder.service) }}</p>
-                                <p class="font-bold">{{ selectedOrder.time }}</p>
-                            </div>
-                        </div>
-
-                        <div class="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100">
-                            <div class="flex justify-between items-center mb-2">
-                                <p class="text-xs text-gray-500 font-bold">總金額</p>
-                                <input type="number" v-model="selectedOrder.rawPrice" class="price-input font-bold text-right bg-transparent border-b w-24">
-                            </div>
-                            <div class="flex justify-between items-center mb-2">
-                                <p class="text-xs text-green-600 font-bold">已收款</p>
-                                <input type="number" v-model="selectedOrder.receivedPrice" class="price-input font-bold text-right bg-transparent border-b w-24 text-green-600">
-                            </div>
-                            <div class="border-t pt-2 flex justify-between items-center">
-                                <p class="text-xs text-red-500 font-bold">尚欠尾款</p>
-                                <p class="font-bold text-xl text-red-500">NT$ {{ selectedOrder.rawPrice - selectedOrder.receivedPrice }}</p>
+                            <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
+                                <input v-if="isEditing" type="text" v-model="editForm.time" class="edit-input">
+                                <p v-else class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                             </div>
                         </div>
                         
-                        <div class="bg-gray-50 p-3 rounded-xl border">
-                             <p class="text-xs text-gray-400">LOCATION / ADDRESS</p>
-                             <p class="font-bold text-sm text-gray-600">{{ selectedOrder.location }}</p>
+                        <!-- 款項明細 -->
+                        <div class="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <p class="text-xs text-gray-500 font-bold">總金額</p>
+                                <div class="flex items-center">
+                                    <span class="text-xs mr-1 text-gray-400">NT$</span>
+                                    <input type="number" v-model="isEditing ? editForm.rawPrice : selectedOrder.rawPrice" 
+                                           :class="{'edit-input w-24 text-right': isEditing, 'price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none': !isEditing}" 
+                                           placeholder="0">
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center mb-2">
+                                <p class="text-xs text-green-600 font-bold">已收款</p>
+                                <div class="flex items-center">
+                                    <span class="text-xs mr-1 text-green-600">NT$</span>
+                                    <input type="number" v-model="isEditing ? editForm.receivedPrice : selectedOrder.receivedPrice" 
+                                           :class="{'edit-input w-24 text-right': isEditing, 'price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none': !isEditing}" 
+                                           placeholder="0">
+                                </div>
+                            </div>
+                            <div class="border-t pt-2 flex justify-between items-center border-yellow-200">
+                                <p class="text-xs text-red-500 font-bold">尚欠尾款</p>
+                                <p class="font-bold text-xl text-red-500">
+                                    NT$ {{ ((isEditing ? editForm.rawPrice : selectedOrder.rawPrice) - (isEditing ? editForm.receivedPrice : selectedOrder.receivedPrice)).toLocaleString() }}
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <!-- 地址 -->
+                        <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                             <p class="text-xs text-gray-400 mb-1">{{ getLabel('location', selectedOrder.service) }}</p>
+                             <input v-if="isEditing" type="text" v-model="editForm.location" class="edit-input">
+                             <p v-else class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
                         </div>
 
-                        <button @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold transition shadow-lg">
-                            ✅ 確認收款並發送通知
-                        </button>
+                        <!-- 動作按鈕 (編輯模式時隱藏) -->
+                        <div v-if="!isEditing" class="pt-2 space-y-3">
+                            <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold transition shadow-lg active:scale-95">
+                                ✅ 確認收款並發送通知
+                            </button>
+                            
+                            <div v-if="selectedOrder.status === 'CONFIRMED'" class="space-y-2">
+                                <button @click="updateOrderStatus('COMPLETE')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-flag-checkered"></i> 完成訂單 (結案)
+                                </button>
+                                <p class="text-center text-xs text-gray-400">點擊後將更新為「已完成」並發送感謝卡</p>
+                            </div>
+
+                            <div v-if="selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELED' || selectedOrder.status === 'REFUNDED'" class="space-y-3">
+                                <div class="text-center py-3 bg-gray-100 text-gray-500 rounded-xl font-bold border border-gray-200">
+                                    此訂單已結案 ({{ getStatusText(selectedOrder.status) }})
+                                </div>
+                                <button @click="updateOrderStatus('RESTORE')" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-xl font-bold transition shadow active:scale-95 flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-rotate-left"></i> 恢復訂單 (重設為未付款)
+                                </button>
+                            </div>
+
+                            <div class="flex gap-2" v-if="selectedOrder.status !== 'CANCELED' && selectedOrder.status !== 'REFUNDED' && selectedOrder.status !== 'COMPLETED'">
+                                <button v-if="selectedOrder.status === 'CONFIRMED'" @click="updateOrderStatus('REFUND')" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
+                                    <i class="fa-solid fa-money-bill-transfer"></i> 辦理退款
+                                </button>
+                                <button @click="updateOrderStatus('CANCEL')" class="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
+                                    <i class="fa-solid fa-ban"></i> 取消訂單
+                                </button>
+                            </div>
+
+                            <p class="text-center text-xs text-gray-400 pt-2">* 點擊按鈕將同步更新試算表與發送 LINE 通知</p>
+                        </div>
                     </div>
                 </div>
+            </div>
+            <div v-else class="flex-1 flex items-center justify-center text-gray-400">
+                <p>請從左側選擇一筆訂單查看詳情</p>
             </div>
         </div>
     </div>
@@ -158,8 +271,21 @@
 
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
+                const isEditing = ref(false);
+                const editForm = ref({});
                 const filter = ref('ALL');
                 const loading = ref(true);
+                const errorMsg = ref(null);
+                const rawJsonData = ref(null);
+
+                // ... (smartGet, getKey, fetchData 邏輯與之前相同，省略以節省篇幅) ...
+                const smartGet = (item, type) => {
+                    const values = Object.values(item).map(v => String(v || '').trim()).filter(v => v);
+                    if (type === 'phone') return values.find(v => v.match(/^09\d{8}$/) || v.match(/^09\d{2}-\d{3}-\d{3}$/)) || '';
+                    if (type === 'name') return values.find(v => v.length >= 2 && v.length <= 15 && !v.includes('http') && !v.includes('U') && !v.match(/\d{4}/) && !v.match(/^09/) && !['專人佈置', '門市自取', '後車廂驚喜', '氣球外送', '已付款', '未付款', 'OK'].some(k => v.includes(k))) || '未知姓名';
+                    if (type === 'location') return values.find(v => (v.includes('路') || v.includes('街') || v.includes('店') || v.includes('市') || v.includes('區') || v.includes('工作室')) && v.length > 2 && !v.includes('http') && !['專人佈置', '門市自取', '後車廂驚喜', '氣球外送'].includes(v)) || '未填寫地點';
+                    return '';
+                };
 
                 const getKey = (item, keys) => {
                     for (const k of keys) {
@@ -169,63 +295,129 @@
                 };
 
                 const fetchData = async () => {
-                    loading.value = true;
+                    loading.value = true; errorMsg.value = null;
                     try {
                         const res = await fetch(DATA_API_URL);
-                        const data = await res.json();
-                        
-                        const formattedData = data.map((item, index) => {
-                            // 地點強化邏輯：同時檢查 4, 5, 6 索引 (對應 Column E, F, G)
-                            // 專人佈置通常在 6, 自取/後車廂通常在 4 或 5
-                            const loc = getKey(item, ['5', '4', '6', 'F', 'E', 'Column F', 'Column E', 'address', 'location']);
+                        const text = await res.text();
+                        if (text.trim() === "Accepted") throw new Error("Make API 目前沒有回傳資料。");
+                        let data = JSON.parse(text);
+                        rawJsonData.value = data;
 
+                        const formattedData = data.map((item, index) => {
+                            const loc = getKey(item, ['5', '4', '6', 'F', 'E', 'Column F', 'Column E', 'address', 'location']) || smartGet(item, 'location');
+                            const clientName = getKey(item, ['3', '8', 'D', 'name']) || smartGet(item, 'name');
+                            const phone = getKey(item, ['9', '7', 'G', 'phone']) || smartGet(item, 'phone');
                             let serviceName = getKey(item, ['2', 'C', 'service']) || '服務';
                             if (serviceName.includes('自取')) serviceName = '門市自取'; 
                             else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
                             else if (serviceName.includes('佈置')) serviceName = '專人佈置';
+                            const rawStatus = (getKey(item, ['11', 'K', '12', 'M', 'status']) || '').trim();
+                            let status = 'UNPAID';
+                            if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
+                            if (rawStatus.includes('取消')) status = 'CANCELED';
+                            if (rawStatus.includes('退款')) status = 'REFUNDED';
+                            if (rawStatus.includes('完成') || rawStatus.includes('結案')) status = 'COMPLETED';
 
                             return {
                                 id: index.toString(), 
                                 oid: getKey(item, ['0', 'A', 'oid']) || `M-${index}`,      
-                                clientName: getKey(item, ['3', '8', 'D', 'name']) || '未知', 
-                                service: serviceName,    
+                                clientName: clientName, service: serviceName,    
                                 date: (getKey(item, ['15', '4', 'P', 'date']) || '').split('T')[0],
                                 time: getKey(item, ['16', '5', 'Q', 'time']) || '',          
-                                phone: getKey(item, ['9', '7', 'G', 'phone']) || '',         
-                                userId: getKey(item, ['10', '11', 'L', 'userId']) || '',        
-                                status: getKey(item, ['11', 'K', 'status']).includes('付款') ? 'CONFIRMED' : 'UNPAID', 
-                                rawPrice: getKey(item, ['12', 'M', 'price']) || '0', 
-                                receivedPrice: getKey(item, ['17', 'R', 'received']) || '0', 
-                                location: loc || '未填寫地點'
+                                phone: phone, userId: getKey(item, ['10', '11', 'L', 'userId']) || '',        
+                                status: status, 
+                                rawPrice: parseInt(getKey(item, ['12', 'M', '13', 'N', 'price'])) || 0, 
+                                receivedPrice: parseInt(getKey(item, ['17', 'R', '18', 'S', 'received'])) || 0, 
+                                location: loc
                             };
                         });
-
                         reservations.value = formattedData.sort((a, b) => new Date(b.date) - new Date(a.date));
-                        if (!selectedOrder.value && formattedData.length > 0) selectedOrder.value = formattedData[0];
-                    } catch (e) { console.error(e); }
+                        if (selectedOrder.value) {
+                             const updated = formattedData.find(r => r.oid === selectedOrder.value.oid);
+                             // 非編輯模式下才更新資料
+                             if (updated && !isEditing.value) selectedOrder.value = updated;
+                        } else if (formattedData.length > 0) {
+                             selectedOrder.value = formattedData[0];
+                        }
+                    } catch (e) { errorMsg.value = e.message; }
                     loading.value = false;
                 };
 
-                // (其餘函數維持不變...)
+                const startEdit = () => {
+                    editForm.value = { ...selectedOrder.value }; // 複製當前資料
+                    isEditing.value = true;
+                };
+
+                const cancelEdit = () => {
+                    isEditing.value = false;
+                    editForm.value = {};
+                };
+
+                const saveEdit = async () => {
+                    const order = selectedOrder.value;
+                    Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
+
+                    // 使用我們原本的 Make Webhook，傳送 actionType = 'UPDATE_DATA' (或直接更新)
+                    // 注意：您需要確保 Make 流程中能處理 update data (寫入對應的欄位)
+                    // 為了簡化，這裡我們假設 Make 流程會更新所有傳送過去的欄位
+                    
+                    const payload = {
+                        to: order.userId,
+                        orderId: order.oid,
+                        // 使用編輯後的新資料
+                        clientName: editForm.value.clientName,
+                        service: order.service, // 服務類型通常不建議改，會影響分頁邏輯
+                        price: editForm.value.rawPrice,
+                        received: editForm.value.receivedPrice,
+                        balance: editForm.value.rawPrice - editForm.value.receivedPrice,
+                        date: editForm.value.date,
+                        time: editForm.value.time,
+                        phone: editForm.value.phone,
+                        location: editForm.value.location,
+                        status: order.status === 'CONFIRMED' ? '✅ 已付款' : '❌ 未付款', // 保持原狀態文字
+                        // 這裡可以選擇是否要發送「資料更新通知」，或者不發送 (message 留空或特定標記)
+                        message: { type: 'flex', altText: '訂單資料更新', contents: {} },
+                        updateOnly: true // 標記：只更新資料，不發卡片 (需配合 Make 邏輯，或 Make 照樣發送更新通知)
+                    };
+
+                    try {
+                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                        
+                        // 更新本地資料
+                        Object.assign(selectedOrder.value, editForm.value);
+                        isEditing.value = false;
+                        Swal.fire('成功', '資料已更新！', 'success');
+                    } catch (e) {
+                        Swal.fire('錯誤', e.message, 'error');
+                    }
+                };
+
+                // ... (getStatusText, getLabel, buildRichFlexMessage, updateOrderStatus, showDebug, selectOrder, filteredList) ...
+                // (為了節省篇幅，請保留您上一版完整的這些函數，或直接用上方提供的完整檔案)
                 const getStatusText = (status, isEnglish = false) => {
                     if (isEnglish) return status === 'CONFIRMED' ? 'PAYMENT CONFIRMED' : 'WAITING FOR PAYMENT';
-                    return status === 'CONFIRMED' ? '已付款' : '未付款';
+                    return status === 'CONFIRMED' ? '已付款' : (status === 'CANCELED' ? '已取消' : (status === 'REFUNDED' ? '已退款' : '未付款'));
                 };
                 const getLabel = (type, service) => (configMap[service] || configMap['專人佈置'])[type];
-                const selectOrder = (order) => { selectedOrder.value = order; };
+                const selectOrder = (order) => { 
+                    if(!isEditing.value) selectedOrder.value = order; // 編輯中不給切換
+                };
                 const filteredList = computed(() => {
                     if (filter.value === 'ALL') return reservations.value;
                     return reservations.value.filter(r => r.status === filter.value);
                 });
-
-                const updateOrderStatus = async (action) => {
-                    // 發送邏輯比照之前
-                    Swal.fire('發送成功', '通知小卡已送出', 'success');
-                };
+                const buildRichFlexMessage = (order, actionType) => { /* ... 請沿用上一版 ... */ return {}; };
+                const updateOrderStatus = async (actionType) => { /* ... 請沿用上一版 ... */ };
+                const showDebug = () => { /* ... */ };
 
                 onMounted(() => { fetchData(); setInterval(fetchData, 300000); });
-                return { reservations, selectedOrder, filter, loading, filteredList, selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel };
+                return { 
+                    reservations, selectedOrder, filter, loading, errorMsg, filteredList, 
+                    selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel, showDebug,
+                    // 新增的編輯功能
+                    isEditing, editForm, startEdit, cancelEdit, saveEdit
+                };
             }
         }).mount('#app');
     </script>
