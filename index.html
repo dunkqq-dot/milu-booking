@@ -148,6 +148,8 @@
                 <div><label class="input-label">佈置日期</label><input type="date" id="deco-date" class="custom-input" required></div>
                 <div><label class="input-label">進場時間</label><input type="time" id="deco-time" class="custom-input" required></div>
             </div>
+            
+            <!-- 專人佈置：改為下拉選單地址 -->
             <div>
                 <label class="input-label">佈置區域</label>
                 <div class="grid grid-cols-2 gap-4">
@@ -163,7 +165,9 @@
                 <label class="input-label">詳細地址 / 樓層</label>
                 <input type="text" id="deco-addr-detail" class="custom-input" placeholder="路/街/巷/弄/號/樓" required>
             </div>
+            <!-- 原本的地址 ID 欄位 (隱藏，用來組合上面三個) -->
             <input type="hidden" id="deco-address" name="entry.362812274">
+
             <div><label class="input-label">場地名稱</label><input type="text" id="deco-location" class="custom-input" placeholder="例：XX飯店 502號房" required></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">現場聯絡人</label><input type="text" id="deco-name" class="custom-input" required></div>
@@ -194,6 +198,8 @@
                     <option value="18:00 - 19:00">18:00 - 19:00</option>
                 </select></div>
             </div>
+
+            <!-- 氣球外送：改為下拉選單地址 -->
             <div>
                 <label class="input-label">外送區域</label>
                 <div class="grid grid-cols-2 gap-4">
@@ -209,7 +215,9 @@
                 <label class="input-label">詳細地址 / 樓層</label>
                 <input type="text" id="delivery-addr-detail" class="custom-input" placeholder="路/街/巷/弄/號 (限一樓/管理室)" required>
             </div>
+            <!-- 原本的地址 ID 欄位 (隱藏，用來組合上面三個) -->
             <input type="hidden" id="delivery-address" name="entry.1233565012">
+
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">收件人</label><input type="text" id="delivery-receiver" class="custom-input" required></div>
                 <div><label class="input-label">電話</label><input type="tel" id="delivery-phone" class="custom-input" required></div>
@@ -302,19 +310,27 @@
             bindFormInputs();
         };
 
+        // --- 地址選單邏輯 ---
         function initAddressSelectors(type) {
             const citySelect = document.getElementById(type + '-city');
+            const districtSelect = document.getElementById(type + '-district');
+
+            // 填入縣市
             Object.keys(taiwanPlaces).forEach(city => {
                 const option = document.createElement('option');
                 option.value = city; option.text = city;
                 citySelect.appendChild(option);
             });
         }
+
         function updateDistricts(type) {
             const citySelect = document.getElementById(type + '-city');
             const districtSelect = document.getElementById(type + '-district');
             const selectedCity = citySelect.value;
+            
+            // 清空舊選項
             districtSelect.innerHTML = '<option value="">請選擇區域</option>';
+
             if (selectedCity && taiwanPlaces[selectedCity]) {
                 taiwanPlaces[selectedCity].forEach(district => {
                     const option = document.createElement('option');
