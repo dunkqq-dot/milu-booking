@@ -83,6 +83,7 @@
             }
         };
 
+        // 台灣縣市區域資料
         const taiwanPlaces = {
             "臺北市": ["中正區", "大同區", "中山區", "松山區", "大安區", "萬華區", "信義區", "士林區", "北投區", "內湖區", "南港區", "文山區"],
             "新北市": ["板橋區", "三重區", "中和區", "永和區", "新莊區", "新店區", "樹林區", "鶯歌區", "三峽區", "淡水區", "汐止區", "瑞芳區", "土城區", "蘆洲區", "五股區", "泰山區", "林口區", "深坑區", "石碇區", "坪林區", "三芝區", "石門區", "八里區", "平溪區", "雙溪區", "貢寮區", "金山區", "萬里區", "烏來區"],
@@ -153,10 +154,10 @@
             <div>
                 <label class="input-label">佈置區域</label>
                 <div class="grid grid-cols-2 gap-4">
-                    <select id="deco-city" class="custom-input" onchange="updateDistricts('deco')">
+                    <select id="deco-city" class="custom-input" onchange="updateDistricts('deco')" required>
                         <option value="">請選擇縣市</option>
                     </select>
-                    <select id="deco-district" class="custom-input">
+                    <select id="deco-district" class="custom-input" required>
                         <option value="">請選擇區域</option>
                     </select>
                 </div>
@@ -203,10 +204,10 @@
             <div>
                 <label class="input-label">外送區域</label>
                 <div class="grid grid-cols-2 gap-4">
-                    <select id="delivery-city" class="custom-input" onchange="updateDistricts('delivery')">
+                    <select id="delivery-city" class="custom-input" onchange="updateDistricts('delivery')" required>
                         <option value="">請選擇縣市</option>
                     </select>
-                    <select id="delivery-district" class="custom-input">
+                    <select id="delivery-district" class="custom-input" required>
                         <option value="">請選擇區域</option>
                     </select>
                 </div>
@@ -487,8 +488,7 @@
             }
 
             let terms = [];
-            if(type === 'deco') terms = ["我已確認場地允許進行氣球佈置..."]; // (省略以保持簡潔)
-            // ... (terms 邏輯保持不變) ...
+            if(type === 'deco') terms = ["我已確認場地允許進行氣球佈置..."]; // (省略)
             
             terms.forEach(t => createHiddenInput(form, 'entry.' + configEntry.TERMS_ID, t));
 
@@ -527,7 +527,7 @@
                     
                     sendFlexMessageAndClose(
                         type === 'deco' ? '專人佈置' : (type === 'delivery' ? '氣球外送' : (type === 'pickup' ? '工作室自取' : '後車廂驚喜')), 
-                        nameVal, // 這裡會傳入正確的名字
+                        nameVal, 
                         dateInput.value, 
                         timeInput.value
                     );
