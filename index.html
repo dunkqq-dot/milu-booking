@@ -57,33 +57,12 @@
                 NAME: '貴誰日工作室 蔡佳苓' 
             },
             
-            DECO: { 
-                ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', 
-                LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855', 
-                SYSTEM_ID: '854196062', PAYMENT_ID: '1383504004',
-                SERVICE_ID: '' 
-            },
-            DELIVERY: { 
-                ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', 
-                LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019', 
-                SYSTEM_ID: '2002313802', PAYMENT_ID: '1973575588',
-                SERVICE_ID: ''
-            }, 
-            TRUNK: { 
-                ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', 
-                LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591', 
-                SYSTEM_ID: '1545965466', PAYMENT_ID: '352227586',
-                SERVICE_ID: ''
-            },
-            PICKUP: { 
-                ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeGfmaUfKjyhvUcerp1gpXU25-C6TRJBkCMyzGBg7qykSkjYg/formResponse', 
-                LINE_ID: '25342459', LOCATION_ID: '1448770209', DATE_ID: '995623192', TIME_ID: '1255688304', NAME_ID: '1307528521', PHONE_ID: '1776788492', TERMS_ID: '178386428', 
-                SYSTEM_ID: '1557454594', PAYMENT_ID: '347397920',
-                SERVICE_ID: ''
-            }
+            DECO: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855', SYSTEM_ID: '854196062', PAYMENT_ID: '1383504004', SERVICE_ID: '' },
+            DELIVERY: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019', SYSTEM_ID: '2002313802', PAYMENT_ID: '1973575588', SERVICE_ID: '' }, 
+            TRUNK: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591', SYSTEM_ID: '1545965466', PAYMENT_ID: '352227586', SERVICE_ID: '' },
+            PICKUP: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeGfmaUfKjyhvUcerp1gpXU25-C6TRJBkCMyzGBg7qykSkjYg/formResponse', LINE_ID: '25342459', LOCATION_ID: '1448770209', DATE_ID: '995623192', TIME_ID: '1255688304', NAME_ID: '1307528521', PHONE_ID: '1776788492', TERMS_ID: '178386428', SYSTEM_ID: '1557454594', PAYMENT_ID: '347397920', SERVICE_ID: '' }
         };
 
-        // 台灣縣市區域資料
         const taiwanPlaces = {
             "臺北市": ["中正區", "大同區", "中山區", "松山區", "大安區", "萬華區", "信義區", "士林區", "北投區", "內湖區", "南港區", "文山區"],
             "新北市": ["板橋區", "三重區", "中和區", "永和區", "新莊區", "新店區", "樹林區", "鶯歌區", "三峽區", "淡水區", "汐止區", "瑞芳區", "土城區", "蘆洲區", "五股區", "泰山區", "林口區", "深坑區", "石碇區", "坪林區", "三芝區", "石門區", "八里區", "平溪區", "雙溪區", "貢寮區", "金山區", "萬里區", "烏來區"],
@@ -243,7 +222,16 @@
             </div></div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">取貨日期</label><input type="date" id="pickup-date" class="custom-input" required></div>
-                <div><label class="input-label">取貨時間</label><select id="pickup-time" class="custom-input" required><option value="" disabled selected>請選擇時段</option><option>12:30 - 13:00</option><option>13:00 - 14:00</option><option>14:00 - 15:00</option><option>15:00 - 16:00</option><option>16:00 - 17:00</option><option>17:00 - 18:00</option><option>18:00 - 19:00</option></select></div>
+                <div><label class="input-label">取貨時間</label><select id="pickup-time" class="custom-input" required>
+                    <option value="" disabled selected>請選擇時段</option>
+                    <option value="12:30 - 13:00">12:30 - 13:00</option>
+                    <option value="13:00 - 14:00">13:00 - 14:00</option>
+                    <option value="14:00 - 15:00">14:00 - 15:00</option>
+                    <option value="15:00 - 16:00">15:00 - 16:00</option>
+                    <option value="16:00 - 17:00">16:00 - 17:00</option>
+                    <option value="17:00 - 18:00">17:00 - 18:00</option>
+                    <option value="18:00 - 19:00">18:00 - 19:00</option>
+                </select></div>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label class="input-label">取貨人姓名</label><input type="text" id="pickup-name" class="custom-input" required></div>
@@ -311,27 +299,21 @@
             bindFormInputs();
         };
 
-        // --- 地址選單邏輯 ---
         function initAddressSelectors(type) {
             const citySelect = document.getElementById(type + '-city');
             const districtSelect = document.getElementById(type + '-district');
 
-            // 填入縣市
             Object.keys(taiwanPlaces).forEach(city => {
                 const option = document.createElement('option');
                 option.value = city; option.text = city;
                 citySelect.appendChild(option);
             });
         }
-
         function updateDistricts(type) {
             const citySelect = document.getElementById(type + '-city');
             const districtSelect = document.getElementById(type + '-district');
             const selectedCity = citySelect.value;
-            
-            // 清空舊選項
             districtSelect.innerHTML = '<option value="">請選擇區域</option>';
-
             if (selectedCity && taiwanPlaces[selectedCity]) {
                 taiwanPlaces[selectedCity].forEach(district => {
                     const option = document.createElement('option');
@@ -341,7 +323,6 @@
             }
         }
 
-        // ... bindFormInputs, switchTab 保持不變 ...
         function bindFormInputs() {
             const decoForm = document.getElementById('form-deco');
             decoForm.action = config.DECO.ACTION;
@@ -400,143 +381,163 @@
             const configEntry = config[type.toUpperCase()];
             form.action = configEntry.ACTION;
 
-            // ⚠️ 關鍵：組合地址 (縣市+區域+詳細)
-            if (type === 'deco' || type === 'delivery') {
-                const city = document.getElementById(type + '-city').value;
-                const district = document.getElementById(type + '-district').value;
-                const detail = document.getElementById(type + '-addr-detail').value;
+            try {
+                // ⚠️ 驗證必填欄位 (防止空白送出)
+                const requiredInputs = form.querySelectorAll('input[required], select[required]');
+                let isValid = true;
+                requiredInputs.forEach(input => {
+                    if (!input.value) isValid = false;
+                });
+                
+                // ⚠️ 驗證地址 (專人佈置 & 氣球外送)
+                if (type === 'deco' || type === 'delivery') {
+                    const city = document.getElementById(type + '-city').value;
+                    const district = document.getElementById(type + '-district').value;
+                    const detail = document.getElementById(type + '-addr-detail').value;
 
-                if (!city || !district || !detail) {
+                    if (!city || !district || !detail) {
+                        Swal.fire({
+                            title: '請填寫完整地址',
+                            text: '縣市、區域與詳細地址皆為必填',
+                            icon: 'warning',
+                            confirmButtonText: '好的',
+                            confirmButtonColor: '#C69C6D'
+                        });
+                        return false;
+                    }
+                    
+                    let addressInput = document.getElementById(type + '-address');
+                    if (addressInput) {
+                        addressInput.value = `${city}${district}${detail}`;
+                    } else {
+                         createHiddenInput(form, 'entry.' + configEntry.ADDRESS_ID, `${city}${district}${detail}`);
+                    }
+                }
+                
+                // ⚠️ 驗證條款 (必須全部勾選)
+                const checkboxes = form.querySelectorAll('.checkbox-input');
+                let allChecked = true;
+                checkboxes.forEach(cb => {
+                    if(!cb.checked) allChecked = false;
+                });
+
+                if (!isValid || !allChecked) {
                     Swal.fire({
-                        title: '請填寫完整地址',
-                        text: '縣市、區域與詳細地址皆為必填',
+                        title: '資料未填寫完整',
+                        text: '請檢查必填欄位並勾選所有預約須知',
                         icon: 'warning',
                         confirmButtonText: '好的',
                         confirmButtonColor: '#C69C6D'
                     });
                     return false;
                 }
+
+                // ... (系統 ID 與日期時間處理保持不變) ...
+                let sysInput = null;
+                if (configEntry.SYSTEM_ID) {
+                    sysInput = form.querySelector(`input[name="entry.${configEntry.SYSTEM_ID}"]`);
+                    if (!sysInput) {
+                        sysInput = document.createElement('input');
+                        sysInput.type = 'hidden';
+                        sysInput.name = 'entry.' + configEntry.SYSTEM_ID;
+                        form.appendChild(sysInput);
+                    }
+                    if(liff.isInClient() && liff.isLoggedIn()) {
+                        try {
+                            const profile = await liff.getProfile();
+                            sysInput.value = profile.userId;
+                        } catch (e) {}
+                    }
+                }
                 
-                let addressInput = document.getElementById(type + '-address');
-                if (addressInput) {
-                    addressInput.value = `${city}${district}${detail}`;
-                } else {
-                     createHiddenInput(form, 'entry.' + configEntry.ADDRESS_ID, `${city}${district}${detail}`);
+                if (configEntry.PAYMENT_ID) {
+                    let payInput = form.querySelector(`input[name="entry.${configEntry.PAYMENT_ID}"]`);
+                    if(!payInput) {
+                        payInput = document.createElement('input');
+                        payInput.type = 'hidden';
+                        payInput.name = 'entry.' + configEntry.PAYMENT_ID;
+                        form.appendChild(payInput);
+                    }
+                    payInput.value = '未付款';
                 }
-            }
-            
-            // 姓名邏輯修正 (如果是外送，使用 delivery-receiver)
-            // 這部分邏輯已整合在送出時的變數讀取中
-            // 但表單提交本身的 name 屬性在 bindFormInputs 已設定好
+                if (configEntry.SERVICE_ID) {
+                    const serviceNameMap = { 'deco': '專人佈置', 'delivery': '氣球外送', 'trunk': '後車廂驚喜', 'pickup': '工作室自取' };
+                    let serviceInput = form.querySelector(`input[name="entry.${configEntry.SERVICE_ID}"]`);
+                    if (!serviceInput) {
+                        serviceInput = document.createElement('input');
+                        serviceInput.type = 'hidden';
+                        serviceInput.name = 'entry.' + configEntry.SERVICE_ID;
+                        form.appendChild(serviceInput);
+                    }
+                    serviceInput.value = serviceNameMap[type];
+                }
 
-            let sysInput = null;
-            if (configEntry.SYSTEM_ID) {
-                sysInput = form.querySelector(`input[name="entry.${configEntry.SYSTEM_ID}"]`);
-                if (!sysInput) {
-                    sysInput = document.createElement('input');
-                    sysInput.type = 'hidden';
-                    sysInput.name = 'entry.' + configEntry.SYSTEM_ID;
-                    form.appendChild(sysInput);
+                const dateInput = document.getElementById(type + '-date');
+                if(dateInput && dateInput.value) {
+                    const parts = dateInput.value.split('-');
+                    createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_year', parts[0]);
+                    createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_month', parts[1]);
+                    createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_day', parts[2]);
+                    createHiddenInput(form, 'entry.' + configEntry.DATE_ID, dateInput.value); 
                 }
-                if(liff.isInClient() && liff.isLoggedIn()) {
-                    try {
-                        const profile = await liff.getProfile();
-                        sysInput.value = profile.userId;
-                    } catch (e) {}
+                
+                const timeInput = document.getElementById(type + '-time');
+                if(timeInput && (type === 'deco' || type === 'trunk')) {
+                     if(timeInput.value) {
+                        const parts = timeInput.value.split(':');
+                        createHiddenInput(form, 'entry.' + configEntry.TIME_ID + '_hour', parts[0]);
+                        createHiddenInput(form, 'entry.' + configEntry.TIME_ID + '_minute', parts[1]);
+                        createHiddenInput(form, 'entry.' + configEntry.TIME_ID, timeInput.value); 
+                    }
                 }
-            }
-            
-            if (configEntry.PAYMENT_ID) {
-                let payInput = form.querySelector(`input[name="entry.${configEntry.PAYMENT_ID}"]`);
-                if(!payInput) {
-                    payInput = document.createElement('input');
-                    payInput.type = 'hidden';
-                    payInput.name = 'entry.' + configEntry.PAYMENT_ID;
-                    form.appendChild(payInput);
-                }
-                payInput.value = '未付款';
-            }
-            if (configEntry.SERVICE_ID) {
-                const serviceNameMap = { 'deco': '專人佈置', 'delivery': '氣球外送', 'trunk': '後車廂驚喜', 'pickup': '工作室自取' };
-                let serviceInput = form.querySelector(`input[name="entry.${configEntry.SERVICE_ID}"]`);
-                if (!serviceInput) {
-                    serviceInput = document.createElement('input');
-                    serviceInput.type = 'hidden';
-                    serviceInput.name = 'entry.' + configEntry.SERVICE_ID;
-                    form.appendChild(serviceInput);
-                }
-                serviceInput.value = serviceNameMap[type];
-            }
 
-            const dateInput = document.getElementById(type + '-date');
-            if(dateInput && dateInput.value) {
-                const parts = dateInput.value.split('-');
-                createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_year', parts[0]);
-                createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_month', parts[1]);
-                createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_day', parts[2]);
-                createHiddenInput(form, 'entry.' + configEntry.DATE_ID, dateInput.value); 
-            }
-            
-            const timeInput = document.getElementById(type + '-time');
-            if(timeInput && (type === 'deco' || type === 'trunk')) {
-                 if(timeInput.value) {
-                    const parts = timeInput.value.split(':');
-                    createHiddenInput(form, 'entry.' + configEntry.TIME_ID + '_hour', parts[0]);
-                    createHiddenInput(form, 'entry.' + configEntry.TIME_ID + '_minute', parts[1]);
-                    createHiddenInput(form, 'entry.' + configEntry.TIME_ID, timeInput.value); 
-                }
-            }
+                // 提交表單
+                form.submit();
 
-            let terms = [];
-            if(type === 'deco') terms = ["我已確認場地允許進行氣球佈置..."]; // (省略)
-            
-            terms.forEach(t => createHiddenInput(form, 'entry.' + configEntry.TERMS_ID, t));
-
-            submitted = true;
-            form.submit();
-
-            // 成功畫面切換
-            if (liff.isInClient()) {
-                Swal.fire({
-                    title: '預約單已送出！',
-                    html: `
-                        <div class="text-left text-sm text-gray-600">
-                            <p class="mb-2">感謝您的填寫！請完成最後一步驟：</p>
-                            <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100 mb-3">
-                                <p class="font-bold text-yellow-800 mb-1">💰 匯款資訊</p>
-                                <p>銀行代碼：<span class="font-bold text-gray-800">${config.BANK_INFO.CODE}</span></p>
-                                <p>銀行帳號：<span class="font-bold text-gray-800">${config.BANK_INFO.ACCOUNT}</span></p>
-                                ${config.BANK_INFO.NAME ? `<p>戶名：<span class="font-bold text-gray-800">${config.BANK_INFO.NAME}</span></p>` : ''}
+                // 顯示成功與匯款資訊 (已修正 HTML 顯示問題)
+                if (liff.isInClient()) {
+                    Swal.fire({
+                        title: '預約單已送出！',
+                        html: `
+                            <div class="text-left text-sm text-gray-600">
+                                <p class="mb-2">感謝您的填寫！請完成最後一步驟：</p>
+                                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100 mb-3">
+                                    <p class="font-bold text-yellow-800 mb-1">💰 匯款資訊</p>
+                                    <p>銀行代碼：<span class="font-bold text-gray-800">${config.BANK_INFO.CODE}</span></p>
+                                    <p>銀行帳號：<span class="font-bold text-gray-800">${config.BANK_INFO.ACCOUNT}</span></p>
+                                    ${config.BANK_INFO.NAME ? `<p>戶名：<span class="font-bold text-gray-800">${config.BANK_INFO.NAME}</span></p>` : ''}
+                                </div>
+                                <p class="font-bold text-red-500">⚠️ 匯款後請務必在 LINE 告知「帳號後五碼」</p>
+                                <p class="mt-1">我們查帳確認後，會回傳「預約成功通知」給您，才算完成喔！</p>
                             </div>
-                            <p class="font-bold text-red-500">⚠️ 匯款後請務必在 LINE 告知「帳號後五碼」</p>
-                            <p class="mt-1">我們查帳確認後，會回傳「預約成功通知」給您，才算完成喔！</p>
-                        </div>
-                    `,
-                    icon: 'info',
-                    confirmButtonText: '好的，關閉視窗',
-                    confirmButtonColor: '#4A4A4A',
-                    background: '#F9F7F2',
-                    color: '#4A4A4A',
-                    customClass: { title: 'font-serif text-milu-gold', popup: 'rounded-xl border border-milu-light' },
-                    allowOutsideClick: false
-                }).then(() => {
-                    // 修正這裡：抓取正確的名字欄位
-                    // 對於 delivery，名字其實是在 delivery-receiver
-                    const nameId = type === 'delivery' ? 'delivery-receiver' : type + '-name';
-                    const nameVal = document.getElementById(nameId) ? document.getElementById(nameId).value : '-';
-                    
-                    sendFlexMessageAndClose(
-                        type === 'deco' ? '專人佈置' : (type === 'delivery' ? '氣球外送' : (type === 'pickup' ? '工作室自取' : '後車廂驚喜')), 
-                        nameVal, 
-                        dateInput.value, 
-                        timeInput.value
-                    );
-                });
-            } else {
-                document.getElementById('booking-page').style.display = 'none';
-                document.getElementById('fallback-success').style.display = 'block';
-            }
+                        `,
+                        icon: 'info',
+                        confirmButtonText: '好的，關閉視窗',
+                        confirmButtonColor: '#4A4A4A',
+                        background: '#F9F7F2',
+                        color: '#4A4A4A',
+                        customClass: { title: 'font-serif text-milu-gold', popup: 'rounded-xl border border-milu-light' },
+                        allowOutsideClick: false
+                    }).then(() => {
+                        const nameId = type === 'delivery' ? 'delivery-receiver' : type + '-name';
+                        const nameVal = document.getElementById(nameId) ? document.getElementById(nameId).value : '-';
+                        
+                        sendFlexMessageAndClose(
+                            type === 'deco' ? '專人佈置' : (type === 'delivery' ? '氣球外送' : (type === 'pickup' ? '工作室自取' : '後車廂驚喜')), 
+                            nameVal, 
+                            dateInput.value, 
+                            timeInput.value
+                        );
+                    });
+                } else {
+                    document.getElementById('booking-page').style.display = 'none';
+                    document.getElementById('fallback-success').style.display = 'block';
+                }
 
+            } catch (error) {
+                console.error("Submission Error:", error);
+                Swal.fire('錯誤', '送出時發生錯誤，請稍後再試', 'error');
+            }
             return false;
         }
 
