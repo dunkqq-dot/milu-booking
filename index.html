@@ -56,13 +56,83 @@
                 ACCOUNT: '54320100686300', 
                 NAME: '貴誰日工作室 蔡佳苓' 
             },
+
+            // 💰 付款規則設定 (已更新為最新版本)
+            PAYMENT_RULES: {
+                // 1. 專人佈置 & 後車廂 (3天以上 - 一般預約)
+                DECO_NORMAL: `
+                    <div class="text-left text-sm space-y-2">
+                        <p class="font-bold">感謝您訂購 麋鹿氣球MILU balloons🎈的服務！</p>
+                        <p>本工作室採 <b>先完成預約程序者優先制</b>。</p>
+                        <hr class="border-blue-200 my-2">
+                        <ol class="list-decimal pl-4 space-y-1">
+                            <li>單一時段僅服務一組客人，如同時段有兩組或以上，將以 <b>最先支付訂金者優先</b>。</li>
+                            <li><b>匯款期限：</b>請於 <b>三日內完成匯款</b>，並將匯款截圖回傳給我們。收到訂金後，預約程序才算完成。<br><span class="text-xs text-gray-500">若超過三日未匯款，訂單將視為 <b>未成立</b>，工作室不會準備任何商品，若仍有需求需重新確認空檔時段。</span></li>
+                            <li><b>訂金規則：</b>預訂款可為 <b>全額或 50% 訂金</b>，尾款請於佈置當天或事先支付。<br><span class="text-xs text-gray-500">若匯款後增加商品數量，需另行支付費用。</span></li>
+                            <li><b>改期與取消：</b>完成預約後 <b>僅接受一次改期</b>，改期日需另行預約。<br><span class="text-xs text-gray-500">若因個人因素取消預約，將 <b>收取總金額 30% 作為服務費</b>，剩餘款項退還。</span></li>
+                        </ol>
+                        <div class="mt-2 p-2 bg-yellow-100 rounded text-yellow-800 text-xs">
+                            📢 <b>貼心提醒</b><br>完成訂金匯款後，預約才算正式成立，請務必依照以上規則操作，以確保您的時段順利保留。
+                        </div>
+                    </div>
+                `,
+                
+                // 2. 專人佈置 & 後車廂 (3天內 - 急單)
+                DECO_URGENT: `
+                    <div class="text-left text-sm space-y-2">
+                        <p class="font-bold text-red-600">⚠️ 本報價單為 三日內預約者專用。</p>
+                        <p class="font-bold">⏱ 預約與付款規則</p>
+                        <hr class="border-blue-200 my-2">
+                        <ol class="list-decimal pl-4 space-y-2">
+                            <li><b>完成預約程序</b><br>請於預約時 <b>支付全額款項</b> 並截圖回傳。<br><span class="text-xs text-gray-500">若在預約時間前「五小時」尚未收到款項，訂單將視為 <b>未成立</b>，工作室不會準備任何商品，敬請配合。</span></li>
+                            <li><b>單一時段僅服務一組客人</b><br>若同時段有多組客人，將以 <b>最先付款者優先</b>。</li>
+                            <li><b>臨時急件服務</b><br>若需安排 24 小時內佈置，將額外收取 <b>急件費 $500</b>。</li>
+                            <li><b>取消規定</b><br>因個人因素取消預約，將收取 <b>總金額 30% 服務費</b>，剩餘款項退還。</li>
+                        </ol>
+                    </div>
+                `,
+                
+                // 3. 氣球外送 & 工作室自取 (統一規則)
+                SIMPLE: `
+                    <div class="text-left text-sm space-y-2">
+                        <p class="font-bold">⏱ 預約與付款規則</p>
+                        <hr class="border-blue-200 my-2">
+                        <ol class="list-decimal pl-4 space-y-2">
+                            <li><b>完成預約程序</b><br>請於預約當下 <b>支付全額款項</b> 並截圖回傳。<br><span class="text-xs text-gray-500">若在預約時間前 24 小時 尚未收到款項，訂單將視為 <b>未成立</b>，工作室不會準備任何商品。</span></li>
+                            <li><b>急件服務</b><br>若需安排 24 小時內臨時急件，需額外收取 <b>急件費 $500</b>。</li>
+                            <li><b>取消規定</b><br>因個人因素 24 小時內取消預約，將 <b>不退還任何款項</b>。</li>
+                        </ol>
+                    </div>
+                `
+            },
             
-            DECO: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855', SYSTEM_ID: '854196062', PAYMENT_ID: '1383504004', SERVICE_ID: '' },
-            DELIVERY: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019', SYSTEM_ID: '2002313802', PAYMENT_ID: '1973575588', SERVICE_ID: '' }, 
-            TRUNK: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591', SYSTEM_ID: '1545965466', PAYMENT_ID: '352227586', SERVICE_ID: '' },
-            PICKUP: { ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeGfmaUfKjyhvUcerp1gpXU25-C6TRJBkCMyzGBg7qykSkjYg/formResponse', LINE_ID: '25342459', LOCATION_ID: '1448770209', DATE_ID: '995623192', TIME_ID: '1255688304', NAME_ID: '1307528521', PHONE_ID: '1776788492', TERMS_ID: '178386428', SYSTEM_ID: '1557454594', PAYMENT_ID: '347397920', SERVICE_ID: '' }
+            DECO: { 
+                ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeuoWKBH5N0OD2ndd4lQY7HS-CplTGh7aN1P_KUsnIV0L22hg/formResponse', 
+                LINE_ID: '25342459', DATE_ID: '144531671', TIME_ID: '1297034041', ADDRESS_ID: '362812274', LOCATION_ID: '2051909207', NAME_ID: '1515108566', PHONE_ID: '2029864194', TERMS_ID: '1988418855', 
+                SYSTEM_ID: '854196062', PAYMENT_ID: '1383504004',
+                SERVICE_ID: '' 
+            },
+            DELIVERY: { 
+                ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeS_OuOMGKgpOmvVZdDtgzG_pBFLn6lbmg_8SsN5-XwBOg3kw/formResponse', 
+                LINE_ID: '25342459', DATE_ID: '1600332996', TIME_ID: '2101241835', ADDRESS_ID: '1233565012', RECEIVER_ID: '431322564', PHONE_ID: '542364066', TERMS_ID: '391729019', 
+                SYSTEM_ID: '2002313802', PAYMENT_ID: '1973575588',
+                SERVICE_ID: ''
+            }, 
+            TRUNK: { 
+                ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSdm8LpSR3hTEWQ2lDfNymhZD91WFyHXWqciFPV0dSxrKViw0Q/formResponse', 
+                LINE_ID: '25342459', LOCATION_ID: '1086826795', DATE_ID: '1836239432', TIME_ID: '1130825436', CAR_ID: '1571766022', NAME_ID: '1970717609', PHONE_ID: '1029904286', TERMS_ID: '1380789591', 
+                SYSTEM_ID: '1545965466', PAYMENT_ID: '352227586',
+                SERVICE_ID: ''
+            },
+            PICKUP: { 
+                ACTION: 'https://docs.google.com/forms/d/e/1FAIpQLSeGfmaUfKjyhvUcerp1gpXU25-C6TRJBkCMyzGBg7qykSkjYg/formResponse', 
+                LINE_ID: '25342459', LOCATION_ID: '1448770209', DATE_ID: '995623192', TIME_ID: '1255688304', NAME_ID: '1307528521', PHONE_ID: '1776788492', TERMS_ID: '178386428', 
+                SYSTEM_ID: '1557454594', PAYMENT_ID: '347397920',
+                SERVICE_ID: ''
+            }
         };
 
+        // 台灣縣市區域資料
         const taiwanPlaces = {
             "臺北市": ["中正區", "大同區", "中山區", "松山區", "大安區", "萬華區", "信義區", "士林區", "北投區", "內湖區", "南港區", "文山區"],
             "新北市": ["板橋區", "三重區", "中和區", "永和區", "新莊區", "新店區", "樹林區", "鶯歌區", "三峽區", "淡水區", "汐止區", "瑞芳區", "土城區", "蘆洲區", "五股區", "泰山區", "林口區", "深坑區", "石碇區", "坪林區", "三芝區", "石門區", "八里區", "平溪區", "雙溪區", "貢寮區", "金山區", "萬里區", "烏來區"],
@@ -91,19 +161,35 @@
 
     <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
 
+    <!-- ⚠️ 這裡修改了 id，避免與 Swal 衝突 -->
+    <div id="booking-success-template" style="display:none;">
+        <div class="text-left text-sm text-gray-600">
+            <p class="mb-2">感謝您的填寫！請完成最後一步驟：</p>
+            
+            <!-- 動態插入付款規則 -->
+            <div id="payment-rule-container" class="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-3 text-blue-800">
+                <!-- JS 會把內容塞進這裡 -->
+            </div>
+            
+            <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100 mb-3">
+                <p class="font-bold text-yellow-800 mb-1">💰 匯款資訊</p>
+                <p>銀行代碼：<span class="font-bold text-gray-800">${config.BANK_INFO.CODE}</span></p>
+                <p>銀行帳號：<span class="font-bold text-gray-800">${config.BANK_INFO.ACCOUNT}</span></p>
+                ${config.BANK_INFO.NAME ? `<p>戶名：<span class="font-bold text-gray-800">${config.BANK_INFO.NAME}</span></p>` : ''}
+            </div>
+            <p class="font-bold text-red-500">⚠️ 匯款後請務必在 LINE 告知「帳號後五碼」</p>
+            <p class="mt-1">我們查帳確認後，會回傳「預約成功通知」給您，才算完成喔！</p>
+        </div>
+    </div>
+
+    <!-- 成功落地頁 (當視窗關不掉時顯示) -->
     <div id="fallback-success">
         <div class="mb-6 text-6xl text-green-500"><i class="fa-solid fa-circle-check"></i></div>
         <h2 class="text-2xl font-bold text-gray-800 mb-4 font-serif">預約已送出！</h2>
         <p class="text-gray-500 mb-8 text-sm leading-relaxed">請截圖保存下方匯款資訊<br>並於匯款後回傳帳號後五碼</p>
-        <div class="bg-yellow-50 p-6 rounded-xl text-left text-gray-700 mb-8 border border-yellow-100 shadow-sm">
-            <p class="font-bold text-yellow-800 mb-3 text-lg border-b border-yellow-200 pb-2">💰 匯款帳號</p>
-            <p class="mb-1 text-sm text-gray-500">銀行代碼</p>
-            <p class="font-bold text-lg mb-3">009 彰化銀行 (汐科分行)</p>
-            <p class="mb-1 text-sm text-gray-500">銀行帳號</p>
-            <p class="font-bold text-xl mb-3 text-milu-dark tracking-wide">54320100686300</p>
-            <p class="mb-1 text-sm text-gray-500">戶名</p>
-            <p class="font-bold text-lg">貴誰日工作室 蔡佳苓</p>
-        </div>
+        <!-- 這裡的內容會由 JS 動態更新，以顯示正確規則 -->
+        <div id="fallback-content"></div>
+        
         <button onclick="liff.closeWindow()" class="w-full bg-gray-800 text-white py-4 rounded-xl font-bold mb-4 shadow-lg hover:bg-gray-700">關閉視窗</button>
         <p class="text-xs text-gray-400">若無法自動關閉，請點擊左上角 X</p>
     </div>
@@ -158,6 +244,7 @@
                 <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>我了解空飄氣球漂浮時間約 6～8 小時，會安排在活動前 1-2 小時完成佈置以達最佳效果。</span></label>
                 <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>關於殘膠風險： 我了解工作室使用 3M 不易殘膠布膠，並同意於 36 小時內 拆除。</span></label>
                 <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>若超過 36 小時未拆除導致殘膠或漆面脫落，或因牆面材質特殊造成損損，我同意工作室不負修復或賠償責任。</span></label>
+                <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>關於作業時間：我了解專人佈置需預留 至少 2 小時 的施作時間。</span></label>
             </div></div>
             <div class="mt-8 mb-4"><button type="submit" class="w-full bg-[#4A4A4A] text-white py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-gray-800 transition transform active:scale-95">提交預約 (下一步：匯款)</button></div>
         </form>
@@ -323,6 +410,7 @@
             }
         }
 
+        // ... bindFormInputs, switchTab 保持不變 ...
         function bindFormInputs() {
             const decoForm = document.getElementById('form-deco');
             decoForm.action = config.DECO.ACTION;
@@ -376,184 +464,209 @@
             });
         }
 
+        function calculateDaysDiff(dateStr) {
+            if (!dateStr) return 0;
+            const targetDate = new Date(dateStr);
+            const today = new Date();
+            // Reset time to compare dates only
+            targetDate.setHours(0, 0, 0, 0);
+            today.setHours(0, 0, 0, 0);
+            
+            const diffTime = targetDate - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays;
+        }
+
+        function getPaymentMessage(type, dateStr) {
+            const rules = config.PAYMENT_RULES;
+            const diffDays = calculateDaysDiff(dateStr);
+            
+            if (type === 'deco' || type === 'trunk') {
+                if (diffDays <= 3) {
+                    return rules.DECO_URGENT;
+                } else {
+                    return rules.DECO_NORMAL;
+                }
+            } else {
+                return rules.SIMPLE;
+            }
+        }
+
         async function handleFormSubmit(event, form, type) {
             event.preventDefault(); 
             const configEntry = config[type.toUpperCase()];
             form.action = configEntry.ACTION;
 
-            try {
-                // ⚠️ 驗證必填欄位 (防止空白送出)
-                const requiredInputs = form.querySelectorAll('input[required], select[required]');
-                let isValid = true;
-                requiredInputs.forEach(input => {
-                    if (!input.value) isValid = false;
-                });
-                
-                // ⚠️ 驗證地址 (專人佈置 & 氣球外送)
-                if (type === 'deco' || type === 'delivery') {
-                    const city = document.getElementById(type + '-city').value;
-                    const district = document.getElementById(type + '-district').value;
-                    const detail = document.getElementById(type + '-addr-detail').value;
+            // ⚠️ 關鍵：組合地址 (縣市+區域+詳細)
+            if (type === 'deco' || type === 'delivery') {
+                const city = document.getElementById(type + '-city').value;
+                const district = document.getElementById(type + '-district').value;
+                const detail = document.getElementById(type + '-addr-detail').value;
 
-                    if (!city || !district || !detail) {
-                        Swal.fire({
-                            title: '請填寫完整地址',
-                            text: '縣市、區域與詳細地址皆為必填',
-                            icon: 'warning',
-                            confirmButtonText: '好的',
-                            confirmButtonColor: '#C69C6D'
-                        });
-                        return false;
-                    }
-                    
-                    let addressInput = document.getElementById(type + '-address');
-                    if (addressInput) {
-                        addressInput.value = `${city}${district}${detail}`;
-                    } else {
-                         createHiddenInput(form, 'entry.' + configEntry.ADDRESS_ID, `${city}${district}${detail}`);
-                    }
-                }
-                
-                // ⚠️ 驗證條款 (必須全部勾選)
-                const checkboxes = form.querySelectorAll('.checkbox-input');
-                let allChecked = true;
-                checkboxes.forEach(cb => {
-                    if(!cb.checked) allChecked = false;
-                });
-
-                if (!isValid || !allChecked) {
+                if (!city || !district || !detail) {
                     Swal.fire({
-                        title: '資料未填寫完整',
-                        text: '請檢查必填欄位並勾選所有預約須知',
+                        title: '請填寫完整地址',
+                        text: '縣市、區域與詳細地址皆為必填',
                         icon: 'warning',
                         confirmButtonText: '好的',
                         confirmButtonColor: '#C69C6D'
                     });
                     return false;
                 }
-
-                // ... (系統 ID 與日期時間處理保持不變) ...
-                let sysInput = null;
-                if (configEntry.SYSTEM_ID) {
-                    sysInput = form.querySelector(`input[name="entry.${configEntry.SYSTEM_ID}"]`);
-                    if (!sysInput) {
-                        sysInput = document.createElement('input');
-                        sysInput.type = 'hidden';
-                        sysInput.name = 'entry.' + configEntry.SYSTEM_ID;
-                        form.appendChild(sysInput);
-                    }
-                    if(liff.isInClient() && liff.isLoggedIn()) {
-                        try {
-                            const profile = await liff.getProfile();
-                            sysInput.value = profile.userId;
-                        } catch (e) {}
-                    }
-                }
                 
-                if (configEntry.PAYMENT_ID) {
-                    let payInput = form.querySelector(`input[name="entry.${configEntry.PAYMENT_ID}"]`);
-                    if(!payInput) {
-                        payInput = document.createElement('input');
-                        payInput.type = 'hidden';
-                        payInput.name = 'entry.' + configEntry.PAYMENT_ID;
-                        form.appendChild(payInput);
-                    }
-                    payInput.value = '未付款';
-                }
-                if (configEntry.SERVICE_ID) {
-                    const serviceNameMap = { 'deco': '專人佈置', 'delivery': '氣球外送', 'trunk': '後車廂驚喜', 'pickup': '工作室自取' };
-                    let serviceInput = form.querySelector(`input[name="entry.${configEntry.SERVICE_ID}"]`);
-                    if (!serviceInput) {
-                        serviceInput = document.createElement('input');
-                        serviceInput.type = 'hidden';
-                        serviceInput.name = 'entry.' + configEntry.SERVICE_ID;
-                        form.appendChild(serviceInput);
-                    }
-                    serviceInput.value = serviceNameMap[type];
-                }
-
-                const dateInput = document.getElementById(type + '-date');
-                if(dateInput && dateInput.value) {
-                    const parts = dateInput.value.split('-');
-                    createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_year', parts[0]);
-                    createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_month', parts[1]);
-                    createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_day', parts[2]);
-                    createHiddenInput(form, 'entry.' + configEntry.DATE_ID, dateInput.value); 
-                }
-                
-                const timeInput = document.getElementById(type + '-time');
-                if(timeInput && (type === 'deco' || type === 'trunk')) {
-                     if(timeInput.value) {
-                        const parts = timeInput.value.split(':');
-                        createHiddenInput(form, 'entry.' + configEntry.TIME_ID + '_hour', parts[0]);
-                        createHiddenInput(form, 'entry.' + configEntry.TIME_ID + '_minute', parts[1]);
-                        createHiddenInput(form, 'entry.' + configEntry.TIME_ID, timeInput.value); 
-                    }
-                }
-
-                // 🌟 修正：恢復並確保正確的條款文字被送出
-                // 這裡的文字必須跟 Google 表單「完全一致」，否則會被拒收
-                let terms = [];
-                if(type === 'deco') {
-                    terms = ["我已確認場地允許進行氣球佈置，並已通知場方。", "我了解空飄氣球漂浮時間約 6～8 小時，會安排在活動前 1-2 小時完成佈置以達最佳效果。", "關於殘膠風險： 我了解工作室使用 3M 不易殘膠布膠，並同意於 36 小時內 拆除。", "若超過 36 小時未拆除導致殘膠或漆面脫落，或因牆面材質特殊造成損損，我同意工作室不負修復或賠償責任。"];
-                } else if(type === 'delivery') {
-                    terms = ["我了解空飄氣球時效約 6～8 小時（隨時間氧化變霧），已確認送達時間符合活動需求。", "關於交貨地點： 我了解外送僅配送至 一樓或管理室，司機不上樓，我（或收件人）會前往一樓取貨。", "關於商品驗收： 商品送達後，我（或收件人）會立即確認氣球完整性。", "若送達當下有疑慮，我會立即向司機或 LINE 客服反映。", "若商品送達後無立即反應，後續破損或消氣會自行負責。"];
-                } else if(type === 'pickup') {
-                    terms = ["關於交通工具： 氣球怕風吹且體積大，我會安排**「汽車」**取貨（❌強烈不建議騎機車）。", "關於司機代取： 若委託司機（如 Uber/Lalamove）代取，我理解工作室僅負責交貨時的完整性（會拍照留存），運送途中的破損風險由我自行承擔。", "關於商品驗收： 我（或代取人）會在**「取貨當下」**確認商品完整性，如有疑慮會立即反映。", "離店後免責： 商品交付離店後，因運送過程、環境溫度或人為擠壓造成的消氣或破損，工作室恕不負責。", "關於時效： 我了解空飄氣球時效約 6～8 小時（依環境而異），會隨時間氧化變霧 或 消氣。"];
-                } else if(type === 'trunk') {
-                    terms = ["關於作業時間： 我了解後車廂佈置需預留 至少 1 小時 的施作時間，我會準時抵達。", "關於時效： 如有訂購空飄氣球我了解空飄氣球時效約 6～8 小時（依環境而異），建議於活動前 1～2 小時內完成佈置以達最佳效果。", "關於空間： 我會提前清空後車廂雜物，以便現場人員直接進行佈置。", "離場後免責： 佈置完成驗收離場後，因行駛過程晃動、溫度變化或人為因素導致的破損或位移，工作室恕不負責。"];
-                }
-                
-                // 產生條款的 hidden input
-                terms.forEach(t => createHiddenInput(form, 'entry.' + configEntry.TERMS_ID, t));
-
-                submitted = true;
-                form.submit();
-
-                // 顯示成功與匯款資訊 (已修正 HTML 顯示問題)
-                if (liff.isInClient()) {
-                    Swal.fire({
-                        title: '預約單已送出！',
-                        html: `
-                            <div class="text-left text-sm text-gray-600">
-                                <p class="mb-2">感謝您的填寫！請完成最後一步驟：</p>
-                                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100 mb-3">
-                                    <p class="font-bold text-yellow-800 mb-1">💰 匯款資訊</p>
-                                    <p>銀行代碼：<span class="font-bold text-gray-800">${config.BANK_INFO.CODE}</span></p>
-                                    <p>銀行帳號：<span class="font-bold text-gray-800">${config.BANK_INFO.ACCOUNT}</span></p>
-                                    ${config.BANK_INFO.NAME ? `<p>戶名：<span class="font-bold text-gray-800">${config.BANK_INFO.NAME}</span></p>` : ''}
-                                </div>
-                                <p class="font-bold text-red-500">⚠️ 匯款後請務必在 LINE 告知「帳號後五碼」</p>
-                                <p class="mt-1">我們查帳確認後，會回傳「預約成功通知」給您，才算完成喔！</p>
-                            </div>
-                        `,
-                        icon: 'info',
-                        confirmButtonText: '好的，關閉視窗',
-                        confirmButtonColor: '#4A4A4A',
-                        background: '#F9F7F2',
-                        color: '#4A4A4A',
-                        customClass: { title: 'font-serif text-milu-gold', popup: 'rounded-xl border border-milu-light' },
-                        allowOutsideClick: false
-                    }).then(() => {
-                        const nameId = type === 'delivery' ? 'delivery-receiver' : type + '-name';
-                        const nameVal = document.getElementById(nameId) ? document.getElementById(nameId).value : '-';
-                        
-                        sendFlexMessageAndClose(
-                            type === 'deco' ? '專人佈置' : (type === 'delivery' ? '氣球外送' : (type === 'pickup' ? '工作室自取' : '後車廂驚喜')), 
-                            nameVal, 
-                            dateInput.value, 
-                            timeInput.value
-                        );
-                    });
+                let addressInput = document.getElementById(type + '-address');
+                if (addressInput) {
+                    addressInput.value = `${city}${district}${detail}`;
                 } else {
-                    document.getElementById('booking-page').style.display = 'none';
-                    document.getElementById('fallback-success').style.display = 'block';
+                     createHiddenInput(form, 'entry.' + configEntry.ADDRESS_ID, `${city}${district}${detail}`);
                 }
-
-            } catch (error) {
-                console.error("Submission Error:", error);
-                Swal.fire('錯誤', '送出時發生錯誤，請稍後再試', 'error');
             }
+            
+            let sysInput = null;
+            if (configEntry.SYSTEM_ID) {
+                sysInput = form.querySelector(`input[name="entry.${configEntry.SYSTEM_ID}"]`);
+                if (!sysInput) {
+                    sysInput = document.createElement('input');
+                    sysInput.type = 'hidden';
+                    sysInput.name = 'entry.' + configEntry.SYSTEM_ID;
+                    form.appendChild(sysInput);
+                }
+                if(liff.isInClient() && liff.isLoggedIn()) {
+                    try {
+                        const profile = await liff.getProfile();
+                        sysInput.value = profile.userId;
+                    } catch (e) {}
+                }
+            }
+            
+            if (configEntry.PAYMENT_ID) {
+                let payInput = form.querySelector(`input[name="entry.${configEntry.PAYMENT_ID}"]`);
+                if(!payInput) {
+                    payInput = document.createElement('input');
+                    payInput.type = 'hidden';
+                    payInput.name = 'entry.' + configEntry.PAYMENT_ID;
+                    form.appendChild(payInput);
+                }
+                payInput.value = '未付款';
+            }
+            if (configEntry.SERVICE_ID) {
+                const serviceNameMap = { 'deco': '專人佈置', 'delivery': '氣球外送', 'trunk': '後車廂驚喜', 'pickup': '工作室自取' };
+                let serviceInput = form.querySelector(`input[name="entry.${configEntry.SERVICE_ID}"]`);
+                if (!serviceInput) {
+                    serviceInput = document.createElement('input');
+                    serviceInput.type = 'hidden';
+                    serviceInput.name = 'entry.' + configEntry.SERVICE_ID;
+                    form.appendChild(serviceInput);
+                }
+                serviceInput.value = serviceNameMap[type];
+            }
+
+            const dateInput = document.getElementById(type + '-date');
+            if(dateInput && dateInput.value) {
+                const parts = dateInput.value.split('-');
+                createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_year', parts[0]);
+                createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_month', parts[1]);
+                createHiddenInput(form, 'entry.' + configEntry.DATE_ID + '_day', parts[2]);
+                createHiddenInput(form, 'entry.' + configEntry.DATE_ID, dateInput.value); 
+            }
+            
+            const timeInput = document.getElementById(type + '-time');
+            if(timeInput && (type === 'deco' || type === 'trunk')) {
+                 if(timeInput.value) {
+                    const parts = timeInput.value.split(':');
+                    createHiddenInput(form, 'entry.' + configEntry.TIME_ID + '_hour', parts[0]);
+                    createHiddenInput(form, 'entry.' + configEntry.TIME_ID + '_minute', parts[1]);
+                    createHiddenInput(form, 'entry.' + configEntry.TIME_ID, timeInput.value); 
+                }
+            }
+
+            let terms = [];
+            if(type === 'deco') {
+                terms = ["我已確認場地允許進行氣球佈置，並已通知場方。", "我了解空飄氣球漂浮時間約 6～8 小時，會安排在活動前 1-2 小時完成佈置以達最佳效果。", "關於殘膠風險： 我了解工作室使用 3M 不易殘膠布膠，並同意於 36 小時內 拆除。", "若超過 36 小時未拆除導致殘膠或漆面脫落，或因牆面材質特殊造成損損，我同意工作室不負修復或賠償責任。", "關於作業時間：我了解專人佈置需預留 至少 2 小時 的施作時間。"];
+            } else if(type === 'delivery') {
+                terms = ["我了解空飄氣球時效約 6～8 小時（隨時間氧化變霧），已確認送達時間符合活動需求。", "關於交貨地點： 我了解外送僅配送至 一樓或管理室，司機不上樓，我（或收件人）會前往一樓取貨。", "關於商品驗收： 商品送達後，我（或收件人）會立即確認氣球完整性。", "若送達當下有疑慮，我會立即向司機或 LINE 客服反映。", "若商品送達後無立即反應，後續破損或消氣會自行負責。"];
+            } else if(type === 'pickup') {
+                terms = ["關於交通工具： 氣球怕風吹且體積大，我會安排**「汽車」**取貨（❌強烈不建議騎機車）。", "關於司機代取： 若委託司機（如 Uber/Lalamove）代取，我理解工作室僅負責交貨時的完整性（會拍照留存），運送途中的破損風險由我自行承擔。", "關於商品驗收： 我（或代取人）會在**「取貨當下」**確認商品完整性，如有疑慮會立即反映。", "離店後免責： 商品交付離店後，因運送過程、環境溫度或人為擠壓造成的消氣或破損，工作室恕不負責。", "關於時效： 我了解空飄氣球時效約 6～8 小時（依環境而異），會隨時間氧化變霧 或 消氣。"];
+            } else if(type === 'trunk') {
+                terms = ["關於作業時間： 我了解後車廂佈置需預留 至少 1 小時 的施作時間，我會準時抵達。", "關於時效： 如有訂購空飄氣球我了解空飄氣球時效約 6～8 小時（依環境而異），建議於活動前 1～2 小時內完成佈置以達最佳效果。", "關於空間： 我會提前清空後車廂雜物，以便現場人員直接進行佈置。", "離場後免責： 佈置完成驗收離場後，因行駛過程晃動、溫度變化或人為因素導致的破損或位移，工作室恕不負責。"];
+            }
+            
+            terms.forEach(t => createHiddenInput(form, 'entry.' + configEntry.TERMS_ID, t));
+
+            submitted = true;
+            form.submit();
+
+            // 計算付款規則訊息
+            const paymentMessage = getPaymentMessage(type, dateInput.value);
+
+            // 成功畫面切換 & 顯示付款規則
+            if (liff.isInClient()) {
+                Swal.fire({
+                    title: '預約單已送出！',
+                    html: `
+                        <div class="text-left text-sm text-gray-600 space-y-4">
+                            <!-- 銀行帳號區塊 -->
+                            <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-100 shadow-sm">
+                                <div class="flex items-center gap-2 mb-2 text-yellow-800 border-b border-yellow-200 pb-2">
+                                    <i class="fa-solid fa-sack-dollar text-lg"></i>
+                                    <span class="font-bold text-lg">匯款資訊</span>
+                                </div>
+                                <div class="space-y-1">
+                                    <p><span class="text-gray-500 text-xs block">銀行代碼</span> <span class="font-bold text-gray-800 text-lg">${config.BANK_INFO.CODE}</span></p>
+                                    <p><span class="text-gray-500 text-xs block">銀行帳號</span> <span class="font-mono font-bold text-xl text-gray-800 tracking-wider">${config.BANK_INFO.ACCOUNT}</span></p>
+                                    ${config.BANK_INFO.NAME ? `<p><span class="text-gray-500 text-xs block">戶名</span> <span class="font-bold text-gray-800">${config.BANK_INFO.NAME}</span></p>` : ''}
+                                </div>
+                            </div>
+                            
+                            <!-- 付款規則區塊 -->
+                            <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 text-blue-900 shadow-sm">
+                                <div class="leading-relaxed text-sm">
+                                    ${paymentMessage}
+                                </div>
+                            </div>
+
+                            <div class="bg-red-50 p-3 rounded-lg border border-red-100 text-center">
+                                <p class="font-bold text-red-500 text-sm">⚠️ 匯款後請務必截圖回傳「帳號後五碼」</p>
+                                <p class="text-xs text-gray-500 mt-1">我們查帳確認後，會回傳「預約成功通知」給您，才算完成喔！</p>
+                            </div>
+                        </div>
+                    `,
+                    icon: 'success',
+                    confirmButtonText: '好的，關閉視窗',
+                    confirmButtonColor: '#4A4A4A',
+                    background: '#FFFFFF',
+                    width: '90%',
+                    customClass: { 
+                        title: 'font-serif text-milu-gold text-2xl font-bold', 
+                        popup: 'rounded-2xl shadow-xl' 
+                    },
+                    allowOutsideClick: false
+                }).then(() => {
+                    const nameId = type === 'delivery' ? 'delivery-receiver' : type + '-name';
+                    const nameVal = document.getElementById(nameId) ? document.getElementById(nameId).value : '-';
+                    
+                    sendFlexMessageAndClose(
+                        type === 'deco' ? '專人佈置' : (type === 'delivery' ? '氣球外送' : (type === 'pickup' ? '工作室自取' : '後車廂驚喜')), 
+                        nameVal, 
+                        dateInput.value, 
+                        timeInput.value
+                    );
+                });
+            } else {
+                // 更新網頁版成功畫面內容
+                const fallbackContent = document.getElementById('fallback-content');
+                if(fallbackContent) {
+                    fallbackContent.innerHTML = `
+                         <div class="bg-blue-50 p-4 rounded-xl border border-blue-100 mb-6 text-left text-blue-900 shadow-sm">
+                            <p class="font-bold text-lg mb-2"><i class="fa-solid fa-circle-info mr-1"></i> 付款注意事項</p>
+                            ${paymentMessage}
+                        </div>
+                    `;
+                }
+                document.getElementById('booking-page').style.display = 'none';
+                document.getElementById('fallback-success').style.display = 'block';
+            }
+
             return false;
         }
 
