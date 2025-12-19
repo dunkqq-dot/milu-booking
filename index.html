@@ -398,7 +398,13 @@
                 const detail = document.getElementById(type + '-addr-detail').value;
 
                 if (!city || !district || !detail) {
-                    Swal.fire('請填寫完整地址', '縣市、區域與詳細地址皆為必填', 'warning');
+                    Swal.fire({
+                        title: '請填寫完整地址',
+                        text: '縣市、區域與詳細地址皆為必填',
+                        icon: 'warning',
+                        confirmButtonText: '好的',
+                        confirmButtonColor: '#C69C6D'
+                    });
                     return false;
                 }
                 
@@ -482,7 +488,19 @@
             if (liff.isInClient()) {
                 Swal.fire({
                     title: '預約單已送出！',
-                    html: `(省略 HTML 內容，保持原樣)`, // ... 請保留原有的成功提示 HTML
+                    html: `
+                        <div class="text-left text-sm text-gray-600">
+                            <p class="mb-2">感謝您的填寫！請完成最後一步驟：</p>
+                            <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-100 mb-3">
+                                <p class="font-bold text-yellow-800 mb-1">💰 匯款資訊</p>
+                                <p>銀行代碼：<span class="font-bold text-gray-800">${config.BANK_INFO.CODE}</span></p>
+                                <p>銀行帳號：<span class="font-bold text-gray-800">${config.BANK_INFO.ACCOUNT}</span></p>
+                                ${config.BANK_INFO.NAME ? `<p>戶名：<span class="font-bold text-gray-800">${config.BANK_INFO.NAME}</span></p>` : ''}
+                            </div>
+                            <p class="font-bold text-red-500">⚠️ 匯款後請務必在 LINE 告知「帳號後五碼」</p>
+                            <p class="mt-1">我們查帳確認後，會回傳「預約成功通知」給您，才算完成喔！</p>
+                        </div>
+                    `,
                     icon: 'info',
                     confirmButtonText: '好的，關閉視窗',
                     confirmButtonColor: '#4A4A4A',
