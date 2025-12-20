@@ -84,6 +84,12 @@
                         <span class="flex items-center gap-1">📅 {{ order.date }}</span>
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
+                    <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.rawPrice > 0 && order.status !== 'CANCELED'">
+                        <span class="text-xs text-gray-400">總額: NT$ {{order.rawPrice.toLocaleString()}}</span>
+                        <span class="text-xs font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500'">
+                            {{ (order.rawPrice - order.receivedPrice) > 0 ? `尚欠: NT$ ${(order.rawPrice - order.receivedPrice).toLocaleString()}` : '已付清' }}
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -314,18 +320,12 @@
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            
-                            // 修正：優先抓 Q (16) 和 R (17) 這是公式產生的乾淨資料
-                            // 若無，則抓 F (5) 和 G (6) 這是原始資料
-                            const dateRaw = getKey(item, ['16', 'Q', '5', 'F', 'date']); 
+                            const dateRaw = getKey(item, ['16', 'Q', '15', 'F', 'date']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            
-                            const time = getKey(item, ['17', 'R', '6', 'G', 'time']) || ''; 
-                            
-                            // 地點 (H欄/Index 7)
+                            const time = getKey(item, ['17', 'R', '16', 'G', 'time']) || ''; 
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
-                            
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
+                            
                             if (serviceName.includes('自取')) serviceName = '門市自取'; 
                             else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
@@ -511,9 +511,9 @@
                         clientName: editForm.value.contactName, 
                         lineName: editForm.value.lineName,       
                         service: order.service, 
-                        price: editForm.value.rawPrice,
-                        received: editForm.value.receivedPrice,
-                        balance: editForm.value.rawPrice - editForm.value.receivedPrice,
+                        price: parseInt(editForm.value.rawPrice) || 0,
+                        received: parseInt(editForm.value.receivedPrice) || 0,
+                        balance: (parseInt(editForm.value.rawPrice) || 0) - (parseInt(editForm.value.receivedPrice) || 0),
                         date: editForm.value.date,
                         time: editForm.value.time,
                         phone: editForm.value.phone,
@@ -530,10 +530,11 @@
                         Swal.fire('成功', '資料已更新！', 'success');
                     } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
                 };
+
                 const showDebug = () => {
                     Swal.fire({
                         title: '原始資料診斷',
-                        html: `<div class="debug-modal text-left"><pre>${JSON.stringify(rawJsonData.value, null, 2)}</pre></div>`,
+                        html: `<div class="debug-modal text-left"><p class="text-[10px] mb-2 font-bold text-red-500">檢測到 ${rawJsonData.value.length} 筆資料</p><pre>${JSON.stringify(rawJsonData.value[0], null, 2)}</pre></div>`,
                         width: '600px'
                     });
                 };
