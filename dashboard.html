@@ -163,7 +163,7 @@
                                 </div>
                                 <div v-else>
                                     <!-- LINE 名稱 -->
-                                    <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
+                                    <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-1">
                                         <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                     </p>
                                     <!-- 聯絡人姓名 -->
@@ -376,9 +376,12 @@
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            const dateRaw = getKey(item, ['16', 'Q', '15', 'F', 'date']); 
+                            
+                            // 修正：優先抓 F (5) 和 G (6)
+                            const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['17', 'R', '16', 'G', 'time']) || ''; 
+                            const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
+                            
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
@@ -544,9 +547,8 @@
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex
                                 };
-                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
-                                // 樂觀更新狀態
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
                                 else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
@@ -567,17 +569,6 @@
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
-                    
-                    // 根據開關決定是否發送通知
-                    let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
-                    let flexContents = {};
-                    
-                    if (notifyOnUpdate.value) {
-                         const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
-                         messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
-                         flexContents = flex;
-                    }
-
                     const payload = {
                         to: order.userId,
                         orderId: order.oid,
@@ -592,11 +583,11 @@
                         phone: editForm.value.phone,
                         location: editForm.value.location,
                         status: order.status === 'CONFIRMED' ? '✅ 已付款' : '❌ 未付款',
-                        message: messagePayload,
-                        flexContents: flexContents
+                        message: { type: 'flex', altText: '訂單資料更新', contents: {} },
+                        updateOnly: true
                     };
                     try {
-                        // 使用 no-cors，改回標準 fetch
+                        // 使用 標準的 fetch
                         await fetch(SEND_MSG_WEBHOOK, { 
                             method: 'POST', 
                             headers: { 'Content-Type': 'application/json' },
