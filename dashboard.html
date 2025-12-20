@@ -162,9 +162,11 @@
                                     <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                 </div>
                                 <div v-else>
+                                    <!-- LINE 名稱 -->
                                     <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
                                         <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                     </p>
+                                    <!-- 聯絡人姓名 -->
                                     <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
                                     <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
                                         <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
@@ -374,9 +376,13 @@
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            const dateRaw = getKey(item, ['16', 'Q', '15', 'F', 'date']); 
+                            
+                            // 修正：優先抓 F (5) 和 G (6)
+                            const dateRaw = getKey(item, ['5', 'F', '16', 'Q', 'date']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['17', 'R', '16', 'G', 'time']) || ''; 
+                            
+                            const time = getKey(item, ['6', 'G', '17', 'R', 'time']) || ''; 
+                            
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
