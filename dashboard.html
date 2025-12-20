@@ -367,8 +367,10 @@
                     const today = new Date();
                     targetDate.setHours(0, 0, 0, 0);
                     today.setHours(0, 0, 0, 0);
+                    
                     const diffTime = targetDate - today;
-                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays;
                 };
 
                 const getPaymentMessage = (type, dateStr) => {
@@ -467,12 +469,15 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
-                     // ... (內容維持不變) ...
+                     // 完整版 Flex 邏輯
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
+                     
+                     let titleText = 'PAYMENT CONFIRMED'; 
+                     let descText = '預約與款項已確認'; 
+                     let statusColor = '#10B981';
                      let bodyContents = [];
 
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
@@ -520,7 +525,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -535,7 +540,6 @@
                 };
 
                 const updateOrderStatus = async (actionType) => {
-                    // ... (updateOrderStatus 內容保持不變) ...
                     const order = selectedOrder.value;
                     if (!order) return;
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
