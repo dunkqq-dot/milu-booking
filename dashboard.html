@@ -84,6 +84,7 @@
                         <span class="flex items-center gap-1">📅 {{ order.date }}</span>
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
+                    <!-- 列表顯示尾款狀態 -->
                     <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.rawPrice > 0 && order.status !== 'CANCELED'">
                         <span class="text-xs text-gray-400">總額: NT$ {{order.rawPrice.toLocaleString()}}</span>
                         <span class="text-xs font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500'">
