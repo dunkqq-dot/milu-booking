@@ -361,32 +361,25 @@
                     }
                 });
 
-                // 補回被遺漏的計算天數差函式
                 const calculateDaysDiff = (dateStr) => {
                     if (!dateStr) return 0;
                     const targetDate = new Date(dateStr);
                     const today = new Date();
                     targetDate.setHours(0, 0, 0, 0);
                     today.setHours(0, 0, 0, 0);
-                    
                     const diffTime = targetDate - today;
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    return diffDays;
+                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 };
 
-                // 補回被遺漏的獲取付款規則函式
                 const getPaymentMessage = (type, dateStr) => {
                     const diffDays = calculateDaysDiff(dateStr);
-                    // 文案常數
                     const PAYMENT_RULES = {
                         DECO_NORMAL: "1. 單一時段僅服務一組客人，以先支付訂金者優先。\n2. 匯款期限：請於三日內完成匯款。\n3. 訂金規則：可付全額或 50% 訂金，尾款於活動當日支付。\n4. 改期與取消：僅接受一次改期；個人因素取消收 30% 服務費。",
                         DECO_URGENT: "⚠️ 3日內急單專用規則\n1. 請於預約時「支付全額款項」並截圖回傳。\n2. 預約前 5 小時未收款視為未成立。\n3. 24小時內急件需加收 $500。\n4. 取消不退還任何款項。",
                         SIMPLE: "1. 請於預約當下「支付全額款項」並截圖回傳。\n2. 預約前 24 小時未收款視為未成立。\n3. 急件加收 $500。\n4. 24小時內取消不退款。"
                     };
-
                     if (type.includes('佈置') || type.includes('後車廂')) {
-                        if (diffDays <= 3) return PAYMENT_RULES.DECO_URGENT;
-                        return PAYMENT_RULES.DECO_NORMAL;
+                        return diffDays <= 3 ? PAYMENT_RULES.DECO_URGENT : PAYMENT_RULES.DECO_NORMAL;
                     } else {
                         return PAYMENT_RULES.SIMPLE;
                     }
@@ -399,7 +392,7 @@
                                        .replace(/<\/p>/gi, '\n\n')
                                        .replace(/<li>/gi, '• ')
                                        .replace(/<\/li>/gi, '\n')
-                                       .replace(/<[^>]+>/g, '') // 移除其他標籤
+                                       .replace(/<[^>]+>/g, '') 
                                        .replace(/&nbsp;/g, ' ');
                     return text.trim();
                 };
@@ -418,12 +411,10 @@
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            
-                            // 修正：優先抓 F (5) 和 G (6)
+                            // 優先抓 F (5) 和 G (6)
                             const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
                             const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
-                            
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
@@ -476,15 +467,12 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
-                     // 完整版 Flex 邏輯
+                     // ... (內容維持不變) ...
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     
-                     let titleText = 'PAYMENT CONFIRMED'; 
-                     let descText = '預約與款項已確認'; 
-                     let statusColor = '#10B981';
+                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
                      let bodyContents = [];
 
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
@@ -496,11 +484,7 @@
                          titleText = 'PAYMENT REQUEST'; 
                          descText = '請詳閱付款規則並完成匯款'; 
                          statusColor = '#2563EB'; 
-                         
-                         // 🌟 動態抓取規則文字並轉換格式
-                         const rawRuleHtml = getPaymentMessage(order.service, order.date);
-                         const ruleText = formatForLine(rawRuleHtml);
-                         
+                         const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
                          bodyContents = [
                             { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
                             { "type": "text", "text": ruleText, "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
@@ -551,6 +535,7 @@
                 };
 
                 const updateOrderStatus = async (actionType) => {
+                    // ... (updateOrderStatus 內容保持不變) ...
                     const order = selectedOrder.value;
                     if (!order) return;
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
@@ -615,6 +600,17 @@
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
+                    
+                    // 如果勾選發送通知，則生成 "UPDATE" 類型的卡片
+                    let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
+                    let flexContents = {};
+                    
+                    if (notifyOnUpdate.value) {
+                         const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
+                         messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
+                         flexContents = flex;
+                    }
+
                     const payload = {
                         to: order.userId,
                         orderId: order.oid,
@@ -629,8 +625,8 @@
                         phone: editForm.value.phone,
                         location: editForm.value.location,
                         status: order.status === 'CONFIRMED' ? '✅ 已付款' : '❌ 未付款',
-                        message: { type: 'flex', altText: '訂單資料更新', contents: {} },
-                        updateOnly: true
+                        message: messagePayload,
+                        flexContents: flexContents
                     };
                     try {
                         // 使用 標準的 fetch
