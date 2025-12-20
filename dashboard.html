@@ -308,6 +308,14 @@
                     return '';
                 };
 
+                // 🌟 新增：金額處理函數 (去除逗號與非數字字元)
+                const parseMoney = (val) => {
+                    if (!val) return 0;
+                    // 將 val 轉字串，移除所有非數字、負號、小數點以外的字元 (例如逗號)
+                    const str = String(val).replace(/[^\d.-]/g, '');
+                    return parseInt(str) || 0;
+                };
+
                 const fetchData = async () => {
                     loading.value = true; errorMsg.value = null;
                     try {
@@ -318,7 +326,6 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
@@ -336,8 +343,10 @@
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
-                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
+                            
+                            // 🌟 修正：使用 parseMoney 處理金額
+                            const rawPrice = parseMoney(getKey(item, ['11', 'L', 'price']));
+                            const receivedPrice = parseMoney(getKey(item, ['12', 'M', 'received']));
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -379,8 +388,9 @@
 
                 const buildRichFlexMessage = (order, actionType) => {
                      const config = configMap[order.service] || configMap['專人佈置'];
-                     const total = parseInt(order.rawPrice) || 0;
-                     const paid = parseInt(order.receivedPrice) || 0;
+                     // 使用已經 parse 過的數字
+                     const total = order.rawPrice || 0;
+                     const paid = order.receivedPrice || 0;
                      const balance = total - paid;
                      let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
                      let bodyContents = [];
@@ -429,7 +439,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -473,7 +483,7 @@
                                     to: order.userId,
                                     orderId: order.oid,
                                     clientName: order.contactName, 
-                                    lineName: order.lineName, // 補上 lineName
+                                    lineName: order.lineName, 
                                     service: order.service,
                                     price: order.rawPrice,
                                     received: order.receivedPrice,
@@ -488,7 +498,6 @@
                                 };
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                                 
-                                // 樂觀更新狀態
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
                                 else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
@@ -515,9 +524,10 @@
                         clientName: editForm.value.contactName, 
                         lineName: editForm.value.lineName,       
                         service: order.service, 
-                        price: editForm.value.rawPrice,
-                        received: editForm.value.receivedPrice,
-                        balance: editForm.value.rawPrice - editForm.value.receivedPrice,
+                        // 這裡使用 parseMoney 確保數字格式
+                        price: parseMoney(editForm.value.rawPrice),
+                        received: parseMoney(editForm.value.receivedPrice),
+                        balance: parseMoney(editForm.value.rawPrice) - parseMoney(editForm.value.receivedPrice),
                         date: editForm.value.date,
                         time: editForm.value.time,
                         phone: editForm.value.phone,
@@ -528,7 +538,11 @@
                     };
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                        // 更新本地資料時也要確保是數字
                         Object.assign(selectedOrder.value, editForm.value);
+                        selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
+                        selectedOrder.value.receivedPrice = parseMoney(editForm.value.receivedPrice);
+                        
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         isEditing.value = false;
                         Swal.fire('成功', '資料已更新！', 'success');
