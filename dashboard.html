@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
+                        <p class="text-xs text-gray-400 mt-1">JSON 精準同步中</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -246,13 +246,13 @@
                         <!-- 動作按鈕 -->
                         <div v-if="!isEditing" class="pt-2 space-y-3">
                             
-                            <!-- 付款須知 -->
+                            <!-- 新增：發送付款須知 (僅在未付款狀態顯示) -->
                             <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知
+                                <i class="fa-solid fa-envelope"></i> 發送付款須知 & 帳號
                             </button>
 
                             <!-- 確認收款 -->
-                            <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                            <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-check-circle"></i> 確認收款並登記
                             </button>
                             
@@ -419,9 +419,9 @@
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
+                            const dateRaw = getKey(item, ['16', 'Q', '15', 'F', 'date']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
+                            const time = getKey(item, ['17', 'R', '16', 'G', 'time']) || ''; 
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
@@ -600,9 +600,9 @@
                                     location: order.location,
                                     status: statusText,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
-                                    flexContents: flex
+                                    flexContents: flex,
+                                    updateOnly: false
                                 };
-                                // 修正：移除 no-cors
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -654,7 +654,6 @@
                         updateOnly: !notifyOnUpdate.value
                     };
                     try {
-                        // 修正：移除 no-cors
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
