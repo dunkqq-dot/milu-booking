@@ -317,23 +317,26 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 精準欄位對應修正 (0-Based Index)
+                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
                             const lineName = getKey(item, ['2', 'C', 'Column C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'Column D', 'name', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
                             const dateRaw = getKey(item, ['5', 'F', 'date']);
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
                             const time = getKey(item, ['6', 'G', 'time']) || '';
-                            const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點';
-                            let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
-                            // 服務名稱標準化
+                            // 修正：地點強制抓取 H 欄 (Index 7)
+                            const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點';
+                            
+                            let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             if (serviceName.includes('自取')) serviceName = '門市自取'; 
                             else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
                             else if (serviceName.includes('佈置')) serviceName = '專人佈置';
 
+                            // 修正：User ID 強制抓取 J 欄 (Index 9)
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
+                            
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
                             const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
                             const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
@@ -365,6 +368,7 @@
                     loading.value = false;
                 };
 
+                // ... (其餘函式維持不變) ...
                 const getStatusText = (status, isEnglish = false) => {
                     if (isEnglish) return status === 'CONFIRMED' ? 'PAYMENT CONFIRMED' : (status === 'COMPLETED' ? 'ORDER COMPLETED' : 'WAITING FOR PAYMENT');
                     return status === 'CONFIRMED' ? '已付款' : (status === 'COMPLETED' ? '已完成' : (status === 'CANCELED' ? '已取消' : (status === 'REFUNDED' ? '已退款' : (status === 'WAITING_PAYMENT' ? '等待匯款' : '未付款'))));
@@ -484,7 +488,7 @@
                                     phone: order.phone,
                                     location: order.location,
                                     status: statusText,
-                                    message: { type: "flex", altText: `通知：${order.service}`, contents: flex },
+                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex
                                 };
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
