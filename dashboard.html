@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
+                        <p class="text-xs text-gray-400 mt-1">訂單核對系統</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -84,7 +84,6 @@
                         <span class="flex items-center gap-1">📅 {{ order.date }}</span>
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
-                    <!-- 列表顯示尾款狀態 -->
                     <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.status !== 'CANCELED' && order.status !== 'COMPLETED'">
                         <span class="text-xs text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
                         <span class="text-xs font-bold" :class="order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500') : 'text-gray-400'">
@@ -114,12 +113,10 @@
                              'bg-blue-500': selectedOrder.status === 'COMPLETED'
                          }">
                         
-                        <!-- 編輯模式按鈕 -->
                         <button v-if="!isEditing" @click="startEdit" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition backdrop-blur-sm" title="編輯資料">
                             <i class="fa-solid fa-pen"></i>
                         </button>
                         <div v-else class="absolute top-4 right-4 flex items-center gap-2">
-                             <!-- 新增：同步發送開關 -->
                             <label class="flex items-center space-x-2 text-xs text-white/90 bg-black/20 px-2 py-1 rounded cursor-pointer select-none">
                                 <input type="checkbox" v-model="notifyOnUpdate" class="form-checkbox h-3 w-3 text-green-500 rounded focus:ring-0">
                                 <span>發送通知</span>
@@ -149,7 +146,6 @@
                     <div class="p-8 space-y-6 relative">
                         <div v-if="isEditing" class="absolute top-0 left-0 w-full h-1 bg-yellow-400 animate-pulse"></div>
 
-                        <!-- 客戶資訊 -->
                         <div class="flex justify-between border-b border-gray-100 pb-4">
                             <div class="flex-1 mr-4">
                                 <p class="text-xs text-gray-400 mb-1">CUSTOMER</p>
@@ -162,11 +158,9 @@
                                     <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                 </div>
                                 <div v-else>
-                                    <!-- LINE 名稱 -->
                                     <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
                                         <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                     </p>
-                                    <!-- 聯絡人姓名 -->
                                     <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
                                     <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
                                         <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
@@ -182,7 +176,6 @@
                             </div>
                         </div>
 
-                        <!-- 時間日期 -->
                         <div class="grid grid-cols-2 gap-4">
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                 <p class="text-xs text-gray-400 mb-1">DATE</p>
@@ -191,7 +184,6 @@
                             </div>
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                 <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
-                                
                                 <template v-if="isEditing">
                                     <select v-if="isTimeSlotService(selectedOrder.service)" v-model="editForm.time" class="edit-input">
                                         <option value="" disabled>請選擇時段</option>
@@ -199,12 +191,10 @@
                                     </select>
                                     <input v-else type="time" v-model="editForm.time" class="edit-input">
                                 </template>
-                                
                                 <p v-else class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                             </div>
                         </div>
                         
-                        <!-- 款項明細 -->
                         <div class="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100 space-y-3">
                             <div class="flex justify-between items-center">
                                 <p class="text-xs text-gray-500 font-bold">總金額 (填入報價)</p>
@@ -235,22 +225,17 @@
                             </div>
                         </div>
                         
-                        <!-- 地址 -->
                         <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                              <p class="text-xs text-gray-400 mb-1">{{ getLabel('location', selectedOrder.service) }}</p>
                              <input v-if="isEditing" type="text" v-model="editForm.location" class="edit-input">
                              <p v-else class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
                         </div>
 
-                        <!-- 動作按鈕 -->
                         <div v-if="!isEditing" class="pt-2 space-y-3">
-                            
-                            <!-- 付款須知 -->
-                            <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-2 rounded-lg font-bold text-sm hover:bg-blue-100 transition">
-                                <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知
+                            <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-envelope"></i> 發送付款須知 & 帳號
                             </button>
 
-                            <!-- 確認收款 -->
                             <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-check-circle"></i> 確認收款並登記
                             </button>
@@ -345,7 +330,6 @@
                     return service.includes('外送') || service.includes('自取');
                 };
 
-                // 計算屬性
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
                     set: (val) => {
@@ -492,8 +476,6 @@
                          statusColor = '#2563EB'; 
                          const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
                          bodyContents = [
-                            { "type": "text", "text": `本次訂單總金額: NT$ ${total.toLocaleString()}`, "weight": "bold", "size": "md", "color": "#C69C6D", "align": "center", "margin": "md" },
-                            { "type": "separator", "margin": "md" },
                             { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
                             { "type": "text", "text": ruleText, "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
                             { "type": "separator", "margin": "lg" },
@@ -538,7 +520,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -614,27 +596,9 @@
                 
                 const startEdit = () => { editForm.value = { ...selectedOrder.value }; isEditing.value = true; };
                 const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
-                
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
-                    
-                    let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
-                    let flexContents = {};
-                    
-                    if (notifyOnUpdate.value) {
-                         const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
-                         messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
-                         flexContents = flex;
-                    }
-
-                    // ⚠️ 注意：如果不發送通知，payload 中不加入 updateOnly 參數，
-                    // 讓 Make 的 filter (Does not exist) 通過 (如果要觸發更新流程但無 LINE)
-                    // 但您的需求是「若不勾選，只更新試算表」。
-                    // 如果 Make 劇本是 [Webhook -> Update Sheet -> Filter -> LINE]
-                    // 則這裡我們需要一個標記讓 Make 的 Filter 擋下 LINE 發送。
-                    // 假設您的 Make Filter 設定是「updateOnly 不存在」才發 LINE。
-                    
                     const payload = {
                         to: order.userId,
                         orderId: order.oid,
@@ -649,17 +613,16 @@
                         phone: editForm.value.phone,
                         location: editForm.value.location,
                         status: order.status === 'CONFIRMED' ? '✅ 已付款' : '❌ 未付款',
-                        message: messagePayload,
-                        flexContents: flexContents
+                        message: { type: 'flex', altText: '訂單資料更新', contents: {} },
+                        updateOnly: true
                     };
-                    
-                    // 如果不發送通知，加入 updateOnly: true 讓 Make 的 Filter 擋下
-                    if (!notifyOnUpdate.value) {
-                        payload.updateOnly = true;
-                    }
-
                     try {
-                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        // 使用 標準的 fetch
+                        await fetch(SEND_MSG_WEBHOOK, { 
+                            method: 'POST', 
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload) 
+                        });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
