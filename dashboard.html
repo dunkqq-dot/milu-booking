@@ -119,6 +119,7 @@
                             <i class="fa-solid fa-pen"></i>
                         </button>
                         <div v-else class="absolute top-4 right-4 flex items-center gap-2">
+                             <!-- 新增：同步發送開關 -->
                             <label class="flex items-center space-x-2 text-xs text-white/90 bg-black/20 px-2 py-1 rounded cursor-pointer select-none">
                                 <input type="checkbox" v-model="notifyOnUpdate" class="form-checkbox h-3 w-3 text-green-500 rounded focus:ring-0">
                                 <span>發送通知</span>
@@ -245,7 +246,7 @@
                         <div v-if="!isEditing" class="pt-2 space-y-3">
                             
                             <!-- 付款須知 -->
-                            <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
+                            <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-2 rounded-lg font-bold text-sm hover:bg-blue-100 transition">
                                 <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知
                             </button>
 
@@ -329,7 +330,6 @@
                     return '';
                 };
 
-                // 金額格式化
                 const formatMoney = (val) => {
                     if (!val && val !== 0) return '0';
                     return val.toLocaleString();
@@ -341,7 +341,6 @@
                     return parseInt(str) || 0;
                 };
 
-                // 判斷是否為時段制服務
                 const isTimeSlotService = (service) => {
                     return service.includes('外送') || service.includes('自取');
                 };
@@ -433,9 +432,8 @@
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            // 修正：使用 parseMoney 處理金額
-                            const rawPrice = parseMoney(getKey(item, ['11', 'L', 'price']));
-                            const receivedPrice = parseMoney(getKey(item, ['12', 'M', 'received']));
+                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
+                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -476,15 +474,11 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
-                     // 完整版 Flex 邏輯 (包含所有欄位)
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     
-                     let titleText = 'PAYMENT CONFIRMED'; 
-                     let descText = '預約與款項已確認'; 
-                     let statusColor = '#10B981';
+                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
                      let bodyContents = [];
 
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
@@ -601,7 +595,6 @@
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex
                                 };
-                                // 修正：移除 no-cors，改為標準 POST
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -621,6 +614,7 @@
                 
                 const startEdit = () => { editForm.value = { ...selectedOrder.value }; isEditing.value = true; };
                 const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
+                
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
@@ -634,6 +628,13 @@
                          flexContents = flex;
                     }
 
+                    // ⚠️ 注意：如果不發送通知，payload 中不加入 updateOnly 參數，
+                    // 讓 Make 的 filter (Does not exist) 通過 (如果要觸發更新流程但無 LINE)
+                    // 但您的需求是「若不勾選，只更新試算表」。
+                    // 如果 Make 劇本是 [Webhook -> Update Sheet -> Filter -> LINE]
+                    // 則這裡我們需要一個標記讓 Make 的 Filter 擋下 LINE 發送。
+                    // 假設您的 Make Filter 設定是「updateOnly 不存在」才發 LINE。
+                    
                     const payload = {
                         to: order.userId,
                         orderId: order.oid,
@@ -649,11 +650,15 @@
                         location: editForm.value.location,
                         status: order.status === 'CONFIRMED' ? '✅ 已付款' : '❌ 未付款',
                         message: messagePayload,
-                        flexContents: flexContents,
-                        updateOnly: !notifyOnUpdate.value
+                        flexContents: flexContents
                     };
+                    
+                    // 如果不發送通知，加入 updateOnly: true 讓 Make 的 Filter 擋下
+                    if (!notifyOnUpdate.value) {
+                        payload.updateOnly = true;
+                    }
+
                     try {
-                        // 修正：移除 no-cors，改為標準 POST
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
