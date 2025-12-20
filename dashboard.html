@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
+                        <p class="text-xs text-gray-400 mt-1">JSON 精準同步中</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -113,7 +113,6 @@
                              'bg-blue-500': selectedOrder.status === 'COMPLETED'
                          }">
                         
-                        <!-- 編輯模式按鈕 -->
                         <button v-if="!isEditing" @click="startEdit" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition backdrop-blur-sm" title="編輯資料">
                             <i class="fa-solid fa-pen"></i>
                         </button>
@@ -143,7 +142,6 @@
                     <div class="p-8 space-y-6 relative">
                         <div v-if="isEditing" class="absolute top-0 left-0 w-full h-1 bg-yellow-400 animate-pulse"></div>
 
-                        <!-- 客戶資訊 -->
                         <div class="flex justify-between border-b border-gray-100 pb-4">
                             <div class="flex-1 mr-4">
                                 <p class="text-xs text-gray-400 mb-1">CUSTOMER</p>
@@ -156,11 +154,9 @@
                                     <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                 </div>
                                 <div v-else>
-                                    <!-- LINE 名稱 -->
-                                    <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-1">
+                                    <p class="font-bold text-2xl text-gray-400 mb-1 flex items-center gap-2">
                                         <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                     </p>
-                                    <!-- 聯絡人姓名 -->
                                     <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
                                     <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
                                         <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
@@ -176,7 +172,6 @@
                             </div>
                         </div>
 
-                        <!-- 時間日期 -->
                         <div class="grid grid-cols-2 gap-4">
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                 <p class="text-xs text-gray-400 mb-1">DATE</p>
@@ -190,7 +185,6 @@
                             </div>
                         </div>
                         
-                        <!-- 款項明細 -->
                         <div class="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100 space-y-3">
                             <div class="flex justify-between items-center">
                                 <p class="text-xs text-gray-500 font-bold">總金額</p>
@@ -218,22 +212,17 @@
                             </div>
                         </div>
                         
-                        <!-- 地址 -->
                         <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                              <p class="text-xs text-gray-400 mb-1">{{ getLabel('location', selectedOrder.service) }}</p>
                              <input v-if="isEditing" type="text" v-model="editForm.location" class="edit-input">
                              <p v-else class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
                         </div>
 
-                        <!-- 動作按鈕 -->
                         <div v-if="!isEditing" class="pt-2 space-y-3">
-                            
-                            <!-- 新增：發送付款須知 (僅在未付款狀態顯示) -->
                             <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-envelope"></i> 發送付款須知 & 帳號
                             </button>
 
-                            <!-- 確認收款 -->
                             <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-check-circle"></i> 確認收款並發送通知
                             </button>
@@ -317,38 +306,33 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 改為抓取原始輸入欄位 (F/G)，避免 P/Q 公式欄位錯誤
+                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            
-                            // 修正：優先抓 F (5) 和 G (6)
-                            const dateRaw = getKey(item, ['5', 'F', 'date', '15', 'P']); 
+                            const dateRaw = getKey(item, ['16', 'Q', '15', 'F', 'date']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['6', 'G', 'time', '16', 'Q']) || ''; 
-                            
+                            const time = getKey(item, ['17', 'R', '16', 'G', 'time']) || ''; 
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
-                            // 服務名稱標準化
                             if (serviceName.includes('自取')) serviceName = '門市自取'; 
                             else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
                             else if (serviceName.includes('佈置')) serviceName = '專人佈置';
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
-                            
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
+                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
+                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
+
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
                             if (rawStatus.includes('取消')) status = 'CANCELED';
                             if (rawStatus.includes('退款')) status = 'REFUNDED';
                             if (rawStatus.includes('完成') || rawStatus.includes('結案')) status = 'COMPLETED';
                             if (rawStatus.includes('等待') || rawStatus.includes('須知')) status = 'WAITING_PAYMENT';
-
-                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
-                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
 
                             return {
                                 id: index.toString(), oid, lineName, contactName, clientName: contactName, 
@@ -451,7 +435,6 @@
                     const order = selectedOrder.value;
                     if (!order) return;
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
-                    
                     Swal.fire({
                         title: '確認發送通知？', text: `即將發送 LINE 通知給 ${order.contactName}`, icon: 'question',
                         showCancelButton: true, confirmButtonText: '確定發送', cancelButtonText: '取消'
@@ -460,7 +443,6 @@
                             try {
                                 Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                                 const flex = buildRichFlexMessage(order, actionType);
-                                
                                 let statusText = '';
                                 if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
                                 else if (actionType === 'PAYMENT_REQUEST') statusText = '⏳ 等待匯款';
@@ -468,9 +450,8 @@
                                 else if (actionType === 'CANCEL') statusText = '❌ 已取消';
                                 else if (actionType === 'REFUND') statusText = '💸 已退款';
                                 else if (actionType === 'RESTORE') statusText = '❌ 未付款';
-
                                 const payload = {
-                                    to: order.userId, orderId: order.oid, clientName: order.contactName, service: order.service,
+                                    to: order.userId, orderId: order.oid, clientName: order.contactName, lineName: order.lineName, service: order.service,
                                     price: order.rawPrice, received: order.receivedPrice, balance: order.rawPrice - order.receivedPrice,
                                     date: order.date, time: order.time, phone: order.phone, location: order.location,
                                     status: statusText,
