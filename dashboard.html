@@ -474,7 +474,6 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
-                     // 完整版 Flex 邏輯 (無省略, 並使用 no-cors 模式)
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
@@ -506,10 +505,20 @@
                                 "size": "xl", 
                                 "color": "#4A4A4A", 
                                 "margin": "xs",
-                                "align": "center",
-                                "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
+                                "align": "center"
                             },
-                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            // 🌟 點擊按鈕自動發送帳號到聊天室 (LINE 官方推薦的複製替代方案)
+                            {
+                                "type": "button",
+                                "style": "secondary",
+                                "action": {
+                                    "type": "message",
+                                    "label": "點我複製帳號",
+                                    "text": "54320100686300"
+                                },
+                                "margin": "md"
+                            },
+                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -604,7 +613,7 @@
                                     flexContents: flex,
                                     updateOnly: false
                                 };
-                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
@@ -655,7 +664,7 @@
                         updateOnly: !notifyOnUpdate.value
                     };
                     try {
-                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
