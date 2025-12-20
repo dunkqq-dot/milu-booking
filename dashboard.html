@@ -84,11 +84,11 @@
                         <span class="flex items-center gap-1">📅 {{ order.date }}</span>
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
-                    <!-- 列表顯示尾款狀態 -->
+                    <!-- 列表顯示尾款狀態 (邏輯修正：金額為0時顯示待報價) -->
                     <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.status !== 'CANCELED' && order.status !== 'COMPLETED'">
                         <span class="text-xs text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
-                        <span class="text-xs font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500'">
-                            {{ (order.rawPrice - order.receivedPrice) > 0 ? `尚欠: ${formatMoney(order.rawPrice - order.receivedPrice)}` : '已付清' }}
+                        <span class="text-xs font-bold" :class="order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500') : 'text-gray-400'">
+                            {{ order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? `尚欠: NT$ ${formatMoney(order.rawPrice - order.receivedPrice)}` : '已付清') : '待報價' }}
                         </span>
                     </div>
                 </div>
@@ -485,10 +485,7 @@
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     
-                     let titleText = 'PAYMENT CONFIRMED'; 
-                     let descText = '預約與款項已確認'; 
-                     let statusColor = '#10B981';
+                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
                      let bodyContents = [];
 
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
@@ -502,24 +499,11 @@
                          statusColor = '#2563EB'; 
                          const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
                          bodyContents = [
-                            { "type": "text", "text": "本次訂單總金額", "size": "sm", "color": "#aaaaaa", "align": "center", "margin": "md" },
-                            { "type": "text", "text": `NT$ ${total.toLocaleString()}`, "weight": "bold", "size": "3xl", "color": "#C69C6D", "align": "center", "margin": "sm" },
-                            { "type": "separator", "margin": "lg" },
                             { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
                             { "type": "text", "text": ruleText, "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
                             { "type": "separator", "margin": "lg" },
                             { "type": "text", "text": "匯款資訊：彰化銀行 (009)", "size": "xs", "color": "#aaaaaa", "margin": "lg" },
-                            { 
-                                "type": "text", 
-                                "text": "54320100686300", 
-                                "weight": "bold", 
-                                "size": "xl", 
-                                "color": "#4A4A4A", 
-                                "margin": "xs",
-                                "align": "center",
-                                "action": { "type": "uri", "label": "複製帳號", "uri": "https://line.me/R/msg/text/?54320100686300" }
-                            },
-                            { "type": "text", "text": "(點擊上方帳號可複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            { "type": "text", "text": "54320100686300", "weight": "bold", "size": "lg", "color": "#4A4A4A", "margin": "xs" }
                          ];
                      }
 
@@ -549,7 +533,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -628,17 +612,6 @@
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
-                    
-                    // 如果勾選發送通知，則生成 "UPDATE" 類型的卡片
-                    let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
-                    let flexContents = {};
-                    
-                    if (notifyOnUpdate.value) {
-                         const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
-                         messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
-                         flexContents = flex;
-                    }
-
                     const payload = {
                         to: order.userId,
                         orderId: order.oid,
