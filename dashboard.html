@@ -27,6 +27,7 @@
         [v-cloak] { display: none; }
         .debug-modal pre { white-space: pre-wrap; word-wrap: break-word; font-size: 11px; color: #333; max-height: 400px; overflow-y: auto; background: #f1f1f1; padding: 15px; border-radius: 5px; text-align: left; }
         .price-input:focus { border-color: #C69C6D; background-color: #fff; }
+        .edit-input { width: 100%; border-bottom: 1px solid #ddd; background: transparent; padding: 2px 0; font-weight: bold; color: #4A4A4A; }
     </style>
 </head>
 <body id="app" v-cloak>
@@ -83,7 +84,6 @@
                         <span class="flex items-center gap-1">📅 {{ order.date }}</span>
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
-                    <!-- 列表顯示尾款狀態 -->
                     <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.rawPrice > 0 && order.status !== 'CANCELED'">
                         <span class="text-xs text-gray-400">總額: NT$ {{order.rawPrice.toLocaleString()}}</span>
                         <span class="text-xs font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500'">
@@ -156,9 +156,9 @@
                                     <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                 </div>
                                 <div v-else>
-                                    <!-- LINE 名稱：小字灰色 -->
-                                    <p class="text-xs text-gray-400 mb-1 flex items-center gap-1">
-                                        <i class="fa-brands fa-line text-green-500"></i> {{ selectedOrder.lineName }}
+                                    <!-- LINE 名稱：與聯絡人姓名一樣大 (2xl)，灰色 -->
+                                    <p class="font-bold text-2xl text-gray-400 mb-1 flex items-center gap-2">
+                                        <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                     </p>
                                     <!-- 聯絡人姓名：大字黑色 -->
                                     <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
@@ -300,31 +300,6 @@
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
 
-                // 文案常數
-                const PAYMENT_RULES = {
-                    DECO_NORMAL: "1. 單一時段僅服務一組客人，以先支付訂金者優先。\n2. 匯款期限：請於三日內完成匯款。\n3. 訂金規則：可付全額或 50% 訂金，尾款於活動當日支付。\n4. 改期與取消：僅接受一次改期；個人因素取消收 30% 服務費。",
-                    DECO_URGENT: "⚠️ 3日內急單專用規則\n1. 請於預約時「支付全額款項」並截圖回傳。\n2. 預約前 5 小時未收款視為未成立。\n3. 24小時內急件需加收 $500。\n4. 取消不退還任何款項。",
-                    SIMPLE: "1. 請於預約當下「支付全額款項」並截圖回傳。\n2. 預約前 24 小時未收款視為未成立。\n3. 急件加收 $500。\n4. 24小時內取消不退款。"
-                };
-
-                const calculateDaysDiff = (dateStr) => {
-                    if (!dateStr) return 0;
-                    const targetDate = new Date(dateStr);
-                    const today = new Date();
-                    targetDate.setHours(0, 0, 0, 0);
-                    today.setHours(0, 0, 0, 0);
-                    const diffTime = targetDate - today;
-                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                };
-
-                const getPaymentMessage = (type, dateStr) => {
-                    const diffDays = calculateDaysDiff(dateStr);
-                    if (type === '專人佈置' || type === '後車廂驚喜') {
-                        return diffDays <= 3 ? PAYMENT_RULES.DECO_URGENT : PAYMENT_RULES.DECO_NORMAL;
-                    }
-                    return PAYMENT_RULES.SIMPLE;
-                };
-
                 const getKey = (item, keys) => {
                     for (const k of keys) {
                         if (item[k] !== undefined && item[k] !== null && item[k] !== '') return item[k];
@@ -333,8 +308,7 @@
                 };
 
                 const fetchData = async () => {
-                    loading.value = true;
-                    errorMsg.value = null;
+                    loading.value = true; errorMsg.value = null;
                     try {
                         const res = await fetch(DATA_API_URL);
                         const text = await res.text();
@@ -343,27 +317,26 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 精準欄位對應 (根據您的表格截圖)
-                            const lineName = getKey(item, ['2', 'C']) || '未知LINE';
-                            const contactName = getKey(item, ['3', 'D']) || '未知客戶';
-                            const phone = getKey(item, ['4', 'E']) || '';
-                            const dateRaw = getKey(item, ['5', 'F']);
-                            // 處理不同日期格式
+                            // 🌟 精準欄位對應修正 (0-Based Index)
+                            const lineName = getKey(item, ['2', 'C', 'Column C', 'lineName']) || '未知LINE';
+                            const contactName = getKey(item, ['3', 'D', 'Column D', 'name', 'contactName']) || '未知客戶';
+                            const phone = getKey(item, ['4', 'E', 'phone']) || '';
+                            const dateRaw = getKey(item, ['5', 'F', 'date']);
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['6', 'G']) || '';
-                            const location = getKey(item, ['7', 'H']) || '未填寫地點';
-                            let serviceName = getKey(item, ['8', 'I']) || '服務';
+                            const time = getKey(item, ['6', 'G', 'time']) || '';
+                            const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點';
+                            let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
                             // 服務名稱標準化
                             if (serviceName.includes('自取')) serviceName = '門市自取'; 
-                            else if (serviceName.includes('後車廂') || serviceName.includes('後車箱')) serviceName = '後車廂驚喜';
+                            else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
                             else if (serviceName.includes('佈置')) serviceName = '專人佈置';
 
-                            const userId = getKey(item, ['9', 'J']) || '';
-                            const rawStatus = (getKey(item, ['10', 'K']) || '').trim();
-                            const rawPrice = parseInt(getKey(item, ['11', 'L'])) || 0;
-                            const receivedPrice = parseInt(getKey(item, ['12', 'M'])) || 0;
+                            const userId = getKey(item, ['9', 'J', 'userId']) || '';
+                            const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
+                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
+                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -374,7 +347,7 @@
 
                             return {
                                 id: index.toString(), 
-                                oid: getKey(item, ['0', 'A']) || `M-${index}`,      
+                                oid: getKey(item, ['0', 'A', 'oid']) || `M-${index}`,      
                                 lineName, contactName, clientName: contactName, 
                                 service: serviceName, date, time, phone, userId, status, 
                                 rawPrice, receivedPrice, location
@@ -388,9 +361,7 @@
                         } else if (formattedData.length > 0) {
                              selectedOrder.value = formattedData[0];
                         }
-                    } catch (e) {
-                        errorMsg.value = e.message;
-                    }
+                    } catch (e) { errorMsg.value = e.message; }
                     loading.value = false;
                 };
 
@@ -423,7 +394,8 @@
                          titleText = 'PAYMENT REQUEST'; 
                          descText = '請詳閱付款規則並完成匯款'; 
                          statusColor = '#2563EB'; 
-                         const ruleText = getPaymentMessage(order.service, order.date);
+                         // 這裡應該要有一個獲取規則的函數，為簡化省略，建議在 client side 寫死或傳送
+                         const ruleText = "請依照約定時間完成匯款"; 
                          bodyContents = [
                             { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
                             { "type": "text", "text": ruleText, "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
