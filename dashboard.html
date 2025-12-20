@@ -186,7 +186,18 @@
                             </div>
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                 <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
-                                <input v-if="isEditing" type="text" v-model="editForm.time" class="edit-input">
+                                
+                                <!-- ⚠️ 智慧時間編輯：根據服務類型切換輸入框 -->
+                                <template v-if="isEditing">
+                                    <!-- 外送或自取：顯示下拉選單 -->
+                                    <select v-if="isTimeSlotService(selectedOrder.service)" v-model="editForm.time" class="edit-input">
+                                        <option value="" disabled>請選擇時段</option>
+                                        <option v-for="slot in timeSlots" :key="slot" :value="slot">{{ slot }}</option>
+                                    </select>
+                                    <!-- 專人佈置或後車廂：顯示時間選擇器 -->
+                                    <input v-else type="time" v-model="editForm.time" class="edit-input">
+                                </template>
+                                
                                 <p v-else class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                             </div>
                         </div>
@@ -287,6 +298,11 @@
             '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
 
+        const timeSlots = [
+            "12:30 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", 
+            "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00"
+        ];
+
         createApp({
             setup() {
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
@@ -308,7 +324,7 @@
                     return '';
                 };
 
-                // 新增：金額格式化
+                // 金額格式化
                 const formatMoney = (val) => {
                     if (!val && val !== 0) return '0';
                     return val.toLocaleString();
@@ -320,7 +336,12 @@
                     return parseInt(str) || 0;
                 };
 
-                // 計算屬性：處理金額輸入的即時綁定
+                // 判斷是否為時段制服務
+                const isTimeSlotService = (service) => {
+                    return service.includes('外送') || service.includes('自取');
+                };
+
+                // 計算屬性
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
                     set: (val) => {
@@ -347,17 +368,13 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            
-                            // 修正：優先抓 F (5) 和 G (6)，備用 Q (16) 和 R (17) 
-                            const dateRaw = getKey(item, ['5', 'F', '16', 'Q', 'date']); 
+                            const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['6', 'G', '17', 'R', 'time']) || ''; 
-                            
+                            const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
@@ -368,8 +385,6 @@
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            
-                            // 金額欄位 (L=11, M=12)
                             const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
                             const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
 
@@ -398,6 +413,7 @@
                     loading.value = false;
                 };
 
+                // ... (getStatusText, getLabel, buildRichFlexMessage, updateOrderStatus 維持不變) ...
                 const getStatusText = (status, isEnglish = false) => {
                     if (isEnglish) return status === 'CONFIRMED' ? 'PAYMENT CONFIRMED' : (status === 'COMPLETED' ? 'ORDER COMPLETED' : 'WAITING FOR PAYMENT');
                     return status === 'CONFIRMED' ? '已付款' : (status === 'COMPLETED' ? '已完成' : (status === 'CANCELED' ? '已取消' : (status === 'REFUNDED' ? '已退款' : (status === 'WAITING_PAYMENT' ? '等待匯款' : '未付款'))));
@@ -412,6 +428,7 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
+                     // 完整版 Flex 邏輯 (無省略)
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
@@ -548,9 +565,9 @@
                         clientName: editForm.value.contactName, 
                         lineName: editForm.value.lineName,       
                         service: order.service, 
-                        price: editForm.value.rawPrice,
-                        received: editForm.value.receivedPrice,
-                        balance: editForm.value.rawPrice - editForm.value.receivedPrice,
+                        price: parseMoney(editForm.value.rawPrice),
+                        received: parseMoney(editForm.value.receivedPrice),
+                        balance: parseMoney(editForm.value.rawPrice) - parseMoney(editForm.value.receivedPrice),
                         date: editForm.value.date,
                         time: editForm.value.time,
                         phone: editForm.value.phone,
@@ -563,6 +580,8 @@
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
+                        selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
+                        selectedOrder.value.receivedPrice = parseMoney(editForm.value.receivedPrice);
                         isEditing.value = false;
                         Swal.fire('成功', '資料已更新！', 'success');
                     } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
@@ -580,7 +599,8 @@
                 return { 
                     reservations, selectedOrder, filter, loading, errorMsg, filteredList, 
                     selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel, showDebug,
-                    isEditing, editForm, startEdit, cancelEdit, saveEdit, formatMoney, displayRawPrice, displayReceivedPrice
+                    isEditing, editForm, startEdit, cancelEdit, saveEdit, formatMoney, displayRawPrice, displayReceivedPrice,
+                    isTimeSlotService, timeSlots
                 };
             }
         }).mount('#app');
