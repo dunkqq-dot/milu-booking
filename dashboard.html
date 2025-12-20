@@ -84,7 +84,6 @@
                         <span class="flex items-center gap-1">📅 {{ order.date }}</span>
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
-                    <!-- 列表顯示尾款狀態 (邏輯修正：金額為0時顯示待報價) -->
                     <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.status !== 'CANCELED' && order.status !== 'COMPLETED'">
                         <span class="text-xs text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
                         <span class="text-xs font-bold" :class="order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500') : 'text-gray-400'">
@@ -119,7 +118,6 @@
                             <i class="fa-solid fa-pen"></i>
                         </button>
                         <div v-else class="absolute top-4 right-4 flex items-center gap-2">
-                             <!-- 新增：同步發送開關 -->
                             <label class="flex items-center space-x-2 text-xs text-white/90 bg-black/20 px-2 py-1 rounded cursor-pointer select-none">
                                 <input type="checkbox" v-model="notifyOnUpdate" class="form-checkbox h-3 w-3 text-green-500 rounded focus:ring-0">
                                 <span>發送通知</span>
@@ -162,11 +160,9 @@
                                     <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                 </div>
                                 <div v-else>
-                                    <!-- LINE 名稱 -->
                                     <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
                                         <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                     </p>
-                                    <!-- 聯絡人姓名 -->
                                     <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
                                     <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
                                         <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
@@ -218,7 +214,6 @@
                             <div class="flex justify-between items-center mb-2">
                                 <p class="text-xs text-green-600 font-bold">已收款 (對帳)</p>
                                 <div class="flex items-center gap-2">
-                                    <!-- ⚡ 一鍵全額按鈕 -->
                                     <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">
                                         ⚡同上
                                     </button>
@@ -246,12 +241,12 @@
                         <!-- 動作按鈕 -->
                         <div v-if="!isEditing" class="pt-2 space-y-3">
                             
-                            <!-- 付款須知：移到下方變小，當作輔助功能 -->
-                            <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-2 rounded-lg font-bold text-sm hover:bg-blue-100 transition">
-                                <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知
+                            <!-- 付款須知 -->
+                            <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-envelope"></i> 發送付款須知 & 帳號
                             </button>
 
-                            <!-- 確認收款：變大變明顯 -->
+                            <!-- 確認收款 -->
                             <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-check-circle"></i> 確認收款並登記
                             </button>
@@ -322,7 +317,7 @@
                 const loading = ref(true);
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
-                const notifyOnUpdate = ref(true); // 預設開啟
+                const notifyOnUpdate = ref(true); 
 
                 const getKey = (item, keys) => {
                     for (const k of keys) {
@@ -331,7 +326,6 @@
                     return '';
                 };
 
-                // 金額格式化
                 const formatMoney = (val) => {
                     if (!val && val !== 0) return '0';
                     return val.toLocaleString();
@@ -343,12 +337,10 @@
                     return parseInt(str) || 0;
                 };
 
-                // 判斷是否為時段制服務
                 const isTimeSlotService = (service) => {
                     return service.includes('外送') || service.includes('自取');
                 };
 
-                // 計算屬性
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
                     set: (val) => {
@@ -365,7 +357,6 @@
                     }
                 });
 
-                // 新增：一鍵全額付清
                 const fillFullPayment = () => {
                     if (isEditing.value) {
                         editForm.value.receivedPrice = editForm.value.rawPrice;
@@ -398,7 +389,6 @@
                     }
                 };
 
-                // 🌟 新增：轉換 HTML 規則為 LINE 格式文字
                 const formatForLine = (htmlText) => {
                     if (!htmlText) return "無";
                     let text = htmlText.replace(/<br\s*\/?>/gi, '\n')
@@ -424,7 +414,6 @@
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            // 優先抓 F (5) 和 G (6)
                             const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
                             const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
@@ -480,7 +469,6 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
-                     // 完整版 Flex 邏輯 (包含所有欄位)
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
@@ -499,11 +487,23 @@
                          statusColor = '#2563EB'; 
                          const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
                          bodyContents = [
+                            { "type": "text", "text": `本次訂單總金額: NT$ ${total.toLocaleString()}`, "weight": "bold", "size": "md", "color": "#C69C6D", "align": "center", "margin": "md" },
+                            { "type": "separator", "margin": "md" },
                             { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
                             { "type": "text", "text": ruleText, "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
                             { "type": "separator", "margin": "lg" },
                             { "type": "text", "text": "匯款資訊：彰化銀行 (009)", "size": "xs", "color": "#aaaaaa", "margin": "lg" },
-                            { "type": "text", "text": "54320100686300", "weight": "bold", "size": "lg", "color": "#4A4A4A", "margin": "xs" }
+                            { 
+                                "type": "text", 
+                                "text": "54320100686300", 
+                                "weight": "bold", 
+                                "size": "xl", 
+                                "color": "#4A4A4A", 
+                                "margin": "xs",
+                                "align": "center",
+                                "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
+                            },
+                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -533,7 +533,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -626,16 +626,11 @@
                         phone: editForm.value.phone,
                         location: editForm.value.location,
                         status: order.status === 'CONFIRMED' ? '✅ 已付款' : '❌ 未付款',
-                        message: messagePayload,
-                        flexContents: flexContents
+                        message: { type: 'flex', altText: '訂單資料更新', contents: {} },
+                        updateOnly: true
                     };
                     try {
-                        // 使用 標準的 fetch
-                        await fetch(SEND_MSG_WEBHOOK, { 
-                            method: 'POST', 
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload) 
-                        });
+                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
