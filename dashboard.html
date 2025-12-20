@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
+                        <p class="text-xs text-gray-400 mt-1">訂單核對系統</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -85,10 +85,10 @@
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
                     <!-- 列表顯示尾款狀態 -->
-                    <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.rawPrice > 0 && order.status !== 'CANCELED'">
+                    <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.status !== 'CANCELED' && order.status !== 'COMPLETED'">
                         <span class="text-xs text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
                         <span class="text-xs font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500'">
-                            {{ (order.rawPrice - order.receivedPrice) > 0 ? `尚欠: NT$ ${formatMoney(order.rawPrice - order.receivedPrice)}` : '已付清' }}
+                            {{ (order.rawPrice - order.receivedPrice) > 0 ? `尚欠: ${formatMoney(order.rawPrice - order.receivedPrice)}` : '已付清' }}
                         </span>
                     </div>
                 </div>
@@ -207,7 +207,7 @@
                         <!-- 款項明細 -->
                         <div class="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100 space-y-3">
                             <div class="flex justify-between items-center">
-                                <p class="text-xs text-gray-500 font-bold">總金額</p>
+                                <p class="text-xs text-gray-500 font-bold">總金額 (填入報價)</p>
                                 <div class="flex items-center">
                                     <span class="text-xs mr-1 text-gray-400">NT$</span>
                                     <input type="number" v-model.number="displayRawPrice" 
@@ -216,8 +216,12 @@
                                 </div>
                             </div>
                             <div class="flex justify-between items-center mb-2">
-                                <p class="text-xs text-green-600 font-bold">已收款</p>
-                                <div class="flex items-center">
+                                <p class="text-xs text-green-600 font-bold">已收款 (對帳)</p>
+                                <div class="flex items-center gap-2">
+                                    <!-- ⚡ 一鍵全額按鈕 -->
+                                    <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">
+                                        ⚡同上
+                                    </button>
                                     <span class="text-xs mr-1 text-green-600">NT$</span>
                                     <input type="number" v-model.number="displayReceivedPrice" 
                                            class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" 
@@ -242,14 +246,14 @@
                         <!-- 動作按鈕 -->
                         <div v-if="!isEditing" class="pt-2 space-y-3">
                             
-                            <!-- 新增：發送付款須知 (僅在未付款狀態顯示) -->
-                            <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-envelope"></i> 發送付款須知 & 帳號
+                            <!-- 付款須知：移到下方變小，當作輔助功能 -->
+                            <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-50 text-blue-600 border border-blue-200 py-2 rounded-lg font-bold text-sm hover:bg-blue-100 transition">
+                                <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知
                             </button>
 
-                            <!-- 確認收款 -->
-                            <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-check-circle"></i> 確認收款並發送通知
+                            <!-- 確認收款：變大變明顯 -->
+                            <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-check-circle"></i> 確認收款並登記
                             </button>
                             
                             <div v-if="selectedOrder.status === 'CONFIRMED'" class="space-y-2">
@@ -276,8 +280,6 @@
                                     <i class="fa-solid fa-ban"></i> 取消訂單
                                 </button>
                             </div>
-
-                            <p class="text-center text-xs text-gray-400 pt-2">* 點擊按鈕將同步更新試算表與發送 LINE 通知</p>
                         </div>
                     </div>
                 </div>
@@ -318,7 +320,7 @@
                 const loading = ref(true);
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
-                const notifyOnUpdate = ref(true); // 預設開啟
+                const notifyOnUpdate = ref(true); 
 
                 const getKey = (item, keys) => {
                     for (const k of keys) {
@@ -327,7 +329,6 @@
                     return '';
                 };
 
-                // 金額格式化
                 const formatMoney = (val) => {
                     if (!val && val !== 0) return '0';
                     return val.toLocaleString();
@@ -339,7 +340,6 @@
                     return parseInt(str) || 0;
                 };
 
-                // 判斷是否為時段制服務
                 const isTimeSlotService = (service) => {
                     return service.includes('外送') || service.includes('自取');
                 };
@@ -361,16 +361,23 @@
                     }
                 });
 
+                // 新增：一鍵全額付清
+                const fillFullPayment = () => {
+                    if (isEditing.value) {
+                        editForm.value.receivedPrice = editForm.value.rawPrice;
+                    } else if (selectedOrder.value) {
+                        selectedOrder.value.receivedPrice = selectedOrder.value.rawPrice;
+                    }
+                };
+
                 const calculateDaysDiff = (dateStr) => {
                     if (!dateStr) return 0;
                     const targetDate = new Date(dateStr);
                     const today = new Date();
                     targetDate.setHours(0, 0, 0, 0);
                     today.setHours(0, 0, 0, 0);
-                    
                     const diffTime = targetDate - today;
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    return diffDays;
+                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 };
 
                 const getPaymentMessage = (type, dateStr) => {
@@ -387,7 +394,6 @@
                     }
                 };
 
-                // 🌟 新增：轉換 HTML 規則為 LINE 格式文字
                 const formatForLine = (htmlText) => {
                     if (!htmlText) return "無";
                     let text = htmlText.replace(/<br\s*\/?>/gi, '\n')
@@ -413,7 +419,6 @@
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            // 優先抓 F (5) 和 G (6)
                             const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
                             const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
@@ -469,15 +474,12 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
-                     // 完整版 Flex 邏輯
+                     // 完整版 Flex 邏輯 (包含所有欄位)
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     
-                     let titleText = 'PAYMENT CONFIRMED'; 
-                     let descText = '預約與款項已確認'; 
-                     let statusColor = '#10B981';
+                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
                      let bodyContents = [];
 
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
@@ -525,7 +527,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -545,7 +547,7 @@
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
                     
                     Swal.fire({
-                        title: '確認發送通知？',
+                        title: '確認動作',
                         text: `即將發送 LINE 通知給 ${order.contactName}`,
                         icon: 'question',
                         showCancelButton: true,
@@ -584,6 +586,7 @@
                                 };
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                                 
+                                // 樂觀更新狀態
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
                                 else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
@@ -661,7 +664,7 @@
                     reservations, selectedOrder, filter, loading, errorMsg, filteredList, 
                     selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel, showDebug,
                     isEditing, editForm, startEdit, cancelEdit, saveEdit, formatMoney, displayRawPrice, displayReceivedPrice,
-                    isTimeSlotService, timeSlots, notifyOnUpdate
+                    isTimeSlotService, timeSlots, notifyOnUpdate, fillFullPayment
                 };
             }
         }).mount('#app');
