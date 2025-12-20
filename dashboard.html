@@ -377,18 +377,31 @@
                 // 補回被遺漏的獲取付款規則函式
                 const getPaymentMessage = (type, dateStr) => {
                     const diffDays = calculateDaysDiff(dateStr);
-                    
+                    // 文案常數
+                    const PAYMENT_RULES = {
+                        DECO_NORMAL: "1. 單一時段僅服務一組客人，以先支付訂金者優先。\n2. 匯款期限：請於三日內完成匯款。\n3. 訂金規則：可付全額或 50% 訂金，尾款於活動當日支付。\n4. 改期與取消：僅接受一次改期；個人因素取消收 30% 服務費。",
+                        DECO_URGENT: "⚠️ 3日內急單專用規則\n1. 請於預約時「支付全額款項」並截圖回傳。\n2. 預約前 5 小時未收款視為未成立。\n3. 24小時內急件需加收 $500。\n4. 取消不退還任何款項。",
+                        SIMPLE: "1. 請於預約當下「支付全額款項」並截圖回傳。\n2. 預約前 24 小時未收款視為未成立。\n3. 急件加收 $500。\n4. 24小時內取消不退款。"
+                    };
+
                     if (type.includes('佈置') || type.includes('後車廂')) {
-                        // 這裡使用 dashboard.html 內建的 PAYMENT_RULES (需補上定義)
-                        // 或直接返回寫死的文字
-                        if (diffDays <= 3) {
-                             return "⚠️ 3日內急單專用規則\n1. 請於預約時「支付全額款項」並截圖回傳。\n2. 預約前 5 小時未收款視為未成立。\n3. 24小時內急件需加收 $500。\n4. 取消不退還任何款項。";
-                        } else {
-                             return "1. 單一時段僅服務一組客人，以先支付訂金者優先。\n2. 匯款期限：請於三日內完成匯款。\n3. 訂金規則：可付全額或 50% 訂金，尾款於活動當日支付。\n4. 改期與取消：僅接受一次改期；個人因素取消收 30% 服務費。";
-                        }
+                        if (diffDays <= 3) return PAYMENT_RULES.DECO_URGENT;
+                        return PAYMENT_RULES.DECO_NORMAL;
                     } else {
-                        return "1. 請於預約當下「支付全額款項」並截圖回傳。\n2. 預約前 24 小時未收款視為未成立。\n3. 急件加收 $500。\n4. 24小時內取消不退款。";
+                        return PAYMENT_RULES.SIMPLE;
                     }
+                };
+
+                // 🌟 新增：轉換 HTML 規則為 LINE 格式文字
+                const formatForLine = (htmlText) => {
+                    if (!htmlText) return "無";
+                    let text = htmlText.replace(/<br\s*\/?>/gi, '\n')
+                                       .replace(/<\/p>/gi, '\n\n')
+                                       .replace(/<li>/gi, '• ')
+                                       .replace(/<\/li>/gi, '\n')
+                                       .replace(/<[^>]+>/g, '') // 移除其他標籤
+                                       .replace(/&nbsp;/g, ' ');
+                    return text.trim();
                 };
 
                 const fetchData = async () => {
