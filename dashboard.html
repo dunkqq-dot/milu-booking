@@ -71,7 +71,8 @@
                                   'bg-red-100 text-red-500': order.status === 'UNPAID',
                                   'bg-gray-200 text-gray-600': order.status === 'CANCELED',
                                   'bg-yellow-100 text-yellow-600': order.status === 'REFUNDED',
-                                  'bg-blue-100 text-blue-600': order.status === 'COMPLETED'
+                                  'bg-blue-100 text-blue-600': order.status === 'COMPLETED',
+                                  'bg-blue-400 text-white': order.status === 'WAITING_PAYMENT'
                               }">
                             {{ getStatusText(order.status) }}
                         </span>
@@ -111,7 +112,8 @@
                              'bg-[#EF4444]': selectedOrder.status === 'UNPAID',
                              'bg-gray-500': selectedOrder.status === 'CANCELED',
                              'bg-yellow-500': selectedOrder.status === 'REFUNDED',
-                             'bg-blue-500': selectedOrder.status === 'COMPLETED'
+                             'bg-blue-500': selectedOrder.status === 'COMPLETED',
+                             'bg-blue-400': selectedOrder.status === 'WAITING_PAYMENT'
                          }">
                         
                         <!-- 編輯模式按鈕 -->
@@ -138,6 +140,7 @@
                                 <i v-else-if="selectedOrder.status === 'CANCELED'" class="fa-solid fa-circle-xmark"></i>
                                 <i v-else-if="selectedOrder.status === 'REFUNDED'" class="fa-solid fa-money-bill-transfer"></i>
                                 <i v-else-if="selectedOrder.status === 'COMPLETED'" class="fa-solid fa-flag-checkered"></i>
+                                <i v-else-if="selectedOrder.status === 'WAITING_PAYMENT'" class="fa-solid fa-hourglass-half"></i>
                                 <i v-else class="fa-solid fa-circle-exclamation"></i>
                             </div>
                             <h2 class="text-lg font-bold tracking-widest opacity-90">
@@ -346,6 +349,7 @@
                     return service.includes('外送') || service.includes('自取');
                 };
 
+                // 計算屬性
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
                     set: (val) => {
@@ -415,10 +419,12 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
+                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
+                            // 優先抓 F (5) 和 G (6)
                             const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
                             const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
@@ -516,7 +522,8 @@
                                     "text": "54320100686300"
                                 },
                                 "margin": "md"
-                            }
+                            },
+                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -527,6 +534,7 @@
                                 { "type": "text", "text": "期待再次為您服務 ❤️", "size": "sm", "color": "#666666", "align": "center", "margin": "sm" }
                              ];
                          } else {
+                             // 一般狀態 (確認收款) - 這裡做了字體大小調整
                              bodyContents = [
                                 {
                                     "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
@@ -543,8 +551,9 @@
                                     "type": "box", "layout": "vertical", "margin": "lg", "spacing": "xs",
                                     "contents": [
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "總計金額", "size": "sm", "color": "#aaaaaa" }, { "type": "text", "text": `NT$ ${total.toLocaleString()}`, "size": "sm", "color": "#666666", "align": "end" } ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "已收款", "size": actionType === 'CONFIRM' ? "xl" : "sm", "color": "#10B981", "weight": "bold", "align": "end" }, { "type": "text", "text": `NT$ ${paid.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "xl" : "sm", "color": "#10B981", "align": "end", "weight": "bold" } ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "尚欠尾款", "size": actionType === 'CONFIRM' ? "xs" : "md", "color": "#EF4444", "weight": "bold" }, { "type": "text", "text": `NT$ ${balance.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "sm" : "xl", "color": "#EF4444", "align": "end", "weight": "bold" } ] }
+                                        // 🌟 已收款放大，尚欠尾款縮小
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "已收款", "size": actionType === 'CONFIRM' ? "md" : "sm", "color": "#10B981", "weight": "bold", "align": "start" }, { "type": "text", "text": `NT$ ${paid.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "xl" : "sm", "color": "#10B981", "align": "end", "weight": "bold" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "尚欠尾款", "size": actionType === 'CONFIRM' ? "xs" : "md", "color": "#EF4444", "weight": "bold", "align": "start" }, { "type": "text", "text": `NT$ ${balance.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "sm" : "xl", "color": "#EF4444", "align": "end", "weight": "bold" } ] }
                                     ]
                                 }
                              ];
@@ -553,7 +562,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -633,16 +642,6 @@
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
-                    
-                    let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
-                    let flexContents = {};
-                    
-                    if (notifyOnUpdate.value) {
-                         const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
-                         messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
-                         flexContents = flex;
-                    }
-
                     const payload = {
                         to: order.userId,
                         orderId: order.oid,
@@ -656,11 +655,19 @@
                         time: editForm.value.time,
                         phone: editForm.value.phone,
                         location: editForm.value.location,
-                        status: order.status === 'CONFIRMED' ? '✅ 已付款' : '❌ 未付款',
-                        message: messagePayload,
-                        flexContents: flexContents,
-                        updateOnly: !notifyOnUpdate.value
+                        // 修正：狀態保持不變，除非是確認收款
+                        status: order.status === 'CONFIRMED' ? '✅ 已付款' : (order.status === 'WAITING_PAYMENT' ? '⏳ 等待匯款' : '❌ 未付款'),
+                        message: { type: 'flex', altText: '訂單資料更新', contents: {} }, // 編輯不發送
+                        updateOnly: true
                     };
+                    
+                    if (notifyOnUpdate.value) {
+                         const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
+                         payload.message = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
+                         payload.flexContents = flex;
+                         payload.updateOnly = false;
+                    }
+
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
