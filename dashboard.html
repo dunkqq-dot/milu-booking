@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">JSON 精準同步中</p>
+                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -252,7 +252,7 @@
                             </button>
 
                             <!-- 確認收款 -->
-                            <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                            <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                 <i class="fa-solid fa-check-circle"></i> 確認收款並登記
                             </button>
                             
@@ -415,13 +415,17 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
+                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            const dateRaw = getKey(item, ['16', 'Q', '15', 'F', 'date']); 
+                            
+                            // 修正：優先抓 F (5) 和 G (6)
+                            const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['17', 'R', '16', 'G', 'time']) || ''; 
+                            const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
+                            
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
