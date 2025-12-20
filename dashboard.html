@@ -248,7 +248,7 @@
                             
                             <!-- 新增：發送付款須知 (僅在未付款狀態顯示) -->
                             <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-envelope"></i> 發送付款須知 & 帳號
+                                <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知 & 帳號
                             </button>
 
                             <!-- 確認收款 -->
@@ -311,8 +311,9 @@
 
         createApp({
             setup() {
+                // ⚠️ 修正：這裡換成了您提供的新 Webhook 網址
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
-                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/obyt3xy5jp4mp9lousp12kkaq4xcvakf';
+                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
 
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
@@ -415,16 +416,18 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
+                            // 🌟 強制優先讀取 F 欄 (5) 和 G 欄 (6) - 最原始的表單輸入
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
                             
-                            // 修正：優先抓 F (5) 和 G (6)
-                            const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
+                            // 修正：優先抓 F (5) ，備用 Q (16)
+                            const dateRaw = getKey(item, ['5', 'F', '16', 'Q', 'date']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
+                            
+                            // 修正：優先抓 G (6) ，備用 R (17)
+                            const time = getKey(item, ['6', 'G', '17', 'R', 'time']) || ''; 
                             
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
@@ -658,6 +661,7 @@
                         updateOnly: !notifyOnUpdate.value
                     };
                     try {
+                        // 修正：移除 no-cors
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
