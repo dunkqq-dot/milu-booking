@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">訂單核對系統</p>
+                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -248,7 +248,7 @@
                             
                             <!-- 付款須知 -->
                             <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
-                                <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知 & 帳號
+                                <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知
                             </button>
 
                             <!-- 確認收款 -->
@@ -312,7 +312,7 @@
         createApp({
             setup() {
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
-                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/obyt3xy5jp4mp9lousp12kkaq4xcvakf';
+                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
 
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
@@ -474,6 +474,7 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
+                     // 完整版 Flex 邏輯 (無省略, 並使用 no-cors 模式)
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
@@ -505,20 +506,10 @@
                                 "size": "xl", 
                                 "color": "#4A4A4A", 
                                 "margin": "xs",
-                                "align": "center"
+                                "align": "center",
+                                "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
-                            // 🌟 新增：點擊按鈕直接發送帳號 (方便複製)
-                            {
-                                "type": "button",
-                                "style": "secondary",
-                                "action": {
-                                    "type": "message",
-                                    "label": "點我複製帳號",
-                                    "text": "54320100686300"
-                                },
-                                "margin": "md"
-                            },
-                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -613,7 +604,7 @@
                                     flexContents: flex,
                                     updateOnly: false
                                 };
-                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
@@ -664,12 +655,7 @@
                         updateOnly: !notifyOnUpdate.value
                     };
                     try {
-                        // 使用 標準的 fetch
-                        await fetch(SEND_MSG_WEBHOOK, { 
-                            method: 'POST', 
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload) 
-                        });
+                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
