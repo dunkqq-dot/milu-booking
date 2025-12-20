@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">JSON 精準同步中</p>
+                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -84,7 +84,6 @@
                         <span class="flex items-center gap-1">📅 {{ order.date }}</span>
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
-                    <!-- 列表顯示尾款狀態 -->
                     <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.rawPrice > 0 && order.status !== 'CANCELED'">
                         <span class="text-xs text-gray-400">總額: NT$ {{order.rawPrice.toLocaleString()}}</span>
                         <span class="text-xs font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500'">
@@ -158,8 +157,8 @@
                                 </div>
                                 <div v-else>
                                     <!-- LINE 名稱 -->
-                                    <p class="text-xs text-gray-500 mb-1 flex items-center gap-1">
-                                        <i class="fa-brands fa-line text-green-500"></i> {{ selectedOrder.lineName }}
+                                    <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-1">
+                                        <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                     </p>
                                     <!-- 聯絡人姓名 -->
                                     <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
@@ -287,13 +286,6 @@
             '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
 
-        // 💰 付款規則設定
-        const PAYMENT_RULES = {
-            DECO_NORMAL: "1. 單一時段僅服務一組客人，以先支付訂金者優先。\n2. 匯款期限：請於三日內完成匯款。\n3. 訂金規則：可付全額或 50% 訂金，尾款於活動當日支付。\n4. 改期與取消：僅接受一次改期；個人因素取消收 30% 服務費。",
-            DECO_URGENT: "⚠️ 3日內急單專用規則\n1. 請於預約時「支付全額款項」並截圖回傳。\n2. 預約前 5 小時未收款視為未成立。\n3. 24小時內急件需加收 $500。\n4. 取消不退還任何款項。",
-            SIMPLE: "1. 請於預約當下「支付全額款項」並截圖回傳。\n2. 預約前 24 小時未收款視為未成立。\n3. 急件加收 $500。\n4. 24小時內取消不退款。"
-        };
-
         createApp({
             setup() {
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
@@ -325,14 +317,17 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
+                            // 🌟 改為抓取原始輸入欄位 (F/G)，避免 P/Q 公式欄位錯誤
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            const dateRaw = getKey(item, ['16', 'Q', '15', 'F', 'date']); 
+                            
+                            // 修正：優先抓 F (5) 和 G (6)
+                            const dateRaw = getKey(item, ['5', 'F', 'date', '15', 'P']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['17', 'R', '16', 'G', 'time']) || ''; 
+                            const time = getKey(item, ['6', 'G', 'time', '16', 'Q']) || ''; 
+                            
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
@@ -342,7 +337,6 @@
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
                             else if (serviceName.includes('佈置')) serviceName = '專人佈置';
 
-                            // 修正：User ID 強制抓取 J 欄 (Index 9)
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
@@ -374,11 +368,11 @@
                     loading.value = false;
                 };
 
-                // ... (StatusText, Label, SelectOrder, FilteredList 維持不變) ...
                 const getStatusText = (status, isEnglish = false) => {
                     if (isEnglish) return status === 'CONFIRMED' ? 'PAYMENT CONFIRMED' : (status === 'COMPLETED' ? 'ORDER COMPLETED' : 'WAITING FOR PAYMENT');
                     return status === 'CONFIRMED' ? '已付款' : (status === 'COMPLETED' ? '已完成' : (status === 'CANCELED' ? '已取消' : (status === 'REFUNDED' ? '已退款' : (status === 'WAITING_PAYMENT' ? '等待匯款' : '未付款'))));
                 };
+
                 const getLabel = (type, service) => (configMap[service] || configMap['專人佈置'])[type];
                 const selectOrder = (order) => { if(!isEditing.value) selectedOrder.value = order; };
                 const filteredList = computed(() => {
@@ -386,24 +380,6 @@
                     if (filter.value === 'UNPAID') return reservations.value.filter(r => r.status === 'UNPAID' || r.status === 'WAITING_PAYMENT');
                     return reservations.value.filter(r => r.status === filter.value);
                 });
-
-                const calculateDaysDiff = (dateStr) => {
-                    if (!dateStr) return 0;
-                    const targetDate = new Date(dateStr);
-                    const today = new Date();
-                    targetDate.setHours(0, 0, 0, 0);
-                    today.setHours(0, 0, 0, 0);
-                    const diffTime = targetDate - today;
-                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                };
-
-                const getPaymentMessage = (type, dateStr) => {
-                    const diffDays = calculateDaysDiff(dateStr);
-                    if (type === '專人佈置' || type === '後車廂驚喜') {
-                        return diffDays <= 3 ? PAYMENT_RULES.DECO_URGENT : PAYMENT_RULES.DECO_NORMAL;
-                    }
-                    return PAYMENT_RULES.SIMPLE;
-                };
 
                 const buildRichFlexMessage = (order, actionType) => {
                      const config = configMap[order.service] || configMap['專人佈置'];
@@ -421,7 +397,7 @@
                          titleText = 'PAYMENT REQUEST'; 
                          descText = '請詳閱付款規則並完成匯款'; 
                          statusColor = '#2563EB'; 
-                         const ruleText = getPaymentMessage(order.service, order.date);
+                         const ruleText = "請依照約定時間完成匯款"; 
                          bodyContents = [
                             { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
                             { "type": "text", "text": ruleText, "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
@@ -439,7 +415,7 @@
                                     { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.contactName, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
                                     { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.phone, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
                                     { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.date, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
-                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold", "color": "#C69C6D" } ] },
+                                    { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
                                     { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" }, { "type": "text", "text": order.location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
                                 ]
                             },
@@ -471,7 +447,6 @@
                     };
                 };
 
-                // ... (updateOrderStatus, startEdit, cancelEdit, saveEdit, showDebug 維持不變) ...
                 const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
                     if (!order) return;
