@@ -163,7 +163,7 @@
                                 </div>
                                 <div v-else>
                                     <!-- LINE 名稱 -->
-                                    <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-1">
+                                    <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
                                         <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                     </p>
                                     <!-- 聯絡人姓名 -->
@@ -371,13 +371,12 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
                             
-                            // 修正：優先抓 F (5) 和 G (6)
+                            // 🌟 修正：優先抓 F (5) 和 G (6)
                             const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
                             const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
@@ -433,16 +432,24 @@
                     return reservations.value.filter(r => r.status === filter.value);
                 });
 
+                // 🌟 新增：轉換 HTML 規則為 LINE 格式文字
+                const formatForLine = (htmlText) => {
+                    if (!htmlText) return "無";
+                    let text = htmlText.replace(/<br\s*\/?>/gi, '\n')
+                                       .replace(/<\/p>/gi, '\n\n')
+                                       .replace(/<li>/gi, '• ')
+                                       .replace(/<\/li>/gi, '\n')
+                                       .replace(/<[^>]+>/g, '') // 移除其他標籤
+                                       .replace(/&nbsp;/g, ' ');
+                    return text.trim();
+                };
+
                 const buildRichFlexMessage = (order, actionType) => {
-                     // 完整版 Flex 邏輯
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     
-                     let titleText = 'PAYMENT CONFIRMED'; 
-                     let descText = '預約與款項已確認'; 
-                     let statusColor = '#10B981';
+                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
                      let bodyContents = [];
 
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
@@ -454,7 +461,11 @@
                          titleText = 'PAYMENT REQUEST'; 
                          descText = '請詳閱付款規則並完成匯款'; 
                          statusColor = '#2563EB'; 
-                         const ruleText = "請依照約定時間完成匯款"; 
+                         
+                         // 🌟 動態抓取規則文字並轉換格式
+                         const rawRuleHtml = getPaymentMessage(order.service, order.date);
+                         const ruleText = formatForLine(rawRuleHtml);
+                         
                          bodyContents = [
                             { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
                             { "type": "text", "text": ruleText, "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
@@ -490,7 +501,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
