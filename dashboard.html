@@ -322,7 +322,7 @@
                 const loading = ref(true);
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
-                const notifyOnUpdate = ref(true); 
+                const notifyOnUpdate = ref(true); // 預設開啟
 
                 const getKey = (item, keys) => {
                     for (const k of keys) {
@@ -485,7 +485,10 @@
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
+                     
+                     let titleText = 'PAYMENT CONFIRMED'; 
+                     let descText = '預約與款項已確認'; 
+                     let statusColor = '#10B981';
                      let bodyContents = [];
 
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
@@ -499,11 +502,24 @@
                          statusColor = '#2563EB'; 
                          const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
                          bodyContents = [
+                            { "type": "text", "text": "本次訂單總金額", "size": "sm", "color": "#aaaaaa", "align": "center", "margin": "md" },
+                            { "type": "text", "text": `NT$ ${total.toLocaleString()}`, "weight": "bold", "size": "3xl", "color": "#C69C6D", "align": "center", "margin": "sm" },
+                            { "type": "separator", "margin": "lg" },
                             { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
                             { "type": "text", "text": ruleText, "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
                             { "type": "separator", "margin": "lg" },
                             { "type": "text", "text": "匯款資訊：彰化銀行 (009)", "size": "xs", "color": "#aaaaaa", "margin": "lg" },
-                            { "type": "text", "text": "54320100686300", "weight": "bold", "size": "lg", "color": "#4A4A4A", "margin": "xs" }
+                            { 
+                                "type": "text", 
+                                "text": "54320100686300", 
+                                "weight": "bold", 
+                                "size": "xl", 
+                                "color": "#4A4A4A", 
+                                "margin": "xs",
+                                "align": "center",
+                                "action": { "type": "uri", "label": "複製帳號", "uri": "https://line.me/R/msg/text/?54320100686300" }
+                            },
+                            { "type": "text", "text": "(點擊上方帳號可複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -612,6 +628,17 @@
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
+                    
+                    // 如果勾選發送通知，則生成 "UPDATE" 類型的卡片
+                    let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
+                    let flexContents = {};
+                    
+                    if (notifyOnUpdate.value) {
+                         const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
+                         messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
+                         flexContents = flex;
+                    }
+
                     const payload = {
                         to: order.userId,
                         orderId: order.oid,
@@ -626,8 +653,8 @@
                         phone: editForm.value.phone,
                         location: editForm.value.location,
                         status: order.status === 'CONFIRMED' ? '✅ 已付款' : '❌ 未付款',
-                        message: { type: 'flex', altText: '訂單資料更新', contents: {} },
-                        updateOnly: true
+                        message: messagePayload,
+                        flexContents: flexContents
                     };
                     try {
                         // 使用 標準的 fetch
