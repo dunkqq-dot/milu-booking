@@ -119,7 +119,7 @@
                             <i class="fa-solid fa-pen"></i>
                         </button>
                         <div v-else class="absolute top-4 right-4 flex items-center gap-2">
-                             <!-- 同步發送開關 -->
+                             <!-- 新增：同步發送開關 -->
                             <label class="flex items-center space-x-2 text-xs text-white/90 bg-black/20 px-2 py-1 rounded cursor-pointer select-none">
                                 <input type="checkbox" v-model="notifyOnUpdate" class="form-checkbox h-3 w-3 text-green-500 rounded focus:ring-0">
                                 <span>發送通知</span>
@@ -218,6 +218,7 @@
                             <div class="flex justify-between items-center mb-2">
                                 <p class="text-xs text-green-600 font-bold">已收款 (對帳)</p>
                                 <div class="flex items-center gap-2">
+                                    <!-- ⚡ 一鍵全額按鈕 -->
                                     <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">
                                         ⚡同上
                                     </button>
@@ -431,8 +432,10 @@
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
-                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
+                            
+                            // 🌟 全面修正：使用 parseMoney 處理金額
+                            const rawPrice = parseMoney(getKey(item, ['11', 'L', 'price']));
+                            const receivedPrice = parseMoney(getKey(item, ['12', 'M', 'received']));
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -461,15 +464,13 @@
 
                 const buildRichFlexMessage = (order, actionType) => {
                      const config = configMap[order.service] || configMap['專人佈置'];
+                     // 使用已經 parse 過的數字 (確保是整數)
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     let titleText = 'PAYMENT CONFIRMED'; 
-                     let descText = '預約與款項已確認'; 
-                     let statusColor = '#10B981';
+                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
                      let bodyContents = [];
-                     
-                     // 標題與描述邏輯
+
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
                      else if (actionType === 'REFUND') { titleText = 'REFUND COMPLETED'; descText = '退款辦理完成'; statusColor = '#EAB308'; }
                      else if (actionType === 'COMPLETE') { titleText = 'SERVICE COMPLETED'; descText = '服務已完成'; statusColor = '#2563EB'; }
@@ -479,10 +480,6 @@
                          titleText = 'PAYMENT REQUEST'; 
                          descText = '請詳閱付款規則並完成匯款'; 
                          statusColor = '#2563EB'; 
-                     }
-
-                     // 內容邏輯
-                     if (actionType === 'PAYMENT_REQUEST') {
                          const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
                          bodyContents = [
                             { "type": "text", "text": `本次訂單總金額: NT$ ${total.toLocaleString()}`, "weight": "bold", "size": "md", "color": "#C69C6D", "align": "center", "margin": "md" },
@@ -509,7 +506,7 @@
                             { "type": "text", "text": "期待再次為您服務 ❤️", "size": "sm", "color": "#666666", "align": "center", "margin": "sm" }
                          ];
                      } else {
-                         // 一般狀態（確認收款、取消、退款、更新資料）
+                         // 一般狀態 (確認、取消、退款、更新)
                          bodyContents = [
                             {
                                 "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
@@ -549,19 +546,24 @@
                     };
                 };
 
-                // ... (updateOrderStatus, startEdit, cancelEdit, saveEdit, showDebug 等函式) ...
                 const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
                     if (!order) return;
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
+                    
                     Swal.fire({
-                        title: '確認發送通知？', text: `即將發送 LINE 通知給 ${order.contactName}`, icon: 'question',
-                        showCancelButton: true, confirmButtonText: '確定發送', cancelButtonText: '取消'
+                        title: '確認發送通知？',
+                        text: `即將發送 LINE 通知給 ${order.contactName}`,
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: '確定發送',
+                        cancelButtonText: '取消'
                     }).then(async (result) => {
                         if (result.isConfirmed) {
                             try {
                                 Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                                 const flex = buildRichFlexMessage(order, actionType);
+                                
                                 let statusText = '';
                                 if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
                                 else if (actionType === 'PAYMENT_REQUEST') statusText = '⏳ 等待匯款';
@@ -569,22 +571,38 @@
                                 else if (actionType === 'CANCEL') statusText = '❌ 已取消';
                                 else if (actionType === 'REFUND') statusText = '💸 已退款';
                                 else if (actionType === 'RESTORE') statusText = '❌ 未付款';
+
                                 const payload = {
-                                    to: order.userId, orderId: order.oid, clientName: order.contactName, lineName: order.lineName, service: order.service,
-                                    price: order.rawPrice, received: order.receivedPrice, balance: order.rawPrice - order.receivedPrice,
-                                    date: order.date, time: order.time, phone: order.phone, location: order.location,
+                                    to: order.userId,
+                                    orderId: order.oid,
+                                    clientName: order.contactName, 
+                                    lineName: order.lineName, 
+                                    service: order.service,
+                                    price: order.rawPrice,
+                                    received: order.receivedPrice,
+                                    balance: order.rawPrice - order.receivedPrice,
+                                    date: order.date,
+                                    time: order.time,
+                                    phone: order.phone,
+                                    location: order.location,
                                     status: statusText,
-                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex }, flexContents: flex
+                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
+                                    flexContents: flex,
+                                    updateOnly: false
                                 };
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                                
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
                                 else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
                                 else if (actionType === 'CANCEL') order.status = 'CANCELED';
                                 else if (actionType === 'REFUND') order.status = 'REFUNDED';
                                 else if (actionType === 'RESTORE') order.status = 'UNPAID';
+                                
                                 Swal.fire('成功', '通知已送出！', 'success');
-                            } catch (e) { Swal.fire('錯誤', '發送失敗：' + e.message, 'error'); }
+                            } catch (e) {
+                                Swal.fire('錯誤', '發送失敗：' + e.message, 'error');
+                            }
                         }
                     });
                 };
@@ -597,6 +615,7 @@
                     
                     let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
                     let flexContents = {};
+                    
                     if (notifyOnUpdate.value) {
                          const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
                          messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
