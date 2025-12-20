@@ -361,6 +361,36 @@
                     }
                 });
 
+                // 補回被遺漏的計算天數差函式
+                const calculateDaysDiff = (dateStr) => {
+                    if (!dateStr) return 0;
+                    const targetDate = new Date(dateStr);
+                    const today = new Date();
+                    targetDate.setHours(0, 0, 0, 0);
+                    today.setHours(0, 0, 0, 0);
+                    
+                    const diffTime = targetDate - today;
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    return diffDays;
+                };
+
+                // 補回被遺漏的獲取付款規則函式
+                const getPaymentMessage = (type, dateStr) => {
+                    const diffDays = calculateDaysDiff(dateStr);
+                    
+                    if (type.includes('佈置') || type.includes('後車廂')) {
+                        // 這裡使用 dashboard.html 內建的 PAYMENT_RULES (需補上定義)
+                        // 或直接返回寫死的文字
+                        if (diffDays <= 3) {
+                             return "⚠️ 3日內急單專用規則\n1. 請於預約時「支付全額款項」並截圖回傳。\n2. 預約前 5 小時未收款視為未成立。\n3. 24小時內急件需加收 $500。\n4. 取消不退還任何款項。";
+                        } else {
+                             return "1. 單一時段僅服務一組客人，以先支付訂金者優先。\n2. 匯款期限：請於三日內完成匯款。\n3. 訂金規則：可付全額或 50% 訂金，尾款於活動當日支付。\n4. 改期與取消：僅接受一次改期；個人因素取消收 30% 服務費。";
+                        }
+                    } else {
+                        return "1. 請於預約當下「支付全額款項」並截圖回傳。\n2. 預約前 24 小時未收款視為未成立。\n3. 急件加收 $500。\n4. 24小時內取消不退款。";
+                    }
+                };
+
                 const fetchData = async () => {
                     loading.value = true; errorMsg.value = null;
                     try {
@@ -376,7 +406,7 @@
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
                             
-                            // 🌟 修正：優先抓 F (5) 和 G (6)
+                            // 修正：優先抓 F (5) 和 G (6)
                             const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
                             const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
@@ -432,24 +462,16 @@
                     return reservations.value.filter(r => r.status === filter.value);
                 });
 
-                // 🌟 新增：轉換 HTML 規則為 LINE 格式文字
-                const formatForLine = (htmlText) => {
-                    if (!htmlText) return "無";
-                    let text = htmlText.replace(/<br\s*\/?>/gi, '\n')
-                                       .replace(/<\/p>/gi, '\n\n')
-                                       .replace(/<li>/gi, '• ')
-                                       .replace(/<\/li>/gi, '\n')
-                                       .replace(/<[^>]+>/g, '') // 移除其他標籤
-                                       .replace(/&nbsp;/g, ' ');
-                    return text.trim();
-                };
-
                 const buildRichFlexMessage = (order, actionType) => {
+                     // 完整版 Flex 邏輯
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
+                     
+                     let titleText = 'PAYMENT CONFIRMED'; 
+                     let descText = '預約與款項已確認'; 
+                     let statusColor = '#10B981';
                      let bodyContents = [];
 
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
@@ -501,7 +523,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -558,7 +580,7 @@
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex
                                 };
-                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
