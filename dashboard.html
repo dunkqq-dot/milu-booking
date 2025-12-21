@@ -462,6 +462,9 @@
                 };
 
                 const fetchData = async () => {
+                    // 🛑 新增：如果在編輯模式，暫停更新，以免干擾使用者
+                    if (isEditing.value) return;
+
                     loading.value = true; errorMsg.value = null;
                     if (!DATA_API_URL) {
                         errorMsg.value = "尚未設定 GAS API 網址，請在程式碼中填入。";
@@ -474,6 +477,14 @@
                         const text = await res.text();
                         if (text.trim() === "Accepted") throw new Error("Make API 目前沒有回傳資料。");
                         let data = JSON.parse(text);
+                        
+                        // ⚡ 極速過濾：移除沒有訂單編號(Index 0)或沒有姓名(Index 3)的空行
+                        data = data.filter(item => {
+                            const hasID = item[0] && String(item[0]).trim() !== '';
+                            const hasName = item[3] && String(item[3]).trim() !== '';
+                            return hasID && hasName;
+                        });
+
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
