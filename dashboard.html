@@ -314,7 +314,7 @@
         createApp({
             setup() {
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
-                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
+                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/obyt3xy5jp4mp9lousp12kkaq4xcvakf';
 
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
@@ -421,19 +421,8 @@
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            
-                            // 修正：日期格式化為 YYYY-MM-DD
                             const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
-                            let date = '';
-                            if (dateRaw) {
-                                if (dateRaw.includes('T')) {
-                                    date = dateRaw.split('T')[0];
-                                } else {
-                                    // 嘗試將 YYYY/MM/DD 轉為 YYYY-MM-DD
-                                    date = dateRaw.replace(/\//g, '-');
-                                }
-                            }
-
+                            const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
                             const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
@@ -540,7 +529,7 @@
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.phone, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.date, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
-                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
+                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" }, { "type": "text", "text": order.location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
                                     ]
                                 },
                                 { "type": "separator", "margin": "xl" },
@@ -638,7 +627,6 @@
                 
                 const startEdit = () => { editForm.value = { ...selectedOrder.value }; isEditing.value = true; };
                 const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
-                
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
@@ -709,29 +697,3 @@
     </script>
 </body>
 </html>
-```
-
-### 3. 2. 關於「Make 資料結構更新」
-
-請確認您已經在 Make 的 **Parse JSON** 模組中，將 **Data Structure** 更新為最新版本，確保 `createCalendarEvent` 能被識別：
-
-```json
-{
-    "to": "U1234567890abcdef",
-    "orderId": "M0001",
-    "clientName": "王小美",
-    "lineName": "May",
-    "service": "專人佈置",
-    "price": 5000,
-    "received": 1000,
-    "balance": 4000,
-    "date": "2025-12-31",
-    "time": "14:30",
-    "phone": "0912345678",
-    "location": "台北市...",
-    "status": "✅ 已付款",
-    "createCalendarEvent": "true",
-    "updateOnly": "false",
-    "message": { "type": "flex", "altText": "通知", "contents": {} },
-    "flexContents": { "type": "bubble", "body": {} }
-}
