@@ -348,7 +348,6 @@
                     return service.includes('外送') || service.includes('自取');
                 };
 
-                // 計算屬性
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
                     set: (val) => {
@@ -418,7 +417,7 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
+                            // 🌟 強制優先讀取 F 欄 (5) 和 G 欄 (6) - 最原始的表單輸入
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
@@ -519,17 +518,7 @@
                                 "align": "center",
                                 "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
-                            {
-                                "type": "button",
-                                "style": "secondary",
-                                "action": {
-                                    "type": "message",
-                                    "label": "點我複製帳號",
-                                    "text": "54320100686300"
-                                },
-                                "margin": "md"
-                            },
-                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -567,7 +556,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -581,6 +570,7 @@
                     };
                 };
 
+                // ... (updateOrderStatus, startEdit, cancelEdit, saveEdit, showDebug) ...
                 const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
                     if (!order) return;
@@ -610,7 +600,8 @@
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
                                     updateOnly: 'false'
                                 };
-                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                                // 修正：移除 no-cors
+                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 // 樂觀更新
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -655,6 +646,7 @@
                         time: editForm.value.time,
                         phone: editForm.value.phone,
                         location: editForm.value.location,
+                        // 修正：狀態保持不變，除非是確認收款
                         status: order.status === 'CONFIRMED' ? '✅ 已付款' : (order.status === 'WAITING_PAYMENT' ? '⏳ 等待匯款' : '❌ 未付款'),
                         message: messagePayload,
                         flexContents: flexContents,
@@ -662,7 +654,13 @@
                         updateOnly: !notifyOnUpdate.value ? 'true' : 'false'
                     };
                     try {
-                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                        // 使用 標準的 fetch
+                        await fetch(SEND_MSG_WEBHOOK, { 
+                            method: 'POST', 
+                            // mode: 'no-cors', // 暫時改回 no-cors 避免跨域問題
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload) 
+                        });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
