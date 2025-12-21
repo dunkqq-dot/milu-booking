@@ -418,19 +418,20 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 強制優先讀取 F 欄 (5) 和 G 欄 (6) - 最原始的表單輸入
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            
-                            // 修正：優先抓 F (5) ，備用 Q (16)
-                            const dateRaw = getKey(item, ['5', 'F', '16', 'Q', 'date']); 
-                            const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            
-                            // 修正：優先抓 G (6) ，備用 R (17)
-                            const time = getKey(item, ['6', 'G', '17', 'R', 'time']) || ''; 
-                            
+                            const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
+                            let date = '';
+                            if (dateRaw) {
+                                if (dateRaw.includes('T')) {
+                                    date = dateRaw.split('T')[0];
+                                } else {
+                                    date = dateRaw.replace(/\//g, '-');
+                                }
+                            }
+                            const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
@@ -441,9 +442,8 @@
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            // 修正：使用 parseMoney 處理金額
-                            const rawPrice = parseMoney(getKey(item, ['11', 'L', 'price']));
-                            const receivedPrice = parseMoney(getKey(item, ['12', 'M', 'received']));
+                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
+                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -556,7 +556,7 @@
                                     "contents": [
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "總計金額", "size": "sm", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": `NT$ ${total.toLocaleString()}`, "size": "sm", "color": "#666666", "align": "end", "flex": 3 } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "已收款", "size": actionType === 'CONFIRM' ? "md" : "sm", "color": "#10B981", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${paid.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "xl" : "sm", "color": "#10B981", "align": "end", "weight": "bold", "flex": 3 } ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "尚欠尾款", "size": actionType === 'CONFIRM' ? "sm" : "md", "color": "#EF4444", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${balance.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "sm" : "xl", "color": "#EF4444", "align": "end", "weight": "bold", "flex": 3 } ] }
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "尚欠尾款", "size": actionType === 'CONFIRM' ? "xs" : "md", "color": "#EF4444", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${balance.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "sm" : "xl", "color": "#EF4444", "align": "end", "weight": "bold", "flex": 3 } ] }
                                     ]
                                 }
                              ];
@@ -565,7 +565,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -579,6 +579,7 @@
                     };
                 };
 
+                // ... (updateOrderStatus, startEdit, cancelEdit, saveEdit, showDebug) ...
                 const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
                     if (!order) return;
@@ -621,13 +622,10 @@
                                     status: statusText,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex,
-                                    // 🌟 確保傳送時不帶 updateOnly，讓 Make 過濾器通過
+                                    // 🌟 修正：使用字串 'true'/'false' 以符合 Make 設定
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false'
                                 };
-                                
-                                // ⚠️ 關鍵：移除 updateOnly 屬性，讓 Make 過濾器 (Does not exist) 通過
-                                // 這裡不設定 payload.updateOnly，這樣它就是 undefined
-                                
+                                // 修正：移除 no-cors
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -686,10 +684,12 @@
                         time: editForm.value.time,
                         phone: editForm.value.phone,
                         location: editForm.value.location,
+                        // 修正：狀態保持不變，除非是確認收款
                         status: newStatus,
                         message: messagePayload,
                         flexContents: flexContents,
-                        createCalendarEvent: 'false'
+                        // 🌟 修正：只有在「已付款」狀態下，編輯才觸發行事曆更新
+                        createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false'
                     };
                     
                     // 🌟 只有在不通知時才加入 updateOnly
