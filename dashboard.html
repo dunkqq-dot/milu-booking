@@ -418,7 +418,7 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 強制優先讀取 F 欄 (5) 和 G 欄 (6) - 最原始的表單輸入
+                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
@@ -441,8 +441,9 @@
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
-                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
+                            // 修正：使用 parseMoney 處理金額
+                            const rawPrice = parseMoney(getKey(item, ['11', 'L', 'price']));
+                            const receivedPrice = parseMoney(getKey(item, ['12', 'M', 'received']));
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -483,6 +484,7 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
+                     // 完整版 Flex 邏輯 (包含所有欄位)
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
@@ -517,7 +519,17 @@
                                 "align": "center",
                                 "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
-                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            {
+                                "type": "button",
+                                "style": "secondary",
+                                "action": {
+                                    "type": "message",
+                                    "label": "點我複製帳號",
+                                    "text": "54320100686300"
+                                },
+                                "margin": "md"
+                            },
+                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -555,7 +567,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -573,20 +585,14 @@
                     const order = selectedOrder.value;
                     if (!order) return;
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
-                    
                     Swal.fire({
-                        title: '確認發送通知？',
-                        text: `即將發送 LINE 通知給 ${order.contactName}`,
-                        icon: 'question',
-                        showCancelButton: true,
-                        confirmButtonText: '確定發送',
-                        cancelButtonText: '取消'
+                        title: '確認發送通知？', text: `即將發送 LINE 通知給 ${order.contactName}`, icon: 'question',
+                        showCancelButton: true, confirmButtonText: '確定發送', cancelButtonText: '取消'
                     }).then(async (result) => {
                         if (result.isConfirmed) {
                             try {
                                 Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                                 const flex = buildRichFlexMessage(order, actionType);
-                                
                                 let statusText = '';
                                 if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
                                 else if (actionType === 'PAYMENT_REQUEST') statusText = '⏳ 等待匯款';
@@ -594,28 +600,19 @@
                                 else if (actionType === 'CANCEL') statusText = '❌ 已取消';
                                 else if (actionType === 'REFUND') statusText = '💸 已退款';
                                 else if (actionType === 'RESTORE') statusText = '❌ 未付款';
-
                                 const payload = {
-                                    to: order.userId,
-                                    orderId: order.oid,
-                                    clientName: order.contactName, 
-                                    lineName: order.lineName, 
-                                    service: order.service,
-                                    price: order.rawPrice,
-                                    received: order.receivedPrice,
-                                    balance: order.rawPrice - order.receivedPrice,
-                                    date: order.date,
-                                    time: order.time,
-                                    phone: order.phone,
-                                    location: order.location,
+                                    to: order.userId, orderId: order.oid, clientName: order.contactName, lineName: order.lineName, service: order.service,
+                                    price: order.rawPrice, received: order.receivedPrice, balance: order.rawPrice - order.receivedPrice,
+                                    date: order.date, time: order.time, phone: order.phone, location: order.location,
                                     status: statusText,
-                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
-                                    flexContents: flex,
-                                    createCalendarEvent: actionType === 'CONFIRM', // 🌟 只在確認收款時為 true
-                                    updateOnly: false
+                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex }, flexContents: flex,
+                                    // 🌟 修正：使用字串 'true'/'false' 以符合 Make 設定
+                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
+                                    updateOnly: 'false'
                                 };
-                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                                 
+                                // 樂觀更新
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
                                 else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
@@ -624,9 +621,7 @@
                                 else if (actionType === 'RESTORE') order.status = 'UNPAID';
                                 
                                 Swal.fire('成功', '通知已送出！', 'success');
-                            } catch (e) {
-                                Swal.fire('錯誤', '發送失敗：' + e.message, 'error');
-                            }
+                            } catch (e) { Swal.fire('錯誤', '發送失敗：' + e.message, 'error'); }
                         }
                     });
                 };
@@ -660,15 +655,14 @@
                         time: editForm.value.time,
                         phone: editForm.value.phone,
                         location: editForm.value.location,
-                        // 狀態保持
                         status: order.status === 'CONFIRMED' ? '✅ 已付款' : (order.status === 'WAITING_PAYMENT' ? '⏳ 等待匯款' : '❌ 未付款'),
                         message: messagePayload,
                         flexContents: flexContents,
-                        createCalendarEvent: false, // 編輯不觸發行事曆
-                        updateOnly: !notifyOnUpdate.value
+                        createCalendarEvent: 'false',
+                        updateOnly: !notifyOnUpdate.value ? 'true' : 'false'
                     };
                     try {
-                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
@@ -698,29 +692,3 @@
     </script>
 </body>
 </html>
-```
-
-### ⚠️ Make 請再次更新 JSON 結構
-
-因為我們新增了 `createCalendarEvent` 欄位，請務必去 Make 的 **Parse JSON** 模組，點擊 **Edit -> Generate**，並貼上以下最新代碼：
-
-```json
-{
-    "to": "U1234567890abcdef",
-    "orderId": "M0001",
-    "clientName": "王小美",
-    "lineName": "May",
-    "service": "專人佈置",
-    "price": 5000,
-    "received": 1000,
-    "balance": 4000,
-    "date": "2025-12-31",
-    "time": "14:30",
-    "phone": "0912345678",
-    "location": "台北市...",
-    "status": "✅ 已付款",
-    "createCalendarEvent": false,
-    "updateOnly": false,
-    "message": { "type": "flex", "altText": "通知", "contents": {} },
-    "flexContents": { "type": "bubble", "body": {} }
-}
