@@ -348,7 +348,6 @@
                     return service.includes('外送') || service.includes('自取');
                 };
 
-                // 計算屬性
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
                     set: (val) => {
