@@ -71,8 +71,7 @@
                                   'bg-red-100 text-red-500': order.status === 'UNPAID',
                                   'bg-gray-200 text-gray-600': order.status === 'CANCELED',
                                   'bg-yellow-100 text-yellow-600': order.status === 'REFUNDED',
-                                  'bg-blue-100 text-blue-600': order.status === 'COMPLETED',
-                                  'bg-blue-400 text-white': order.status === 'WAITING_PAYMENT'
+                                  'bg-blue-100 text-blue-600': order.status === 'COMPLETED'
                               }">
                             {{ getStatusText(order.status) }}
                         </span>
@@ -423,14 +422,7 @@
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
                             const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
-                            let date = '';
-                            if (dateRaw) {
-                                if (dateRaw.includes('T')) {
-                                    date = dateRaw.split('T')[0];
-                                } else {
-                                    date = dateRaw.replace(/\//g, '-');
-                                }
-                            }
+                            const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
                             const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
@@ -612,10 +604,13 @@
                                     status: statusText,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex,
-                                    // 🌟 確保傳送時不帶 updateOnly，讓 Make 過濾器通過
+                                    // 🌟 修正：確保在需要發送通知時，移除 updateOnly 屬性
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false'
-                                    // 移除 updateOnly: 'false'
                                 };
+                                
+                                // ⚠️ 關鍵：移除 updateOnly 屬性，讓 Make 過濾器 (Does not exist) 通過
+                                // 這裡不設定 payload.updateOnly，這樣它就是 undefined
+                                
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -642,15 +637,15 @@
                     
                     let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
                     let flexContents = {};
-                    let payloadUpdateOnly = undefined;
+                    let payloadUpdateOnly = undefined; // 預設 undefined
                     
                     if (notifyOnUpdate.value) {
+                         // 要發通知 -> updateOnly 保持 undefined
                          const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
                          messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
                          flexContents = flex;
-                         // 如果要通知，不傳送 updateOnly (undefined)，Make 過濾器 "updateOnly Does Not Exist" 通過 -> 發送 LINE
                     } else {
-                         // 如果不通知，傳送 updateOnly = 'true'，Make 過濾器 "updateOnly Does Not Exist" 失敗 -> 擋下 LINE
+                         // 不發通知 -> 設定 updateOnly
                          payloadUpdateOnly = 'true';
                     }
 
@@ -680,7 +675,7 @@
                         createCalendarEvent: 'false'
                     };
                     
-                    // 🌟 只有在不通知時才加入 updateOnly
+                    // 🌟 只有在「不通知」時才加入 updateOnly
                     if (payloadUpdateOnly) {
                         payload.updateOnly = payloadUpdateOnly;
                     }
