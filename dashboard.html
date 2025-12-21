@@ -41,10 +41,15 @@
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
                         <p class="text-xs text-gray-400 mt-1">訂單核對系統</p>
                     </div>
-                    <div class="flex gap-2">
-                        <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
-                        <div class="text-xs px-2 py-1 bg-white rounded text-gray-400 border" v-if="loading">更新中...</div>
-                        <button @click="fetchData" v-else class="text-gray-400 hover:text-milu-gold transition"><i class="fa-solid fa-rotate-right"></i></button>
+                    <div class="flex flex-col items-end gap-1">
+                        <div class="flex gap-2">
+                            <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
+                            <div class="text-xs px-2 py-1 bg-white rounded text-gray-400 border flex items-center gap-1" v-if="loading">
+                                <i class="fa-solid fa-circle-notch fa-spin"></i> 更新中...
+                            </div>
+                            <button @click="fetchData" v-else class="text-gray-400 hover:text-milu-gold transition" title="手動更新"><i class="fa-solid fa-rotate-right"></i></button>
+                        </div>
+                        <span v-if="lastUpdated" class="text-[10px] text-gray-300">更新於: {{ lastUpdated }}</span>
                     </div>
                 </div>
                 <div v-if="errorMsg" class="mt-2 p-2 bg-red-50 text-red-500 text-xs rounded border border-red-100 break-words">{{ errorMsg }}</div>
@@ -314,9 +319,10 @@
 
         createApp({
             setup() {
-                // 修正：僅更新 SEND_MSG_WEBHOOK 為您提供的新網址
-                // DATA_API_URL 仍維持原樣 (若讀取資料也有問題，請檢查另一個 Make 流程)
-                const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
+                // ⚠️ 已自動填入您的 GAS Web App 網址
+                const DATA_API_URL = 'https://script.google.com/macros/s/AKfycbwfAyj7ktWXv4gPoFo7wVPLn1_nQ6w0hX8kTToggetxt3jqqD7yp67cxlrg5l1N1rsLaA/exec'; 
+                
+                // 這是發送 LINE 通知的 Make Webhook (維持不變)
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/63u0kheb71v9vengzdggfy1ga7r8gmng';
 
                 const reservations = ref([]);
@@ -327,7 +333,8 @@
                 const loading = ref(true);
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
-                const notifyOnUpdate = ref(true); 
+                const notifyOnUpdate = ref(true);
+                const lastUpdated = ref(null);
 
                 const getKey = (item, keys) => {
                     for (const k of keys) {
@@ -411,8 +418,57 @@
                     return text.trim();
                 };
 
+                // 🛠️ 格式修正函式
+                const formatGASDate = (val) => {
+                    if (!val) return '';
+                    const s = String(val);
+                    if (s.includes('T')) {
+                        const d = new Date(s);
+                        if (isNaN(d.getTime())) return s;
+                        const y = d.getFullYear();
+                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        return `${y}-${m}-${day}`;
+                    }
+                    return s;
+                };
+
+                const formatGASTime = (val) => {
+                    if (!val) return '';
+                    const s = String(val);
+                    
+                    // 1. GAS 可能回傳 ISO 時間格式 (如 1899-12-30T14:30:00.000Z)
+                    if (s.includes('T') && s.includes('Z')) {
+                        const d = new Date(s);
+                        if (!isNaN(d.getTime())) {
+                            const hh = String(d.getHours()).padStart(2, '0');
+                            const mm = String(d.getMinutes()).padStart(2, '0');
+                            return `${hh}:${mm}`;
+                        }
+                    }
+                    
+                    // 2. 處理簡單時間字串 (如 9:30 -> 09:30, 14:00:00 -> 14:00)
+                    // 排除時段範圍 (例如 13:00 - 14:00 不處理)
+                    const simpleTimeRegex = /^(\d{1,2}):(\d{2})(:(\d{2}))?$/;
+                    const match = s.trim().match(simpleTimeRegex);
+                    if (match) {
+                        const hh = match[1].padStart(2, '0');
+                        const mm = match[2];
+                        return `${hh}:${mm}`;
+                    }
+                    
+                    // 3. 其他格式 (如時段範圍) 直接回傳
+                    return s;
+                };
+
                 const fetchData = async () => {
                     loading.value = true; errorMsg.value = null;
+                    if (!DATA_API_URL) {
+                        errorMsg.value = "尚未設定 GAS API 網址，請在程式碼中填入。";
+                        loading.value = false;
+                        return;
+                    }
+
                     try {
                         const res = await fetch(DATA_API_URL);
                         const text = await res.text();
@@ -421,32 +477,28 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 精準欄位對應修正 (0-Based Index: A=0, J=9, H=7)
-                            const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
-                            const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
-                            const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
-                            const phone = getKey(item, ['4', 'E', 'phone']) || '';
+                            const oid = item[0] || `M-${index}`;
+                            const lineName = item[2] || '未知LINE';
+                            const contactName = item[3] || '未知客戶';
+                            const phone = item[4] || '';
                             
-                            // 修正：優先抓 F (5) ，備用 Q (16)
-                            const dateRaw = getKey(item, ['5', 'F', '16', 'Q', 'date']); 
-                            const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
+                            // 🌟 套用格式修正
+                            const date = formatGASDate(item[5]);
+                            const time = formatGASTime(item[6]);
                             
-                            // 修正：優先抓 G (6) ，備用 R (17)
-                            const time = getKey(item, ['6', 'G', '17', 'R', 'time']) || ''; 
-                            
-                            const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
-                            let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
+                            const location = item[7] || '未填寫地點'; 
+                            let serviceName = item[8] || '服務';
                             
                             if (serviceName.includes('自取')) serviceName = '門市自取'; 
                             else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
                             else if (serviceName.includes('佈置')) serviceName = '專人佈置';
 
-                            const userId = getKey(item, ['9', 'J', 'userId']) || '';
-                            const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            // 修正：使用 parseMoney 處理金額
-                            const rawPrice = parseMoney(getKey(item, ['11', 'L', 'price']));
-                            const receivedPrice = parseMoney(getKey(item, ['12', 'M', 'received']));
+                            const userId = item[9] || '';
+                            const rawStatus = (item[10] || '').trim();
+                            
+                            const rawPrice = parseMoney(item[11]);
+                            const receivedPrice = parseMoney(item[12]);
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -469,6 +521,10 @@
                         } else if (formattedData.length > 0) {
                              selectedOrder.value = formattedData[0];
                         }
+                        
+                        const now = new Date();
+                        lastUpdated.value = now.toLocaleTimeString();
+
                     } catch (e) { errorMsg.value = e.message; }
                     loading.value = false;
                 };
@@ -655,7 +711,6 @@
                         // 情況 A：時段選單 (氣球外送/自取)
                         if (isTimeSlotService(formData.service)) {
                             // 嘗試匹配選單中的選項 (忽略空白差異)
-                            // 例如表單是 "13:00-14:00" 但選單是 "13:00 - 14:00"
                             const cleanTime = formData.time.replace(/\s+/g, '');
                             const matchedSlot = timeSlots.find(slot => slot.replace(/\s+/g, '') === cleanTime);
                             if (matchedSlot) {
@@ -749,12 +804,13 @@
                     });
                 };
 
-                onMounted(() => { fetchData(); setInterval(fetchData, 300000); });
+                // 將自動更新頻率改為 10 秒
+                onMounted(() => { fetchData(); setInterval(fetchData, 10000); });
                 return { 
                     reservations, selectedOrder, filter, loading, errorMsg, filteredList, 
                     selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel, showDebug,
                     isEditing, editForm, startEdit, cancelEdit, saveEdit, formatMoney, displayRawPrice, displayReceivedPrice,
-                    isTimeSlotService, timeSlots, notifyOnUpdate, fillFullPayment
+                    isTimeSlotService, timeSlots, notifyOnUpdate, fillFullPayment, lastUpdated
                 };
             }
         }).mount('#app');
