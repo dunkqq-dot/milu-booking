@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
+                        <p class="text-xs text-gray-400 mt-1">訂單核對系統</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -348,6 +348,7 @@
                     return service.includes('外送') || service.includes('自取');
                 };
 
+                // 計算屬性
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
                     set: (val) => {
@@ -417,13 +418,19 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
+                            // 🌟 強制優先讀取 F 欄 (5) 和 G 欄 (6) - 最原始的表單輸入
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
+                            
+                            // 修正：優先抓 F (5) ，備用 Q (16)
+                            const dateRaw = getKey(item, ['5', 'F', '16', 'Q', 'date']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
+                            
+                            // 修正：優先抓 G (6) ，備用 R (17)
+                            const time = getKey(item, ['6', 'G', '17', 'R', 'time']) || ''; 
+                            
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
@@ -434,8 +441,9 @@
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
-                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
+                            // 修正：使用 parseMoney 處理金額
+                            const rawPrice = parseMoney(getKey(item, ['11', 'L', 'price']));
+                            const receivedPrice = parseMoney(getKey(item, ['12', 'M', 'received']));
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -507,8 +515,17 @@
                                 "size": "xl", 
                                 "color": "#4A4A4A", 
                                 "margin": "xs",
-                                "align": "center",
-                                "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
+                                "align": "center"
+                            },
+                            {
+                                "type": "button",
+                                "style": "secondary",
+                                "action": {
+                                    "type": "message",
+                                    "label": "點我複製帳號",
+                                    "text": "54320100686300"
+                                },
+                                "margin": "md"
                             },
                             { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
@@ -604,7 +621,7 @@
                                     status: statusText,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex,
-                                    // 🌟 修正：確保在需要發送通知時，移除 updateOnly 屬性
+                                    // 🌟 確保傳送時不帶 updateOnly，讓 Make 過濾器通過
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false'
                                 };
                                 
@@ -630,6 +647,7 @@
                 
                 const startEdit = () => { editForm.value = { ...selectedOrder.value }; isEditing.value = true; };
                 const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
+                
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
