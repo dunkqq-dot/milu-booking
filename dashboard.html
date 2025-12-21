@@ -511,7 +511,7 @@
                                 "align": "center",
                                 "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
-                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -522,6 +522,7 @@
                                 { "type": "text", "text": "期待再次為您服務 ❤️", "size": "sm", "color": "#666666", "align": "center", "margin": "sm" }
                              ];
                          } else {
+                             // 🌟 修正：Flex Message 排版優化 (字體統一為 sm/md，數字靠右)
                              bodyContents = [
                                 {
                                     "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
@@ -535,7 +536,7 @@
                                 },
                                 { "type": "separator", "margin": "xl" },
                                 {
-                                    "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm",
+                                    "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm", // spacing 設定為 sm
                                     "contents": [
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "總計金額", "size": "sm", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": `NT$ ${total.toLocaleString()}`, "size": "sm", "color": "#666666", "align": "end", "flex": 3 } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "已收款", "size": actionType === 'CONFIRM' ? "md" : "sm", "color": "#10B981", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${paid.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "xl" : "sm", "color": "#10B981", "align": "end", "weight": "bold", "flex": 3 } ] },
@@ -605,9 +606,13 @@
                                     status: statusText,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex,
-                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
-                                    updateOnly: 'false'
+                                    // 🌟 確保傳送時不帶 updateOnly，讓 Make 過濾器通過
+                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false'
                                 };
+                                
+                                // ⚠️ 關鍵：移除 updateOnly 屬性，讓 Make 過濾器 (Does not exist) 通過
+                                // 這裡不設定 payload.updateOnly，這樣它就是 undefined
+                                
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -634,13 +639,19 @@
                     
                     let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
                     let flexContents = {};
+                    let payloadUpdateOnly = undefined; // 預設 undefined
                     
                     if (notifyOnUpdate.value) {
+                         // 要發通知 -> updateOnly 保持 undefined
                          const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
                          messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
                          flexContents = flex;
+                    } else {
+                         // 不發通知 -> 設定 updateOnly
+                         payloadUpdateOnly = 'true';
                     }
 
+                    // 邏輯修正：如果狀態是 '等待匯款'，編輯後維持原樣，不要變成 '未付款'
                     let newStatus = order.status;
                     if (order.status === 'CONFIRMED') newStatus = '✅ 已付款';
                     else if (order.status === 'WAITING_PAYMENT') newStatus = '⏳ 等待匯款';
@@ -663,9 +674,14 @@
                         status: newStatus,
                         message: messagePayload,
                         flexContents: flexContents,
-                        createCalendarEvent: 'false',
-                        updateOnly: !notifyOnUpdate.value ? 'true' : 'false'
+                        createCalendarEvent: 'false'
                     };
+                    
+                    // 🌟 只有在不通知時才加入 updateOnly
+                    if (payloadUpdateOnly) {
+                        payload.updateOnly = payloadUpdateOnly;
+                    }
+
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
