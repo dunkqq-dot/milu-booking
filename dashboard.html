@@ -566,20 +566,14 @@
                     const order = selectedOrder.value;
                     if (!order) return;
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
-                    
                     Swal.fire({
-                        title: '確認發送通知？',
-                        text: `即將發送 LINE 通知給 ${order.contactName}`,
-                        icon: 'question',
-                        showCancelButton: true,
-                        confirmButtonText: '確定發送',
-                        cancelButtonText: '取消'
+                        title: '確認發送通知？', text: `即將發送 LINE 通知給 ${order.contactName}`, icon: 'question',
+                        showCancelButton: true, confirmButtonText: '確定發送', cancelButtonText: '取消'
                     }).then(async (result) => {
                         if (result.isConfirmed) {
                             try {
                                 Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                                 const flex = buildRichFlexMessage(order, actionType);
-                                
                                 let statusText = '';
                                 if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
                                 else if (actionType === 'PAYMENT_REQUEST') statusText = '⏳ 等待匯款';
@@ -587,30 +581,19 @@
                                 else if (actionType === 'CANCEL') statusText = '❌ 已取消';
                                 else if (actionType === 'REFUND') statusText = '💸 已退款';
                                 else if (actionType === 'RESTORE') statusText = '❌ 未付款';
-
                                 const payload = {
-                                    to: order.userId,
-                                    orderId: order.oid,
-                                    clientName: order.contactName, 
-                                    lineName: order.lineName, 
-                                    service: order.service,
-                                    price: order.rawPrice,
-                                    received: order.receivedPrice,
-                                    balance: order.rawPrice - order.receivedPrice,
-                                    date: order.date,
-                                    time: order.time,
-                                    phone: order.phone,
-                                    location: order.location,
+                                    to: order.userId, orderId: order.oid, clientName: order.contactName, lineName: order.lineName, service: order.service,
+                                    price: order.rawPrice, received: order.receivedPrice, balance: order.rawPrice - order.receivedPrice,
+                                    date: order.date, time: order.time, phone: order.phone, location: order.location,
                                     status: statusText,
-                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
-                                    flexContents: flex,
-                                    // 🌟 修正：確保在需要發送通知時，移除 updateOnly 屬性
-                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false'
+                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex }, flexContents: flex
                                 };
                                 
-                                // ⚠️ 關鍵：移除 updateOnly 屬性，讓 Make 過濾器 (Does not exist) 通過
-                                // 這裡不設定 payload.updateOnly，這樣它就是 undefined
-                                
+                                // 🌟 確保移除 updateOnly
+                                delete payload.updateOnly;
+                                // 🌟 確保 createCalendarEvent 存在
+                                payload.createCalendarEvent = actionType === 'CONFIRM' ? 'true' : 'false';
+
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -619,11 +602,8 @@
                                 else if (actionType === 'CANCEL') order.status = 'CANCELED';
                                 else if (actionType === 'REFUND') order.status = 'REFUNDED';
                                 else if (actionType === 'RESTORE') order.status = 'UNPAID';
-                                
                                 Swal.fire('成功', '通知已送出！', 'success');
-                            } catch (e) {
-                                Swal.fire('錯誤', '發送失敗：' + e.message, 'error');
-                            }
+                            } catch (e) { Swal.fire('錯誤', '發送失敗：' + e.message, 'error'); }
                         }
                     });
                 };
@@ -637,24 +617,12 @@
                     
                     let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
                     let flexContents = {};
-                    let payloadUpdateOnly = undefined; // 預設 undefined
                     
                     if (notifyOnUpdate.value) {
-                         // 要發通知 -> updateOnly 保持 undefined
                          const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
                          messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
                          flexContents = flex;
-                    } else {
-                         // 不發通知 -> 設定 updateOnly
-                         payloadUpdateOnly = 'true';
                     }
-
-                    // 邏輯修正：如果狀態是 '等待匯款'，編輯後維持原樣，不要變成 '未付款'
-                    let newStatus = order.status;
-                    if (order.status === 'CONFIRMED') newStatus = '✅ 已付款';
-                    else if (order.status === 'WAITING_PAYMENT') newStatus = '⏳ 等待匯款';
-                    else if (order.status === 'UNPAID') newStatus = '❌ 未付款';
-                    else if (order.status === 'COMPLETED') newStatus = '🏁 已完成';
 
                     const payload = {
                         to: order.userId,
@@ -669,15 +637,20 @@
                         time: editForm.value.time,
                         phone: editForm.value.phone,
                         location: editForm.value.location,
-                        status: newStatus,
+                        status: order.status === 'CONFIRMED' ? '✅ 已付款' : (order.status === 'WAITING_PAYMENT' ? '⏳ 等待匯款' : '❌ 未付款'),
                         message: messagePayload,
                         flexContents: flexContents,
                         createCalendarEvent: 'false'
                     };
                     
-                    // 🌟 只有在「不通知」時才加入 updateOnly
-                    if (payloadUpdateOnly) {
-                        payload.updateOnly = payloadUpdateOnly;
+                    // 🌟 關鍵邏輯：
+                    // 1. 如果要發送通知 (notifyOnUpdate=true)，則 updateOnly 必須不存在 (undefined/delete)
+                    // 2. 如果不發送通知，則 updateOnly = 'true'
+                    
+                    if (notifyOnUpdate.value) {
+                        delete payload.updateOnly; 
+                    } else {
+                        payload.updateOnly = 'true';
                     }
 
                     try {
