@@ -642,7 +642,42 @@
                     });
                 };
                 
-                const startEdit = () => { editForm.value = { ...selectedOrder.value }; isEditing.value = true; };
+                const startEdit = () => { 
+                    // 複製資料到編輯表單
+                    const formData = { ...selectedOrder.value };
+                    
+                    // 🛠️ 修正 1：日期格式必須轉為 YYYY-MM-DD
+                    if (formData.date && formData.date.includes('/')) {
+                        formData.date = formData.date.replace(/\//g, '-');
+                    }
+                    
+                    if (formData.time) {
+                        // 情況 A：時段選單 (氣球外送/自取)
+                        if (isTimeSlotService(formData.service)) {
+                            // 嘗試匹配選單中的選項 (忽略空白差異)
+                            // 例如表單是 "13:00-14:00" 但選單是 "13:00 - 14:00"
+                            const cleanTime = formData.time.replace(/\s+/g, '');
+                            const matchedSlot = timeSlots.find(slot => slot.replace(/\s+/g, '') === cleanTime);
+                            if (matchedSlot) {
+                                formData.time = matchedSlot;
+                            }
+                        } 
+                        // 情況 B：具體時間 (專人佈置/後車廂) -> input[type="time"]
+                        else {
+                            // 使用 Regex 抓取 HH:mm (不管前後有什麼字)
+                            const timeMatch = formData.time.match(/(\d{1,2}):(\d{2})/);
+                            if (timeMatch) {
+                                let hh = timeMatch[1];
+                                let mm = timeMatch[2];
+                                if (hh.length === 1) hh = '0' + hh; // 補零
+                                formData.time = `${hh}:${mm}`;
+                            }
+                        }
+                    }
+
+                    editForm.value = formData; 
+                    isEditing.value = true; 
+                };
                 const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
                 
                 const saveEdit = async () => {
