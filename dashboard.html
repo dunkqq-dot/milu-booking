@@ -314,7 +314,7 @@
         createApp({
             setup() {
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
-                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/obyt3xy5jp4mp9lousp12kkaq4xcvakf';
+                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
 
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
@@ -510,7 +510,7 @@
                                 "align": "center",
                                 "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
-                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -529,7 +529,7 @@
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.phone, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.date, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
-                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" }, { "type": "text", "text": order.location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
+                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
                                     ]
                                 },
                                 { "type": "separator", "margin": "xl" },
@@ -562,6 +562,7 @@
                     };
                 };
 
+                // ... (updateOrderStatus, startEdit, cancelEdit, saveEdit, showDebug) ...
                 const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
                     if (!order) return;
@@ -604,11 +605,10 @@
                                     status: statusText,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex,
-                                    // 🌟 修正：使用字串 'true'/'false' 以符合 Make 設定
-                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
-                                    updateOnly: 'false'
+                                    updateOnly: 'false' // 🌟 確保傳送字串 'false'
                                 };
-                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                                // 修正：移除 no-cors
+                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
@@ -627,6 +627,7 @@
                 
                 const startEdit = () => { editForm.value = { ...selectedOrder.value }; isEditing.value = true; };
                 const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
+                
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
@@ -639,6 +640,13 @@
                          messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
                          flexContents = flex;
                     }
+
+                    // 邏輯修正：如果狀態是 '等待匯款'，編輯後維持原樣，不要變成 '未付款'
+                    let newStatus = order.status;
+                    if (order.status === 'CONFIRMED') newStatus = '✅ 已付款';
+                    else if (order.status === 'WAITING_PAYMENT') newStatus = '⏳ 等待匯款';
+                    else if (order.status === 'UNPAID') newStatus = '❌ 未付款';
+                    else if (order.status === 'COMPLETED') newStatus = '🏁 已完成';
 
                     const payload = {
                         to: order.userId,
@@ -653,18 +661,15 @@
                         time: editForm.value.time,
                         phone: editForm.value.phone,
                         location: editForm.value.location,
-                        // 修正：狀態保持不變，除非是確認收款
-                        status: order.status === 'CONFIRMED' ? '✅ 已付款' : (order.status === 'WAITING_PAYMENT' ? '⏳ 等待匯款' : '❌ 未付款'),
+                        status: newStatus, // 使用修正後的狀態
                         message: messagePayload,
                         flexContents: flexContents,
-                        createCalendarEvent: 'false',
-                        updateOnly: !notifyOnUpdate.value ? 'true' : 'false'
+                        updateOnly: !notifyOnUpdate.value ? 'true' : 'false' // 🌟 字串化
                     };
                     try {
                         // 使用 標準的 fetch
                         await fetch(SEND_MSG_WEBHOOK, { 
                             method: 'POST', 
-                            mode: 'no-cors', // 暫時改回 no-cors 避免跨域問題
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload) 
                         });
