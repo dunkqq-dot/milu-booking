@@ -482,6 +482,7 @@
                     return reservations.value.filter(r => r.status === filter.value);
                 });
 
+                // 🌟 修正：移除 buildRichFlexMessage header 中的 letterSpacing
                 const buildRichFlexMessage = (order, actionType) => {
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
@@ -517,7 +518,7 @@
                                 "align": "center",
                                 "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
-                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -555,7 +556,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" }, // 移除了 letterSpacing
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -612,12 +613,10 @@
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex,
                                     // 🌟 確保傳送時不帶 updateOnly，讓 Make 過濾器通過
-                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false'
+                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
+                                    updateOnly: 'false'
                                 };
-                                
-                                // ⚠️ 關鍵：移除 updateOnly 屬性，讓 Make 過濾器 (Does not exist) 通過
-                                // 這裡不設定 payload.updateOnly，這樣它就是 undefined
-                                
+                                // 修正：移除 no-cors
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -688,6 +687,7 @@
                     }
 
                     try {
+                        // 修正：移除 no-cors
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
