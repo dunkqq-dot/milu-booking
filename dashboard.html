@@ -516,8 +516,18 @@
                                 "size": "xl", 
                                 "color": "#4A4A4A", 
                                 "margin": "xs",
-                                "align": "center",
-                                "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
+                                "align": "center"
+                                // 移除 action，改用下方的獨立按鈕
+                            },
+                            {
+                                "type": "button",
+                                "style": "secondary",
+                                "action": {
+                                    "type": "message",
+                                    "label": "點我複製帳號",
+                                    "text": "54320100686300"
+                                },
+                                "margin": "md"
                             },
                             { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
@@ -557,7 +567,7 @@
 
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -613,13 +623,10 @@
                                     status: statusText,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex,
-                                    // 🌟 確保傳送時不帶 updateOnly，讓 Make 過濾器通過
-                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false'
+                                    // 🌟 修正：使用字串 'true'/'false' 以符合 Make 設定
+                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
+                                    updateOnly: 'false'
                                 };
-                                
-                                // ⚠️ 關鍵：移除 updateOnly 屬性，讓 Make 過濾器 (Does not exist) 通過
-                                // 這裡不設定 payload.updateOnly，這樣它就是 undefined
-                                
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -692,6 +699,7 @@
                     }
 
                     try {
+                        // 修正：移除 no-cors
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
