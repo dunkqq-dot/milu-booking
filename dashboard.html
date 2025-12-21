@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
+                        <p class="text-xs text-gray-400 mt-1">訂單核對系統</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -417,19 +417,24 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
-                            // 🌟 強制優先讀取 F 欄 (5) 和 G 欄 (6) - 最原始的表單輸入
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
                             
-                            // 修正：優先抓 F (5) ，備用 Q (16)
-                            const dateRaw = getKey(item, ['5', 'F', '16', 'Q', 'date']); 
-                            const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            
-                            // 修正：優先抓 G (6) ，備用 R (17)
-                            const time = getKey(item, ['6', 'G', '17', 'R', 'time']) || ''; 
-                            
+                            // 修正：日期格式化為 YYYY-MM-DD
+                            const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
+                            let date = '';
+                            if (dateRaw) {
+                                if (dateRaw.includes('T')) {
+                                    date = dateRaw.split('T')[0];
+                                } else {
+                                    // 嘗試將 YYYY/MM/DD 轉為 YYYY-MM-DD
+                                    date = dateRaw.replace(/\//g, '-');
+                                }
+                            }
+
+                            const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
@@ -440,9 +445,8 @@
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            // 修正：使用 parseMoney 處理金額
-                            const rawPrice = parseMoney(getKey(item, ['11', 'L', 'price']));
-                            const receivedPrice = parseMoney(getKey(item, ['12', 'M', 'received']));
+                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
+                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -483,7 +487,6 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
-                     // 完整版 Flex 邏輯 (包含所有欄位)
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
@@ -537,7 +540,7 @@
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.phone, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.date, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
-                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" }, { "type": "text", "text": order.location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
+                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
                                     ]
                                 },
                                 { "type": "separator", "margin": "xl" },
@@ -570,19 +573,24 @@
                     };
                 };
 
-                // ... (updateOrderStatus, startEdit, cancelEdit, saveEdit, showDebug) ...
                 const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
                     if (!order) return;
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
+                    
                     Swal.fire({
-                        title: '確認發送通知？', text: `即將發送 LINE 通知給 ${order.contactName}`, icon: 'question',
-                        showCancelButton: true, confirmButtonText: '確定發送', cancelButtonText: '取消'
+                        title: '確認發送通知？',
+                        text: `即將發送 LINE 通知給 ${order.contactName}`,
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: '確定發送',
+                        cancelButtonText: '取消'
                     }).then(async (result) => {
                         if (result.isConfirmed) {
                             try {
                                 Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                                 const flex = buildRichFlexMessage(order, actionType);
+                                
                                 let statusText = '';
                                 if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
                                 else if (actionType === 'PAYMENT_REQUEST') statusText = '⏳ 等待匯款';
@@ -590,20 +598,29 @@
                                 else if (actionType === 'CANCEL') statusText = '❌ 已取消';
                                 else if (actionType === 'REFUND') statusText = '💸 已退款';
                                 else if (actionType === 'RESTORE') statusText = '❌ 未付款';
+
                                 const payload = {
-                                    to: order.userId, orderId: order.oid, clientName: order.contactName, lineName: order.lineName, service: order.service,
-                                    price: order.rawPrice, received: order.receivedPrice, balance: order.rawPrice - order.receivedPrice,
-                                    date: order.date, time: order.time, phone: order.phone, location: order.location,
+                                    to: order.userId,
+                                    orderId: order.oid,
+                                    clientName: order.contactName, 
+                                    lineName: order.lineName, 
+                                    service: order.service,
+                                    price: order.rawPrice,
+                                    received: order.receivedPrice,
+                                    balance: order.rawPrice - order.receivedPrice,
+                                    date: order.date,
+                                    time: order.time,
+                                    phone: order.phone,
+                                    location: order.location,
                                     status: statusText,
-                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex }, flexContents: flex,
+                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
+                                    flexContents: flex,
                                     // 🌟 修正：使用字串 'true'/'false' 以符合 Make 設定
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
                                     updateOnly: 'false'
                                 };
-                                // 修正：移除 no-cors
-                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
                                 
-                                // 樂觀更新
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
                                 else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
@@ -612,7 +629,9 @@
                                 else if (actionType === 'RESTORE') order.status = 'UNPAID';
                                 
                                 Swal.fire('成功', '通知已送出！', 'success');
-                            } catch (e) { Swal.fire('錯誤', '發送失敗：' + e.message, 'error'); }
+                            } catch (e) {
+                                Swal.fire('錯誤', '發送失敗：' + e.message, 'error');
+                            }
                         }
                     });
                 };
@@ -657,7 +676,7 @@
                         // 使用 標準的 fetch
                         await fetch(SEND_MSG_WEBHOOK, { 
                             method: 'POST', 
-                            // mode: 'no-cors', // 暫時改回 no-cors 避免跨域問題
+                            mode: 'no-cors', // 暫時改回 no-cors 避免跨域問題
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload) 
                         });
@@ -690,3 +709,29 @@
     </script>
 </body>
 </html>
+```
+
+### 3. 2. 關於「Make 資料結構更新」
+
+請確認您已經在 Make 的 **Parse JSON** 模組中，將 **Data Structure** 更新為最新版本，確保 `createCalendarEvent` 能被識別：
+
+```json
+{
+    "to": "U1234567890abcdef",
+    "orderId": "M0001",
+    "clientName": "王小美",
+    "lineName": "May",
+    "service": "專人佈置",
+    "price": 5000,
+    "received": 1000,
+    "balance": 4000,
+    "date": "2025-12-31",
+    "time": "14:30",
+    "phone": "0912345678",
+    "location": "台北市...",
+    "status": "✅ 已付款",
+    "createCalendarEvent": "true",
+    "updateOnly": "false",
+    "message": { "type": "flex", "altText": "通知", "contents": {} },
+    "flexContents": { "type": "bubble", "body": {} }
+}
