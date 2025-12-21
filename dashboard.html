@@ -71,8 +71,7 @@
                                   'bg-red-100 text-red-500': order.status === 'UNPAID',
                                   'bg-gray-200 text-gray-600': order.status === 'CANCELED',
                                   'bg-yellow-100 text-yellow-600': order.status === 'REFUNDED',
-                                  'bg-blue-100 text-blue-600': order.status === 'COMPLETED',
-                                  'bg-blue-400 text-white': order.status === 'WAITING_PAYMENT'
+                                  'bg-blue-100 text-blue-600': order.status === 'COMPLETED'
                               }">
                             {{ getStatusText(order.status) }}
                         </span>
@@ -121,7 +120,7 @@
                             <i class="fa-solid fa-pen"></i>
                         </button>
                         <div v-else class="absolute top-4 right-4 flex items-center gap-2">
-                             <!-- 同步發送開關 -->
+                             <!-- 新增：同步發送開關 -->
                             <label class="flex items-center space-x-2 text-xs text-white/90 bg-black/20 px-2 py-1 rounded cursor-pointer select-none">
                                 <input type="checkbox" v-model="notifyOnUpdate" class="form-checkbox h-3 w-3 text-green-500 rounded focus:ring-0">
                                 <span>發送通知</span>
@@ -165,9 +164,11 @@
                                     <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                 </div>
                                 <div v-else>
+                                    <!-- LINE 名稱 -->
                                     <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
                                         <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                     </p>
+                                    <!-- 聯絡人姓名 -->
                                     <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
                                     <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
                                         <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
@@ -192,6 +193,7 @@
                             </div>
                             <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                 <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
+                                
                                 <template v-if="isEditing">
                                     <select v-if="isTimeSlotService(selectedOrder.service)" v-model="editForm.time" class="edit-input">
                                         <option value="" disabled>請選擇時段</option>
@@ -199,6 +201,7 @@
                                     </select>
                                     <input v-else type="time" v-model="editForm.time" class="edit-input">
                                 </template>
+                                
                                 <p v-else class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                             </div>
                         </div>
@@ -310,6 +313,7 @@
 
         createApp({
             setup() {
+                // ⚠️ 修正：Webhook 網址確認
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
 
@@ -345,6 +349,7 @@
                     return service.includes('外送') || service.includes('自取');
                 };
 
+                // 計算屬性
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
                     set: (val) => {
@@ -414,13 +419,19 @@
                         rawJsonData.value = data;
 
                         const formattedData = data.map((item, index) => {
+                            // 🌟 強制優先讀取 F 欄 (5) 和 G 欄 (6) - 最原始的表單輸入
                             const oid = getKey(item, ['0', 'A', 'oid']) || `M-${index}`;
                             const lineName = getKey(item, ['2', 'C', 'lineName']) || '未知LINE';
                             const contactName = getKey(item, ['3', 'D', 'contactName']) || '未知客戶';
                             const phone = getKey(item, ['4', 'E', 'phone']) || '';
-                            const dateRaw = getKey(item, ['5', 'F', 'date', '16', 'Q']); 
+                            
+                            // 修正：優先抓 F (5) ，備用 Q (16)
+                            const dateRaw = getKey(item, ['5', 'F', '16', 'Q', 'date']); 
                             const date = dateRaw ? (dateRaw.includes('T') ? dateRaw.split('T')[0] : dateRaw) : '';
-                            const time = getKey(item, ['6', 'G', 'time', '17', 'R']) || ''; 
+                            
+                            // 修正：優先抓 G (6) ，備用 R (17)
+                            const time = getKey(item, ['6', 'G', '17', 'R', 'time']) || ''; 
+                            
                             const location = getKey(item, ['7', 'H', 'location']) || '未填寫地點'; 
                             let serviceName = getKey(item, ['8', 'I', 'service']) || '服務';
                             
@@ -431,8 +442,9 @@
 
                             const userId = getKey(item, ['9', 'J', 'userId']) || '';
                             const rawStatus = (getKey(item, ['10', 'K', 'status']) || '').trim();
-                            const rawPrice = parseInt(getKey(item, ['11', 'L', 'price'])) || 0;
-                            const receivedPrice = parseInt(getKey(item, ['12', 'M', 'received'])) || 0;
+                            // 修正：使用 parseMoney 處理金額
+                            const rawPrice = parseMoney(getKey(item, ['11', 'L', 'price']));
+                            const receivedPrice = parseMoney(getKey(item, ['12', 'M', 'received']));
 
                             let status = 'UNPAID';
                             if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
@@ -473,11 +485,15 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
+                     // 完整版 Flex 邏輯 (包含所有欄位，移除 letterSpacing)
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
                      const paid = parseInt(order.receivedPrice) || 0;
                      const balance = total - paid;
-                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
+                     
+                     let titleText = 'PAYMENT CONFIRMED'; 
+                     let descText = '預約與款項已確認'; 
+                     let statusColor = '#10B981';
                      let bodyContents = [];
 
                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
@@ -504,19 +520,10 @@
                                 "size": "xl", 
                                 "color": "#4A4A4A", 
                                 "margin": "xs",
-                                "align": "center"
+                                "align": "center",
+                                "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
-                            {
-                                "type": "button",
-                                "style": "secondary",
-                                "action": {
-                                    "type": "message",
-                                    "label": "點我複製帳號",
-                                    "text": "54320100686300"
-                                },
-                                "margin": "md"
-                            },
-                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -612,9 +619,9 @@
                                     flexContents: flex,
                                     updateOnly: false
                                 };
-                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+                                // 修正：移除 no-cors
+                                await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
-                                // 樂觀更新狀態
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
                                 else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
