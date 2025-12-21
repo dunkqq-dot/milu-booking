@@ -314,8 +314,10 @@
 
         createApp({
             setup() {
+                // 修正：僅更新 SEND_MSG_WEBHOOK 為您提供的新網址
+                // DATA_API_URL 仍維持原樣 (若讀取資料也有問題，請檢查另一個 Make 流程)
                 const DATA_API_URL = 'https://hook.eu1.make.com/299dlrz8g64ecrg8q0obdpxhbkkxo5nj'; 
-                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
+                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/63u0kheb71v9vengzdggfy1ga7r8gmng';
 
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
@@ -485,25 +487,25 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
-                     // 完整版 Flex 邏輯 (無 letterSpacing)
-                     const config = configMap[order.service] || configMap['專人佈置'];
-                     const total = parseInt(order.rawPrice) || 0;
-                     const paid = parseInt(order.receivedPrice) || 0;
-                     const balance = total - paid;
-                     let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
-                     let bodyContents = [];
+                      // 完整版 Flex 邏輯 (無 letterSpacing)
+                      const config = configMap[order.service] || configMap['專人佈置'];
+                      const total = parseInt(order.rawPrice) || 0;
+                      const paid = parseInt(order.receivedPrice) || 0;
+                      const balance = total - paid;
+                      let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
+                      let bodyContents = [];
 
-                     if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
-                     else if (actionType === 'REFUND') { titleText = 'REFUND COMPLETED'; descText = '退款辦理完成'; statusColor = '#EAB308'; }
-                     else if (actionType === 'COMPLETE') { titleText = 'SERVICE COMPLETED'; descText = '服務已完成'; statusColor = '#2563EB'; }
-                     else if (actionType === 'RESTORE') { titleText = 'ORDER RESTORED'; descText = '訂單狀態已恢復'; statusColor = '#EF4444'; }
-                     else if (actionType === 'UPDATE') { titleText = 'BOOKING UPDATED'; descText = '預約資料已更新'; statusColor = '#3B82F6'; }
-                     else if (actionType === 'PAYMENT_REQUEST') { 
-                         titleText = 'PAYMENT REQUEST'; 
-                         descText = '請詳閱付款規則並完成匯款'; 
-                         statusColor = '#2563EB'; 
-                         const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
-                         bodyContents = [
+                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
+                      else if (actionType === 'REFUND') { titleText = 'REFUND COMPLETED'; descText = '退款辦理完成'; statusColor = '#EAB308'; }
+                      else if (actionType === 'COMPLETE') { titleText = 'SERVICE COMPLETED'; descText = '服務已完成'; statusColor = '#2563EB'; }
+                      else if (actionType === 'RESTORE') { titleText = 'ORDER RESTORED'; descText = '訂單狀態已恢復'; statusColor = '#EF4444'; }
+                      else if (actionType === 'UPDATE') { titleText = 'BOOKING UPDATED'; descText = '預約資料已更新'; statusColor = '#3B82F6'; }
+                      else if (actionType === 'PAYMENT_REQUEST') { 
+                          titleText = 'PAYMENT REQUEST'; 
+                          descText = '請詳閱付款規則並完成匯款'; 
+                          statusColor = '#2563EB'; 
+                          const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
+                          bodyContents = [
                             { "type": "text", "text": `本次訂單總金額: NT$ ${total.toLocaleString()}`, "weight": "bold", "size": "md", "color": "#C69C6D", "align": "center", "margin": "md" },
                             { "type": "separator", "margin": "md" },
                             { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
@@ -521,18 +523,18 @@
                                 "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
                             { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
-                         ];
-                     }
+                          ];
+                      }
 
-                     if (bodyContents.length === 0) {
-                         if (actionType === 'COMPLETE') {
-                             bodyContents = [
+                      if (bodyContents.length === 0) {
+                          if (actionType === 'COMPLETE') {
+                              bodyContents = [
                                 { "type": "text", "text": "感謝您選擇 MILU BALLOONS！", "weight": "bold", "size": "md", "color": "#4A4A4A", "align": "center", "margin": "lg", "wrap": true },
                                 { "type": "text", "text": "期待再次為您服務 ❤️", "size": "sm", "color": "#666666", "align": "center", "margin": "sm" }
                              ];
-                         } else {
-                             // 🌟 修正：Flex Message 排版優化 (Header 移除 letterSpacing)
-                             bodyContents = [
+                          } else {
+                              // 🌟 修正：Flex Message 排版優化 (Header 移除 letterSpacing)
+                              bodyContents = [
                                 {
                                     "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
                                     "contents": [
@@ -553,28 +555,28 @@
                                     ]
                                 }
                              ];
-                         }
-                     }
+                          }
+                      }
 
-                     return {
-                        "type": "bubble", "size": "mega",
-                        "header": { 
-                            "type": "box", "layout": "vertical", "contents": [ 
-                                { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } 
-                            ], 
-                            "paddingBottom": "none" 
-                        },
-                        "body": {
-                            "type": "box", "layout": "vertical",
-                            "contents": [
-                                { "type": "text", "text": `${config.icon} ${order.service}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A", "wrap": true },
-                                { "type": "text", "text": descText, "size": "sm", "color": "#999999", "align": "center", "margin": "xs" },
-                                { "type": "separator", "margin": "md" },
-                                ...bodyContents
-                            ]
-                        },
-                        "footer": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" } ] }
-                    };
+                      return {
+                         "type": "bubble", "size": "mega",
+                         "header": { 
+                             "type": "box", "layout": "vertical", "contents": [ 
+                                 { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } 
+                             ], 
+                             "paddingBottom": "none" 
+                         },
+                         "body": {
+                             "type": "box", "layout": "vertical",
+                             "contents": [
+                                 { "type": "text", "text": `${config.icon} ${order.service}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A", "wrap": true },
+                                 { "type": "text", "text": descText, "size": "sm", "color": "#999999", "align": "center", "margin": "xs" },
+                                 { "type": "separator", "margin": "md" },
+                                 ...bodyContents
+                             ]
+                         },
+                         "footer": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" } ] }
+                     };
                 };
 
                 const updateOrderStatus = async (actionType) => {
