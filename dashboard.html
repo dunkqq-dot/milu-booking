@@ -475,6 +475,7 @@
                     return reservations.value.filter(r => r.status === filter.value);
                 });
 
+                // 🌟 修正重點：移除 Header 的 letterSpacing
                 const buildRichFlexMessage = (order, actionType) => {
                      const config = configMap[order.service] || configMap['專人佈置'];
                      const total = parseInt(order.rawPrice) || 0;
@@ -521,7 +522,6 @@
                                 { "type": "text", "text": "期待再次為您服務 ❤️", "size": "sm", "color": "#666666", "align": "center", "margin": "sm" }
                              ];
                          } else {
-                             // 🌟 修正：Flex Message 排版優化 (字體統一為 sm/md，數字靠右)
                              bodyContents = [
                                 {
                                     "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
@@ -535,7 +535,7 @@
                                 },
                                 { "type": "separator", "margin": "xl" },
                                 {
-                                    "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm", // spacing 設定為 sm
+                                    "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm",
                                     "contents": [
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "總計金額", "size": "sm", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": `NT$ ${total.toLocaleString()}`, "size": "sm", "color": "#666666", "align": "end", "flex": 3 } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "已收款", "size": actionType === 'CONFIRM' ? "md" : "sm", "color": "#10B981", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${paid.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "xl" : "sm", "color": "#10B981", "align": "end", "weight": "bold", "flex": 3 } ] },
@@ -546,9 +546,10 @@
                          }
                      }
 
+                     // 🌟 修正：移除 letterSpacing
                      return {
                         "type": "bubble", "size": "mega",
-                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center", "letterSpacing": "1px" } ], "paddingBottom": "none" },
+                        "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
                         "body": {
                             "type": "box", "layout": "vertical",
                             "contents": [
@@ -566,14 +567,20 @@
                     const order = selectedOrder.value;
                     if (!order) return;
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
+                    
                     Swal.fire({
-                        title: '確認發送通知？', text: `即將發送 LINE 通知給 ${order.contactName}`, icon: 'question',
-                        showCancelButton: true, confirmButtonText: '確定發送', cancelButtonText: '取消'
+                        title: '確認發送通知？',
+                        text: `即將發送 LINE 通知給 ${order.contactName}`,
+                        icon: 'question',
+                        showCancelButton: true,
+                        confirmButtonText: '確定發送',
+                        cancelButtonText: '取消'
                     }).then(async (result) => {
                         if (result.isConfirmed) {
                             try {
                                 Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                                 const flex = buildRichFlexMessage(order, actionType);
+                                
                                 let statusText = '';
                                 if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
                                 else if (actionType === 'PAYMENT_REQUEST') statusText = '⏳ 等待匯款';
@@ -598,7 +605,6 @@
                                     status: statusText,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex,
-                                    // 🌟 修正：確保在需要發送通知時，移除 updateOnly 屬性
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
                                     updateOnly: 'false'
                                 };
@@ -635,7 +641,6 @@
                          flexContents = flex;
                     }
 
-                    // 邏輯修正：如果狀態是 '等待匯款'，編輯後維持原樣，不要變成 '未付款'
                     let newStatus = order.status;
                     if (order.status === 'CONFIRMED') newStatus = '✅ 已付款';
                     else if (order.status === 'WAITING_PAYMENT') newStatus = '⏳ 等待匯款';
@@ -659,7 +664,7 @@
                         message: messagePayload,
                         flexContents: flexContents,
                         createCalendarEvent: 'false',
-                        updateOnly: !notifyOnUpdate.value ? 'true' : 'false' // 🌟 字串化
+                        updateOnly: !notifyOnUpdate.value ? 'true' : 'false'
                     };
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
