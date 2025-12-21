@@ -510,7 +510,7 @@
                                 "align": "center",
                                 "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
-                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -566,20 +566,14 @@
                     const order = selectedOrder.value;
                     if (!order) return;
                     if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
-                    
                     Swal.fire({
-                        title: '確認發送通知？',
-                        text: `即將發送 LINE 通知給 ${order.contactName}`,
-                        icon: 'question',
-                        showCancelButton: true,
-                        confirmButtonText: '確定發送',
-                        cancelButtonText: '取消'
+                        title: '確認發送通知？', text: `即將發送 LINE 通知給 ${order.contactName}`, icon: 'question',
+                        showCancelButton: true, confirmButtonText: '確定發送', cancelButtonText: '取消'
                     }).then(async (result) => {
                         if (result.isConfirmed) {
                             try {
                                 Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                                 const flex = buildRichFlexMessage(order, actionType);
-                                
                                 let statusText = '';
                                 if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
                                 else if (actionType === 'PAYMENT_REQUEST') statusText = '⏳ 等待匯款';
@@ -604,13 +598,10 @@
                                     status: statusText,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex,
-                                    // 🌟 確保傳送時不帶 updateOnly，讓 Make 過濾器通過
-                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false'
+                                    // 🌟 修正：確保在需要發送通知時，移除 updateOnly 屬性
+                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
+                                    updateOnly: 'false'
                                 };
-                                
-                                // ⚠️ 關鍵：移除 updateOnly 屬性，讓 Make 過濾器 (Does not exist) 通過
-                                // 這裡不設定 payload.updateOnly，這樣它就是 undefined
-                                
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -637,16 +628,11 @@
                     
                     let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
                     let flexContents = {};
-                    let payloadUpdateOnly = undefined; // 預設 undefined
                     
                     if (notifyOnUpdate.value) {
-                         // 要發通知 -> updateOnly 保持 undefined
                          const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
                          messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
                          flexContents = flex;
-                    } else {
-                         // 不發通知 -> 設定 updateOnly
-                         payloadUpdateOnly = 'true';
                     }
 
                     // 邏輯修正：如果狀態是 '等待匯款'，編輯後維持原樣，不要變成 '未付款'
@@ -672,14 +658,9 @@
                         status: newStatus,
                         message: messagePayload,
                         flexContents: flexContents,
-                        createCalendarEvent: 'false'
+                        createCalendarEvent: 'false',
+                        updateOnly: !notifyOnUpdate.value ? 'true' : 'false' // 🌟 字串化
                     };
-                    
-                    // 🌟 只有在不通知時才加入 updateOnly
-                    if (payloadUpdateOnly) {
-                        payload.updateOnly = payloadUpdateOnly;
-                    }
-
                     try {
                         await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
