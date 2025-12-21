@@ -39,7 +39,7 @@
                 <div class="flex justify-between items-center">
                     <div>
                         <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">訂單核對系統</p>
+                        <p class="text-xs text-gray-400 mt-1">智慧資料同步中</p>
                     </div>
                     <div class="flex gap-2">
                         <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
@@ -348,6 +348,7 @@
                     return service.includes('外送') || service.includes('自取');
                 };
 
+                // 計算屬性
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
                     set: (val) => {
@@ -510,7 +511,7 @@
                                 "align": "center",
                                 "action": { "type": "message", "label": "複製帳號", "text": "54320100686300" }
                             },
-                            { "type": "text", "text": "(點擊上方帳號可發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                            { "type": "text", "text": "(點擊按鈕將帳號發送至聊天室以複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                          ];
                      }
 
@@ -529,7 +530,7 @@
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.phone, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.date, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
                                         { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
-                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" }, { "type": "text", "text": order.location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
+                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": order.location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
                                     ]
                                 },
                                 { "type": "separator", "margin": "xl" },
@@ -590,9 +591,7 @@
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex }, flexContents: flex,
                                     updateOnly: false
                                 };
-                                // 修正：移除 no-cors
                                 await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-                                
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
                                 else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
@@ -610,16 +609,6 @@
                 const saveEdit = async () => {
                     const order = selectedOrder.value;
                     Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
-                    
-                    let messagePayload = { type: 'flex', altText: '訂單資料更新', contents: {} };
-                    let flexContents = {};
-                    
-                    if (notifyOnUpdate.value) {
-                         const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
-                         messagePayload = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
-                         flexContents = flex;
-                    }
-
                     const payload = {
                         to: order.userId,
                         orderId: order.oid,
@@ -635,17 +624,19 @@
                         location: editForm.value.location,
                         // 修正：狀態保持不變，除非是確認收款
                         status: order.status === 'CONFIRMED' ? '✅ 已付款' : (order.status === 'WAITING_PAYMENT' ? '⏳ 等待匯款' : '❌ 未付款'),
-                        message: messagePayload,
-                        flexContents: flexContents,
-                        updateOnly: !notifyOnUpdate.value
+                        message: { type: 'flex', altText: '訂單資料更新', contents: {} },
+                        updateOnly: true
                     };
+                    
+                    if (notifyOnUpdate.value) {
+                         const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
+                         payload.message = { type: "flex", altText: `資料更新：${order.service}`, contents: flex };
+                         payload.flexContents = flex;
+                         payload.updateOnly = false;
+                    }
+
                     try {
-                        // 使用 標準的 fetch
-                        await fetch(SEND_MSG_WEBHOOK, { 
-                            method: 'POST', 
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify(payload) 
-                        });
+                        await fetch(SEND_MSG_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
