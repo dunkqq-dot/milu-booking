@@ -132,7 +132,6 @@
                 <button @click="selectedOrder = null" class="bg-white p-2 rounded-full shadow text-gray-500">⬅</button>
             </div>
 
-            <!-- 🛠️ 修正：移除 flex items-center，改用 min-h-full 與 py-10 來確保捲動時上方不會被切掉 -->
             <div v-if="selectedOrder" class="flex-1 overflow-y-auto relative">
                 <div class="min-h-full flex flex-col items-center justify-center p-4 md:p-10 py-16 md:py-10">
                     <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-md mx-auto">
@@ -524,12 +523,22 @@
                     }
 
                     try {
-                        const url = `${DATA_API_URL}?mode=api&auth=${authPassword.value}`;
+                        const url = `${DATA_API_URL}?mode=api&auth=${authPassword.value}&_=${new Date().getTime()}`; // 🚀 加入時間戳記避免快取
                         const res = await fetch(url);
-                        if (!res.ok) throw new Error(`伺服器回應錯誤 (${res.status})`);
+                        
+                        if (!res.ok) {
+                             throw new Error(`伺服器回應錯誤 (${res.status})`);
+                        }
+
                         const text = await res.text();
                         let data;
-                        try { data = JSON.parse(text); } catch (e) { throw new Error("無法解析伺服器回應 (請檢查部署權限)"); }
+                        
+                        try { 
+                            data = JSON.parse(text); 
+                        } catch (e) { 
+                            console.error("解析 JSON 失敗，原始回應:", text);
+                            throw new Error("無法解析伺服器回應 (請檢查部署權限)"); 
+                        }
 
                         if (data.error) {
                              if (isLoginAttempt) loginError.value = data.error; 
@@ -751,12 +760,15 @@
                                 else if (actionType === 'REFUND') statusText = '💸 已退款';
                                 else if (actionType === 'RESTORE') statusText = '❌ 未付款';
 
+                                // 👉 關鍵修改：使用 action: 'UPDATE_ORDER' 呼叫 GAS
+                                // 如果是純修改 (Save)，notifyMake 為 'false'，如果是按鈕動作，則為 'true'
                                 const payload = {
-                                    action: 'UPDATE_ORDER', 
+                                    action: 'UPDATE_ORDER', // 告訴 GAS 這是寫入動作
                                     auth: authPassword.value, // 🔒 傳送密碼
                                     orderId: order.oid,
-                                    service: order.service, 
+                                    service: order.service, // 用來找分頁
                                     
+                                    // 資料欄位
                                     lineName: order.lineName,
                                     clientName: order.contactName, 
                                     phone: order.phone,
@@ -767,9 +779,11 @@
                                     price: order.rawPrice,
                                     received: order.receivedPrice,
                                     
+                                    // 邏輯控制
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
                                     notifyMake: 'true', // 因為是按鈕動作，所以要發 LINE
                                     
+                                    // 傳給 Make 發 LINE 用的資料 (Flex Message)
                                     to: order.userId,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex
@@ -828,30 +842,37 @@
                     const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
                     
                     const payload = {
-                        action: 'UPDATE_ORDER', 
+                        action: 'UPDATE_ORDER', // 告訴 GAS 這是寫入動作
                         auth: authPassword.value, // 🔒 傳送密碼
                         orderId: order.oid,
                         service: order.service,
                         
+                        // 更新後的資料
                         lineName: editForm.value.lineName,
                         clientName: editForm.value.contactName, 
                         phone: editForm.value.phone,
                         date: editForm.value.date,
                         time: editForm.value.time,
                         location: editForm.value.location,
-                        status: statusText, 
+                        status: statusText, // 狀態通常不因編輯而改變，除非連動邏輯
                         price: parseMoney(editForm.value.rawPrice),
                         received: parseMoney(editForm.value.receivedPrice),
                         
+                        // 邏輯控制
+                        // 只有在狀態是「已付款/已完成」時，編輯才同步行事曆
                         createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false',
                         notifyMake: notifyOnUpdate.value ? 'true' : 'false',
+                        
+                        // 傳給 Make 發 LINE 用的資料
                         to: order.userId,
                         message: { type: "flex", altText: `資料更新：${order.service}`, contents: flex },
                         flexContents: flex
                     };
 
                     try {
+                        // 👉 改為 POST 到 GAS
                         await fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) });
+                        
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
