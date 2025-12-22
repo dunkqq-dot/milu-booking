@@ -122,7 +122,6 @@
                     </div>
                     <div class="flex justify-between items-center">
                         <h3 class="font-bold text-gray-800">
-                            <!-- 簡單的高亮搜尋字 -->
                             <span v-html="highlightText(order.contactName)"></span>
                         </h3>
                         <span class="text-xs text-gray-400">{{ order.service }}</span>
@@ -567,8 +566,9 @@
                     filterService.value = '';
                 };
                 
-                // 簡單的高亮文字功能
+                // 簡單的高亮文字功能 (增加防呆)
                 const highlightText = (text) => {
+                    if (!text) return ''; // 👈 防呆
                     if (!searchQuery.value) return text;
                     const regex = new RegExp(`(${searchQuery.value})`, 'gi');
                     return text.replace(regex, '<span class="bg-yellow-200 text-black">$1</span>');
@@ -734,7 +734,6 @@
                                 const received = parseInt(order.receivedPrice) || 0;
                                 const balance = price - received;
 
-                                // 這是給 GAS 用的 payload (notifyMake 為 false，因為我們自己發)
                                 const payload = {
                                     action: 'UPDATE_ORDER',
                                     orderId: order.oid,
@@ -750,7 +749,7 @@
                                     received: received,
                                     balance: balance,
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
-                                    notifyMake: 'false', // ⛔ 告訴 GAS 不要發送
+                                    notifyMake: 'false', // ⛔ 告訴 GAS 不要發送，因為我們自己發
                                     to: order.userId,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex
@@ -819,7 +818,6 @@
                     const received = parseMoney(editForm.value.receivedPrice);
                     const balance = price - received;
 
-                    // 這是給 GAS 用的 payload
                     const payload = {
                         action: 'UPDATE_ORDER',
                         orderId: order.oid,
@@ -839,7 +837,9 @@
                         createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false',
                         notifyMake: 'false', // ⛔ 告訴 GAS 不要發送
                         
+                        // 關鍵：如果選擇不通知，將 to 設為空字串，讓 Make 的 Filter 擋下
                         to: shouldNotify ? order.userId : '', 
+                        
                         message: shouldNotify ? { type: "flex", altText: `資料更新：${order.service}`, contents: flex } : null,
                         flexContents: shouldNotify ? flex : null
                     };
@@ -849,10 +849,9 @@
                         // 1. 存檔到 GAS (永遠執行)
                         requests.push(fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) }));
 
-                        // 2. 發送 LINE 到 Make (只有在選擇發送時執行)
-                        if (shouldNotify) {
-                            requests.push(sendToMake(payload, flex));
-                        }
+                        // 2. 發送 LINE 到 Make (修正：無論是否通知都發送，交由 Make Filter 決定)
+                        // 之前是 if (shouldNotify) { ... }
+                        requests.push(sendToMake(payload, flex)); 
 
                         await Promise.all(requests);
                         
