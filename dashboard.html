@@ -32,21 +32,7 @@
 </head>
 <body id="app" v-cloak>
 
-    <!-- 🔒 登入畫面 -->
-    <div v-if="!isLoggedIn" class="fixed inset-0 bg-[#F9F7F2] z-50 flex flex-col items-center justify-center p-4">
-        <div class="bg-white p-8 rounded-2xl shadow-xl border border-milu-gold/20 w-full max-w-sm text-center">
-            <h1 class="text-3xl font-serif text-milu-gold font-bold mb-2">MILU ADMIN</h1>
-            <p class="text-gray-400 text-xs mb-6 tracking-widest">系統鎖定中</p>
-            <div class="relative">
-                <input type="password" v-model="inputPassword" @keyup.enter="login"
-                       class="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 outline-none focus:border-milu-gold transition text-center tracking-widest text-lg"
-                       placeholder="請輸入後台密碼">
-            </div>
-            
-            <button @click="login" :disabled="isLoginLoading" class="w-full bg-milu-gold text-white font-bold py-3 rounded-lg mt-4 hover:bg-[#b08b60] transition shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-                <span v-if="isLoginLoading"><i class="fa-solid fa-circle-notch fa-spin"></i> 驗證中...</span>
-                <span v-else>登入系統</span>
-            </button>
+
             
             <!-- 錯誤訊息顯示區 (紅字) -->
             <div class="mt-4 min-h-[20px]">
