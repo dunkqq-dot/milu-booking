@@ -32,7 +32,33 @@
 </head>
 <body id="app" v-cloak>
 
- 
+    <!-- 🔒 登入畫面 -->
+    <div v-if="!isLoggedIn" class="fixed inset-0 bg-[#F9F7F2] z-50 flex flex-col items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl border border-milu-gold/20 w-full max-w-sm text-center">
+            <h1 class="text-3xl font-serif text-milu-gold font-bold mb-2">MILU ADMIN</h1>
+            <p class="text-gray-400 text-xs mb-6 tracking-widest">系統鎖定中</p>
+            <div class="relative">
+                <input type="password" v-model="inputPassword" @keyup.enter="login"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 outline-none focus:border-milu-gold transition text-center tracking-widest text-lg"
+                       placeholder="請輸入後台密碼">
+            </div>
+            
+            <button @click="login" :disabled="isLoginLoading" class="w-full bg-milu-gold text-white font-bold py-3 rounded-lg mt-4 hover:bg-[#b08b60] transition shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <span v-if="isLoginLoading"><i class="fa-solid fa-circle-notch fa-spin"></i> 驗證中...</span>
+                <span v-else>登入系統</span>
+            </button>
+            
+            <!-- 錯誤訊息顯示區 (紅字) -->
+            <div class="mt-4 min-h-[20px]">
+                <p v-if="loginError" class="text-xs text-red-500 font-bold bg-red-50 py-1 px-2 rounded break-all">{{ loginError }}</p>
+            </div>
+            
+            <div class="mt-4 text-[10px] text-gray-400 text-left bg-gray-100 p-2 rounded hidden" id="debug-info">
+                 <p>API URL: {{ shortUrl }}</p>
+            </div>
+        </div>
+        <p class="mt-8 text-gray-300 text-xs">© MILU BALLOONS</p>
+    </div>
 
     <!-- 🔓 主畫面 -->
     <div v-else class="flex h-full">
@@ -352,7 +378,29 @@
                     return DATA_API_URL ? '...' + DATA_API_URL.substr(-10) : '未設定';
                 });
 
-            
+                const login = () => {
+                    if (!inputPassword.value) { loginError.value = '請輸入密碼'; return; }
+                    authPassword.value = inputPassword.value.trim();
+                    loginError.value = '';
+                    isLoginLoading.value = true; 
+                    fetchData(true).then(() => { isLoginLoading.value = false; });
+                };
+
+                const logout = () => {
+                    isLoggedIn.value = false;
+                    authPassword.value = '';
+                    inputPassword.value = '';
+                    localStorage.removeItem('milu_auth');
+                    selectedOrder.value = null;
+                };
+
+                const checkLogin = () => {
+                    const savedPass = localStorage.getItem('milu_auth');
+                    if (savedPass) {
+                        authPassword.value = savedPass;
+                        fetchData(true);
+                    }
+                };
 
                 const safeText = (text) => {
                     return (text && String(text).trim() !== '') ? String(text) : ' ';
