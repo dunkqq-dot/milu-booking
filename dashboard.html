@@ -32,19 +32,7 @@
 </head>
 <body id="app" v-cloak>
 
-
-            
-            <!-- 錯誤訊息顯示區 (紅字) -->
-            <div class="mt-4 min-h-[20px]">
-                <p v-if="loginError" class="text-xs text-red-500 font-bold bg-red-50 py-1 px-2 rounded break-all">{{ loginError }}</p>
-            </div>
-            
-            <div class="mt-4 text-[10px] text-gray-400 text-left bg-gray-100 p-2 rounded hidden" id="debug-info">
-                 <p>API URL: {{ shortUrl }}</p>
-            </div>
-        </div>
-        <p class="mt-8 text-gray-300 text-xs">© MILU BALLOONS</p>
-    </div>
+ 
 
     <!-- 🔓 主畫面 -->
     <div v-else class="flex h-full">
