@@ -479,7 +479,7 @@
 
                         const formattedData = data.map((item, index) => {
                             let serviceName = item[8] || '服務';
-                            if (serviceName.includes('自取')) serviceName = '工作室自取'; 
+                            if (serviceName.includes('自取')) serviceName = '工作室取貨'; 
                             else if (serviceName.includes('後車廂')) serviceName = '後車廂佈置';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
                             else if (serviceName.includes('佈置')) serviceName = '專人佈置';
