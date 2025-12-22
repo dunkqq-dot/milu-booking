@@ -340,8 +340,8 @@
 
         const configMap = {
             '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
-            '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
-            '後車廂驚喜': { time: '抵達時間', location: '施作地點', icon: '🚗' },
+            '工作室取貨': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
+            '後車廂佈置': { time: '抵達時間', location: '施作地點', icon: '🚗' },
             '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
 
@@ -479,8 +479,8 @@
 
                         const formattedData = data.map((item, index) => {
                             let serviceName = item[8] || '服務';
-                            if (serviceName.includes('自取')) serviceName = '門市自取'; 
-                            else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
+                            if (serviceName.includes('自取')) serviceName = '工作室自取'; 
+                            else if (serviceName.includes('後車廂')) serviceName = '後車廂佈置';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
                             else if (serviceName.includes('佈置')) serviceName = '專人佈置';
 
