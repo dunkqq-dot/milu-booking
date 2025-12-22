@@ -665,25 +665,33 @@
                       };
                 };
 
-                // ⚡ 專門負責發送 LINE 訊息的函式 (直接打 Make Webhook)
+                // ⚡ 專門負責發送 LINE 訊息的函式 (修正版)
                 const sendToMake = async (payload, flex) => {
-                    const linePayload = {
-                        // 模仿 GAS 送過去的格式，確保 Make 接收無誤
+                    // 1. 建構資料：修正結構與 GAS 一致
+                    const makePayload = {
                         to: payload.to,
-                        messages: [ 
-                            { 
-                                type: "flex", 
-                                altText: payload.message.altText, 
-                                contents: flex 
-                            } 
-                        ],
-                        // 也保留單數 message 格式以防萬一
-                        message: payload.message
+                        flexContents: flex, 
+                        flexJson: JSON.stringify(flex), // 確保這是純字串
+                        altText: payload.message ? payload.message.altText : '新通知',
+                        
+                        // 額外資訊 (Make 可能需要)
+                        lineName: payload.lineName,
+                        clientName: payload.clientName
                     };
+
+                    // 2. 深拷貝移除 Vue Proxy 殘留 (關鍵步驟)
+                    // 這一步是為了解決傳送給 Make 的資料結構可能包含 Vue 內部的 getter/setter
+                    const cleanBody = JSON.parse(JSON.stringify(makePayload));
+
+                    console.log("Sending to Make (Clean):", cleanBody);
+
+                    // 3. 發送
                     return fetch(SEND_MSG_WEBHOOK, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(linePayload)
+                        headers: { 
+                            'Content-Type': 'application/json; charset=UTF-8' // 強制 UTF-8
+                        },
+                        body: JSON.stringify(cleanBody)
                     });
                 };
 
@@ -738,9 +746,9 @@
                                     flexContents: flex
                                 };
 
-                                // 🚀 平行處理：同時發 LINE (快) 和存 GAS (慢)
+                                // 🚀 平行處理
                                 await Promise.all([
-                                    sendToMake(payload, flex), // 直接發 LINE
+                                    sendToMake(payload, flex), // 直接發 LINE (格式已修正)
                                     fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) }) // 存 GAS
                                 ]);
                                 
@@ -818,7 +826,7 @@
                         
                         // 邏輯控制
                         createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false',
-                        notifyMake: 'false', // ⛔ 告訴 GAS 不要發送，因為我們自己發 (如果是要發送的情況)
+                        notifyMake: 'false', // ⛔ 告訴 GAS 不要發送，因為我們自己發
                         
                         to: shouldNotify ? order.userId : '', 
                         message: shouldNotify ? { type: "flex", altText: `資料更新：${order.service}`, contents: flex } : null,
