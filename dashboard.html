@@ -228,6 +228,7 @@
                                 </div>
                                 <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                     <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
+                                    
                                     <template v-if="isEditing">
                                         <select v-if="isTimeSlotService(selectedOrder.service)" v-model="editForm.time" class="edit-input">
                                             <option value="" disabled>請選擇時段</option>
@@ -235,6 +236,7 @@
                                         </select>
                                         <input v-else type="time" v-model="editForm.time" class="edit-input">
                                     </template>
+                                    
                                     <p v-else class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                                 </div>
                             </div>
@@ -245,22 +247,31 @@
                                     <p class="text-xs text-gray-500 font-bold">總金額 (填入報價)</p>
                                     <div class="flex items-center">
                                         <span class="text-xs mr-1 text-gray-400">NT$</span>
-                                        <input type="number" v-model.number="displayRawPrice" @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none" placeholder="0">
+                                        <input type="number" v-model.number="displayRawPrice" 
+                                               @focus="handlePriceFocus"
+                                               class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none" 
+                                               placeholder="0">
                                     </div>
                                 </div>
                                 <div class="flex justify-between items-center mb-2">
                                     <p class="text-xs text-green-600 font-bold">已收款 (對帳)</p>
                                     <div class="flex items-center gap-2">
-                                        <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">⚡同上</button>
+                                        <!-- ⚡ 一鍵全額按鈕 -->
+                                        <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">
+                                            ⚡同上
+                                        </button>
                                         <span class="text-xs mr-1 text-green-600">NT$</span>
-                                        <input type="number" v-model.number="displayReceivedPrice" @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" placeholder="0">
+                                        <input type="number" v-model.number="displayReceivedPrice" 
+                                               @focus="handlePriceFocus"
+                                               class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" 
+                                               placeholder="0">
                                     </div>
                                 </div>
                                 <div class="border-t pt-2 flex justify-between items-center border-yellow-200">
                                     <p class="text-xs text-red-500 font-bold">尚欠尾款</p>
-                                    <p class="font-bold text-xl text-red-500">NT$ {{ formatMoney(displayRawPrice - displayReceivedPrice) }}</p>
+                                    <p class="font-bold text-xl text-red-500">
+                                        NT$ {{ formatMoney(displayRawPrice - displayReceivedPrice) }}
+                                    </p>
                                 </div>
                             </div>
                             
@@ -273,18 +284,24 @@
 
                             <!-- 動作按鈕 -->
                             <div v-if="!isEditing" class="pt-2 space-y-3">
+                                
+                                <!-- 付款須知 -->
                                 <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知 & 帳號
                                 </button>
+
+                                <!-- 確認收款 -->
                                 <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-check-circle"></i> 確認收款並登記
                                 </button>
+                                
                                 <div v-if="selectedOrder.status === 'CONFIRMED'" class="space-y-2">
                                     <button @click="updateOrderStatus('COMPLETE')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                         <i class="fa-solid fa-flag-checkered"></i> 完成訂單 (結案)
                                     </button>
                                     <p class="text-center text-xs text-gray-400">已付款，可進行結案</p>
                                 </div>
+
                                 <div v-if="selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELED' || selectedOrder.status === 'REFUNDED'" class="space-y-3">
                                     <div class="text-center py-3 bg-gray-100 text-gray-500 rounded-xl font-bold border border-gray-200">
                                         此訂單已結案 ({{ getStatusText(selectedOrder.status) }})
@@ -293,6 +310,7 @@
                                         <i class="fa-solid fa-rotate-left"></i> 恢復訂單 (重設為未付款)
                                     </button>
                                 </div>
+
                                 <div class="flex gap-2" v-if="selectedOrder.status !== 'CANCELED' && selectedOrder.status !== 'REFUNDED' && selectedOrder.status !== 'COMPLETED'">
                                     <button v-if="selectedOrder.status === 'CONFIRMED'" @click="updateOrderStatus('REFUND')" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
                                         <i class="fa-solid fa-money-bill-transfer"></i> 辦理退款
@@ -301,6 +319,7 @@
                                         <i class="fa-solid fa-ban"></i> 取消訂單
                                     </button>
                                 </div>
+
                                 <p class="text-center text-xs text-gray-400 pt-2">* 點擊按鈕將同步更新試算表與發送 LINE 通知</p>
                             </div>
                         </div>
@@ -332,8 +351,10 @@
 
         createApp({
             setup() {
-                // ⚠️ 自動使用您提供的 GAS URL
+                // ⚠️ 已自動填入您的 GAS Web App 網址
                 const DATA_API_URL = 'https://script.google.com/macros/s/AKfycbwfAyj7ktWXv4gPoFo7wVPLn1_nQ6w0hX8kTToggetxt3jqqD7yp67cxlrg5l1N1rsLaA/exec'; 
+                
+                // 這是發送 LINE 通知的 Make Webhook (維持不變)
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/63u0kheb71v9vengzdggfy1ga7r8gmng';
 
                 const reservations = ref([]);
@@ -467,6 +488,7 @@
                     return text.trim();
                 };
 
+                // 🛠️ 格式修正函式
                 const formatGASDate = (val) => {
                     if (!val) return '';
                     const s = String(val);
@@ -484,6 +506,8 @@
                 const formatGASTime = (val) => {
                     if (!val) return '';
                     const s = String(val);
+                    
+                    // 1. GAS 可能回傳 ISO 時間格式 (如 1899-12-30T14:30:00.000Z)
                     if (s.includes('T') && s.includes('Z')) {
                         const d = new Date(s);
                         if (!isNaN(d.getTime())) {
@@ -492,6 +516,9 @@
                             return `${hh}:${mm}`;
                         }
                     }
+                    
+                    // 2. 處理簡單時間字串 (如 9:30 -> 09:30, 14:00:00 -> 14:00)
+                    // 排除時段範圍 (例如 13:00 - 14:00 不處理)
                     const simpleTimeRegex = /^(\d{1,2}):(\d{2})(:(\d{2}))?$/;
                     const match = s.trim().match(simpleTimeRegex);
                     if (match) {
@@ -499,12 +526,17 @@
                         const mm = match[2];
                         return `${hh}:${mm}`;
                     }
+                    
+                    // 3. 其他格式 (如時段範圍) 直接回傳
                     return s;
                 };
 
                 const fetchData = async (isLoginAttempt = false) => {
+                    // 🛑 新增：如果在編輯模式，暫停更新，以免干擾使用者
+                    if (isEditing.value) return;
+
+                    // 🔒 如果沒密碼且不是嘗試登入，就停下來
                     if (!authPassword.value) return;
-                    if (isEditing.value && !isLoginAttempt) return;
 
                     if(!isLoginAttempt) loading.value = true; 
                     errorMsg.value = null;
@@ -514,8 +546,13 @@
                     }
 
                     try {
+                        // 🔒 加入 no-referrer 解決部分跨域轉導問題
                         const url = `${DATA_API_URL}?mode=api&auth=${authPassword.value}&t=${Date.now()}`;
-                        const res = await fetch(url);
+                        const res = await fetch(url, { 
+                            method: "GET",
+                            redirect: "follow",
+                            referrerPolicy: "no-referrer"
+                        });
                         
                         if (!res.ok) {
                              throw new Error(`伺服器回應錯誤 (${res.status}) - 請檢查 GAS 部署權限`);
@@ -528,6 +565,7 @@
                             data = JSON.parse(text); 
                         } catch (e) { 
                             console.error("解析 JSON 失敗:", text);
+                            // 🌟 優化錯誤訊息：檢查是否是權限頁面
                             if (text.includes("Google Accounts") || text.includes("<!DOCTYPE html")) {
                                 throw new Error("權限不足：請確認 GAS 部署為「任何人 (Anyone)」");
                             }
@@ -546,6 +584,7 @@
                             localStorage.setItem('milu_auth', authPassword.value);
                         }
                         
+                        // ⚡ 極速過濾：移除沒有訂單編號(Index 0)或沒有姓名(Index 3)的空行
                         data = data.filter(item => {
                             const hasID = item[0] && String(item[0]).trim() !== '';
                             const hasName = item[3] && String(item[3]).trim() !== '';
@@ -559,10 +598,14 @@
                             const lineName = item[2] || '未知LINE';
                             const contactName = item[3] || '未知客戶';
                             const phone = item[4] || '';
+                            
+                            // 🌟 套用格式修正
                             const date = formatGASDate(item[5]);
                             const time = formatGASTime(item[6]);
+                            
                             const location = item[7] || '未填寫地點'; 
                             let serviceName = item[8] || '服務';
+                            
                             if (serviceName.includes('自取')) serviceName = '門市自取'; 
                             else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
@@ -570,6 +613,7 @@
 
                             const userId = item[9] || '';
                             const rawStatus = (item[10] || '').trim();
+                            
                             const rawPrice = parseMoney(item[11]);
                             const receivedPrice = parseMoney(item[12]);
 
@@ -594,6 +638,7 @@
                                  Object.assign(selectedOrder.value, updated);
                              }
                         } else if (formattedData.length > 0) {
+                             // 🛠️ BUG FIX: 手機版 (寬度 < 768px) 不要自動選取第一筆
                              if (window.innerWidth >= 768 && !selectedOrder.value) {
                                  selectedOrder.value = formattedData[0];
                              }
@@ -604,10 +649,14 @@
 
                     } catch (e) { 
                         console.error(e);
-                        if (isLoginAttempt) {
-                            loginError.value = e.message;
+                        // 🛠️ 專門捕捉 "Failed to fetch"
+                        if (e.message === 'Failed to fetch') {
+                            const msg = "連線失敗：請檢查 GAS 部署設定「誰可以存取」是否為「任何人 (Anyone)」";
+                            if (isLoginAttempt) loginError.value = msg;
+                            else errorMsg.value = msg;
                         } else {
-                            errorMsg.value = e.message; 
+                            if (isLoginAttempt) loginError.value = e.message;
+                            else errorMsg.value = e.message;
                         }
                     }
                     loading.value = false;
@@ -713,8 +762,8 @@
                          "body": {
                              "type": "box", "layout": "vertical",
                              "contents": [
-                                 { "type": "text", "text": `${config.icon} ${order.service}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A", "wrap": true },
-                                 { "type": "text", "text": descText, "size": "sm", "color": "#999999", "align": "center", "margin": "xs" },
+                                 { "type": "text", "text": `${config.icon} ${safeText(order.service)}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A", "wrap": true },
+                                 { "type": "text", "text": safeText(descText), "size": "sm", "color": "#999999", "align": "center", "margin": "xs" },
                                  { "type": "separator", "margin": "md" },
                                  ...bodyContents
                              ]
@@ -763,8 +812,8 @@
                                     time: order.time,
                                     location: order.location,
                                     status: statusText,
-                                    price: order.rawPrice,
-                                    received: order.receivedPrice,
+                                    price: parseMoney(editForm.value.rawPrice),
+                                    received: parseMoney(editForm.value.receivedPrice),
                                     
                                     // 邏輯控制
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
