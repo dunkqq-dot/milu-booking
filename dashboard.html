@@ -4,10 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MILU 預約管理後台</title>
-    <!-- 資源載入 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
@@ -27,16 +25,45 @@
         .card-shadow { box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
         .active-item { background-color: #FDFbf7; border-left: 4px solid #C69C6D; }
         [v-cloak] { display: none; }
+        .debug-modal pre { white-space: pre-wrap; word-wrap: break-word; font-size: 11px; color: #333; max-height: 400px; overflow-y: auto; background: #f1f1f1; padding: 15px; border-radius: 5px; text-align: left; }
         .price-input:focus { border-color: #C69C6D; background-color: #fff; }
-        .edit-input { width: 100%; border-bottom: 1px solid #ddd; background: transparent; padding: 2px 0; font-weight: bold; color: #4A4A4A; outline: none; }
+        .edit-input { width: 100%; border-bottom: 1px solid #ddd; background: transparent; padding: 2px 0; font-weight: bold; color: #4A4A4A; }
     </style>
 </head>
 <body id="app" v-cloak>
 
-    <div class="flex h-full">
-        <!-- 📂 左側列表 -->
+    <!-- 🔒 登入畫面 -->
+    <div v-if="!isLoggedIn" class="fixed inset-0 bg-[#F9F7F2] z-50 flex flex-col items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl border border-milu-gold/20 w-full max-w-sm text-center">
+            <h1 class="text-3xl font-serif text-milu-gold font-bold mb-2">MILU ADMIN</h1>
+            <p class="text-gray-400 text-xs mb-6 tracking-widest">系統鎖定中</p>
+            <div class="relative">
+                <input type="password" v-model="inputPassword" @keyup.enter="login"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 outline-none focus:border-milu-gold transition text-center tracking-widest text-lg"
+                       placeholder="請輸入後台密碼">
+            </div>
+            
+            <button @click="login" :disabled="isLoginLoading" class="w-full bg-milu-gold text-white font-bold py-3 rounded-lg mt-4 hover:bg-[#b08b60] transition shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <span v-if="isLoginLoading"><i class="fa-solid fa-circle-notch fa-spin"></i> 驗證中...</span>
+                <span v-else>登入系統</span>
+            </button>
+            
+            <!-- 錯誤訊息顯示區 (紅字) -->
+            <div class="mt-4 min-h-[20px]">
+                <p v-if="loginError" class="text-xs text-red-500 font-bold bg-red-50 py-1 px-2 rounded break-all">{{ loginError }}</p>
+            </div>
+            
+            <div class="mt-4 text-[10px] text-gray-400 text-left bg-gray-100 p-2 rounded hidden" id="debug-info">
+                 <p>API URL: {{ shortUrl }}</p>
+            </div>
+        </div>
+        <p class="mt-8 text-gray-300 text-xs">© MILU BALLOONS</p>
+    </div>
+
+    <!-- 🔓 主畫面 -->
+    <div v-else class="flex h-full">
+        <!-- 左側列表 -->
         <div class="w-full md:w-1/3 bg-white border-r border-gray-200 flex flex-col h-full z-10" :class="{'hidden md:flex': selectedOrder}">
-            <!-- Header -->
             <div class="p-5 border-b border-gray-100 bg-[#F9F7F2]">
                 <div class="flex justify-between items-center">
                     <div>
@@ -45,33 +72,27 @@
                     </div>
                     <div class="flex flex-col items-end gap-1">
                         <div class="flex gap-2">
+                            <button @click="logout" class="text-xs px-2 py-1 bg-red-100 text-red-500 rounded hover:bg-red-200" title="登出"><i class="fa-solid fa-lock"></i></button>
+                            <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
                             <div class="text-xs px-2 py-1 bg-white rounded text-gray-400 border flex items-center gap-1" v-if="loading">
-                                <i class="fa-solid fa-circle-notch fa-spin"></i>
+                                <i class="fa-solid fa-circle-notch fa-spin"></i> 更新中...
                             </div>
-                            <button @click="fetchData" class="text-gray-400 hover:text-milu-gold transition" title="手動更新">
-                                <i class="fa-solid fa-rotate-right"></i>
-                            </button>
+                            <button @click="fetchData" v-else class="text-gray-400 hover:text-milu-gold transition" title="手動更新"><i class="fa-solid fa-rotate-right"></i></button>
                         </div>
-                        <span class="text-[10px] text-gray-300">最後更新: {{ lastUpdated || '載入中...' }}</span>
+                        <span v-if="lastUpdated" class="text-[10px] text-gray-300">更新於: {{ lastUpdated }}</span>
                     </div>
                 </div>
-                <!-- 錯誤警告 -->
-                <div v-if="errorMsg" class="mt-2 p-2 bg-red-50 text-red-500 text-xs rounded border border-red-100 break-words font-bold">
-                    ⚠️ {{ errorMsg }}
-                </div>
+                <div v-if="errorMsg" class="mt-2 p-2 bg-red-50 text-red-500 text-xs rounded border border-red-100 break-words">{{ errorMsg }}</div>
             </div>
 
-            <!-- 過濾標籤 -->
-            <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto no-scrollbar">
-                <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-4">全部</button>
-                <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-4">未付款</button>
-                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-4">已付款</button>
+            <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto">
+                <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">全部</button>
+                <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">未付款</button>
+                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已付款</button>
             </div>
 
-            <!-- 訂單清單 -->
             <div class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
-                <div v-if="loading && reservations.length === 0" class="text-center py-10 text-gray-400 text-sm">載入中...</div>
-                <div v-else-if="filteredList.length === 0" class="text-center py-10 text-gray-400 text-sm">目前無相關訂單</div>
+                <div v-if="filteredList.length === 0" class="text-center py-10 text-gray-400 text-sm">沒有相關訂單</div>
 
                 <div v-for="order in filteredList" :key="order.oid" @click="selectOrder(order)" 
                      class="p-4 rounded-xl cursor-pointer transition-all bg-white border border-transparent hover:border-gray-200 card-shadow"
@@ -79,7 +100,7 @@
                     
                     <div class="flex justify-between items-start mb-2">
                         <span class="text-xs font-mono text-gray-400 bg-gray-100 px-1 rounded">#{{ order.oid }}</span>
-                        <span class="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                        <span class="text-[10px] px-2 py-1 rounded-full font-bold"
                               :class="{
                                   'bg-green-100 text-green-600': order.status === 'CONFIRMED',
                                   'bg-red-100 text-red-500': order.status === 'UNPAID',
@@ -96,29 +117,32 @@
                         <span class="text-xs text-gray-400">{{ order.service }}</span>
                     </div>
                     <div class="flex items-center text-xs text-gray-500 mt-2 gap-3">
-                        <span>📅 {{ order.date }}</span>
-                        <span>⏰ {{ order.time }}</span>
+                        <span class="flex items-center gap-1">📅 {{ order.date }}</span>
+                        <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
+                    </div>
+                    <!-- 列表顯示尾款狀態 -->
+                    <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.status !== 'CANCELED' && order.status !== 'COMPLETED'">
+                        <span class="text-xs text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
+                        <span class="text-xs font-bold" :class="order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500') : 'text-gray-400'">
+                            {{ order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? `尚欠: NT$ ${formatMoney(order.rawPrice - order.receivedPrice)}` : '已付清') : '待報價' }}
+                        </span>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 🔍 右側詳情 -->
+        <!-- 右側詳情 -->
         <div class="w-full md:w-2/3 bg-[#F9F9F9] flex flex-col relative h-full" :class="{'hidden md:flex': !selectedOrder}">
             
-            <!-- 手機版返回按鈕 -->
             <div class="md:hidden absolute top-4 left-4 z-20">
-                <button @click="selectedOrder = null" class="bg-white p-2 rounded-full shadow text-gray-500">
-                    <i class="fa-solid fa-arrow-left"></i>
-                </button>
+                <button @click="selectedOrder = null" class="bg-white p-2 rounded-full shadow text-gray-500">⬅</button>
             </div>
 
-            <div v-if="selectedOrder" class="flex-1 overflow-y-auto">
+            <div v-if="selectedOrder" class="flex-1 overflow-y-auto relative">
                 <div class="min-h-full flex flex-col items-center justify-center p-4 md:p-10 py-16 md:py-10">
                     <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-md mx-auto">
                     
-                        <!-- 頂部狀態列 -->
-                        <div class="h-28 flex items-center justify-center relative transition-colors duration-300"
+                        <div class="h-28 flex items-center justify-center transition-colors duration-300 relative"
                              :class="{
                                  'bg-[#10B981]': selectedOrder.status === 'CONFIRMED',
                                  'bg-[#EF4444]': selectedOrder.status === 'UNPAID',
@@ -128,324 +152,781 @@
                                  'bg-blue-400': selectedOrder.status === 'WAITING_PAYMENT'
                              }">
                             
-                            <button v-if="!isEditing" @click="startEdit" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full backdrop-blur-sm">
-                                <i class="fa-solid fa-pen text-sm"></i>
+                            <!-- 編輯模式按鈕 -->
+                            <button v-if="!isEditing" @click="startEdit" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition backdrop-blur-sm" title="編輯資料">
+                                <i class="fa-solid fa-pen"></i>
                             </button>
                             <div v-else class="absolute top-4 right-4 flex items-center gap-2">
-                                <label class="flex items-center space-x-2 text-xs text-white/90 bg-black/20 px-2 py-1 rounded cursor-pointer">
-                                    <input type="checkbox" v-model="notifyOnUpdate" class="rounded">
+                                 <!-- 新增：同步發送開關 -->
+                                <label class="flex items-center space-x-2 text-xs text-white/90 bg-black/20 px-2 py-1 rounded cursor-pointer select-none">
+                                    <input type="checkbox" v-model="notifyOnUpdate" class="form-checkbox h-3 w-3 text-green-500 rounded focus:ring-0">
                                     <span>發送通知</span>
                                 </label>
-                                <button @click="saveEdit" class="bg-green-500 text-white px-3 py-1 rounded-lg text-sm font-bold">儲存</button>
-                                <button @click="cancelEdit" class="bg-white/20 text-white px-3 py-1 rounded-lg text-sm">取消</button>
+                                <button @click="saveEdit" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm shadow font-bold">
+                                    <i class="fa-solid fa-floppy-disk"></i> 儲存
+                                </button>
+                                <button @click="cancelEdit" class="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm backdrop-blur-sm">
+                                    取消
+                                </button>
                             </div>
 
                             <div class="text-center text-white">
                                 <div class="text-4xl mb-1">
                                     <i v-if="selectedOrder.status === 'CONFIRMED'" class="fa-solid fa-circle-check"></i>
                                     <i v-else-if="selectedOrder.status === 'CANCELED'" class="fa-solid fa-circle-xmark"></i>
+                                    <i v-else-if="selectedOrder.status === 'REFUNDED'" class="fa-solid fa-money-bill-transfer"></i>
+                                    <i v-else-if="selectedOrder.status === 'COMPLETED'" class="fa-solid fa-flag-checkered"></i>
                                     <i v-else-if="selectedOrder.status === 'WAITING_PAYMENT'" class="fa-solid fa-hourglass-half"></i>
                                     <i v-else class="fa-solid fa-circle-exclamation"></i>
                                 </div>
-                                <h2 class="text-lg font-bold tracking-widest opacity-90">{{ getStatusText(selectedOrder.status) }}</h2>
+                                <h2 class="text-lg font-bold tracking-widest opacity-90">
+                                    {{ getStatusText(selectedOrder.status, true) }}
+                                </h2>
                             </div>
                         </div>
 
-                        <!-- 內容細節 -->
-                        <div class="p-8 space-y-6">
+                        <div class="p-8 space-y-6 relative">
+                            <div v-if="isEditing" class="absolute top-0 left-0 w-full h-1 bg-yellow-400 animate-pulse"></div>
+
+                            <!-- 客戶資訊 -->
                             <div class="flex justify-between border-b border-gray-100 pb-4">
                                 <div class="flex-1 mr-4">
-                                    <p class="text-xs text-gray-400 mb-1">客戶資訊</p>
+                                    <p class="text-xs text-gray-400 mb-1">CUSTOMER</p>
                                     <div v-if="isEditing">
-                                        <input v-model="editForm.contactName" class="edit-input text-xl mb-1" placeholder="客戶姓名">
+                                        <label class="text-[10px] text-gray-400">LINE名稱</label>
+                                        <input v-model="editForm.lineName" class="edit-input text-sm mb-1" placeholder="LINE名稱">
+                                        <label class="text-[10px] text-gray-400">聯絡人姓名</label>
+                                        <input v-model="editForm.contactName" class="edit-input text-xl mb-1" placeholder="聯絡人姓名">
+                                        <label class="text-[10px] text-gray-400">電話</label>
                                         <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                     </div>
                                     <div v-else>
+                                        <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
+                                            <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
+                                        </p>
                                         <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
-                                        <p class="text-sm text-gray-600 mt-1">{{ selectedOrder.phone }}</p>
+                                        <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
+                                            <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
+                                        </p>
                                     </div>
+                                    <p class="text-xs text-gray-300 font-mono mt-2" v-if="!isEditing">
+                                        {{ selectedOrder.userId ? `ID: ...${selectedOrder.userId.substr(-4)}` : '未綁定LINE ID' }}
+                                    </p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-xs text-gray-400 mb-1">預約服務</p>
+                                    <p class="text-xs text-gray-400 mb-1">SERVICE</p>
                                     <p class="font-bold text-lg text-milu-gold">{{ selectedOrder.service }}</p>
                                 </div>
                             </div>
 
+                            <!-- 時間日期 -->
                             <div class="grid grid-cols-2 gap-4">
-                                <div class="bg-gray-50 p-3 rounded-xl">
-                                    <p class="text-xs text-gray-400 mb-1">日期</p>
+                                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <p class="text-xs text-gray-400 mb-1">DATE</p>
                                     <input v-if="isEditing" type="date" v-model="editForm.date" class="edit-input">
                                     <p v-else class="font-bold text-gray-700">{{ selectedOrder.date }}</p>
                                 </div>
-                                <div class="bg-gray-50 p-3 rounded-xl">
-                                    <p class="text-xs text-gray-400 mb-1">時間</p>
-                                    <input v-if="isEditing" type="text" v-model="editForm.time" class="edit-input">
+                                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                    <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
+                                    
+                                    <template v-if="isEditing">
+                                        <select v-if="isTimeSlotService(selectedOrder.service)" v-model="editForm.time" class="edit-input">
+                                            <option value="" disabled>請選擇時段</option>
+                                            <option v-for="slot in timeSlots" :key="slot" :value="slot">{{ slot }}</option>
+                                        </select>
+                                        <input v-else type="time" v-model="editForm.time" class="edit-input">
+                                    </template>
+                                    
                                     <p v-else class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                                 </div>
                             </div>
-
-                            <!-- 金額 -->
-                            <div class="bg-yellow-50 p-4 rounded-xl border border-yellow-100 space-y-3">
+                            
+                            <!-- 款項明細 -->
+                            <div class="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100 space-y-3">
                                 <div class="flex justify-between items-center">
-                                    <p class="text-xs text-gray-500 font-bold">總金額</p>
+                                    <p class="text-xs text-gray-500 font-bold">總金額 (填入報價)</p>
                                     <div class="flex items-center">
                                         <span class="text-xs mr-1 text-gray-400">NT$</span>
-                                        <input type="number" v-model.number="displayRawPrice" @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none">
+                                        <input type="number" v-model.number="displayRawPrice" 
+                                               @focus="handlePriceFocus"
+                                               class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none" 
+                                               placeholder="0">
                                     </div>
                                 </div>
-                                <div class="flex justify-between items-center">
-                                    <p class="text-xs text-green-600 font-bold">已收款</p>
+                                <div class="flex justify-between items-center mb-2">
+                                    <p class="text-xs text-green-600 font-bold">已收款 (對帳)</p>
                                     <div class="flex items-center gap-2">
-                                        <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-0.5 rounded">⚡全額</button>
+                                        <!-- ⚡ 一鍵全額按鈕 -->
+                                        <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">
+                                            ⚡同上
+                                        </button>
                                         <span class="text-xs mr-1 text-green-600">NT$</span>
-                                        <input type="number" v-model.number="displayReceivedPrice" @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none">
+                                        <input type="number" v-model.number="displayReceivedPrice" 
+                                               @focus="handlePriceFocus"
+                                               class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" 
+                                               placeholder="0">
                                     </div>
                                 </div>
+                                <div class="border-t pt-2 flex justify-between items-center border-yellow-200">
+                                    <p class="text-xs text-red-500 font-bold">尚欠尾款</p>
+                                    <p class="font-bold text-xl text-red-500">
+                                        NT$ {{ formatMoney(displayRawPrice - displayReceivedPrice) }}
+                                    </p>
+                                </div>
+                            </div>
+                            
+                            <!-- 地址 -->
+                            <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                 <p class="text-xs text-gray-400 mb-1">{{ getLabel('location', selectedOrder.service) }}</p>
+                                 <input v-if="isEditing" type="text" v-model="editForm.location" class="edit-input">
+                                 <p v-else class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
                             </div>
 
-                            <!-- 地點 -->
-                            <div class="bg-gray-50 p-3 rounded-xl">
-                                <p class="text-xs text-gray-400 mb-1">預約地點 / 詳細資料</p>
-                                <input v-if="isEditing" type="text" v-model="editForm.location" class="edit-input">
-                                <p v-else class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
-                            </div>
-
-                            <!-- 按鈕 -->
+                            <!-- 動作按鈕 -->
                             <div v-if="!isEditing" class="pt-2 space-y-3">
-                                <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 text-white py-3.5 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
-                                    <i class="fa-solid fa-envelope"></i> 發送匯款帳號
+                                
+                                <!-- 付款須知 -->
+                                <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知 & 帳號
                                 </button>
-                                <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] text-white py-4 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2">
+
+                                <!-- 確認收款 -->
+                                <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-check-circle"></i> 確認收款並登記
                                 </button>
-                                <button v-if="selectedOrder.status === 'CONFIRMED'" @click="updateOrderStatus('COMPLETE')" class="w-full bg-blue-600 text-white py-3.5 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2">
-                                    <i class="fa-solid fa-flag-checkered"></i> 完成訂單 (結案)
-                                </button>
-                                <div class="flex gap-2" v-if="['CONFIRMED', 'UNPAID', 'WAITING_PAYMENT'].includes(selectedOrder.status)">
-                                    <button @click="updateOrderStatus('CANCEL')" class="flex-1 bg-gray-400 text-white py-3 rounded-xl font-bold shadow">取消訂單</button>
+                                
+                                <div v-if="selectedOrder.status === 'CONFIRMED'" class="space-y-2">
+                                    <button @click="updateOrderStatus('COMPLETE')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-flag-checkered"></i> 完成訂單 (結案)
+                                    </button>
+                                    <p class="text-center text-xs text-gray-400">已付款，可進行結案</p>
                                 </div>
-                                <div v-if="['CANCELED', 'COMPLETED', 'REFUNDED'].includes(selectedOrder.status)">
-                                    <button @click="updateOrderStatus('RESTORE')" class="w-full bg-gray-500 text-white py-3 rounded-xl font-bold shadow">恢復訂單 (重設為未付)</button>
+
+                                <div v-if="selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELED' || selectedOrder.status === 'REFUNDED'" class="space-y-3">
+                                    <div class="text-center py-3 bg-gray-100 text-gray-500 rounded-xl font-bold border border-gray-200">
+                                        此訂單已結案 ({{ getStatusText(selectedOrder.status) }})
+                                    </div>
+                                    <button @click="updateOrderStatus('RESTORE')" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-xl font-bold transition shadow active:scale-95 flex items-center justify-center gap-2">
+                                        <i class="fa-solid fa-rotate-left"></i> 恢復訂單 (重設為未付款)
+                                    </button>
                                 </div>
+
+                                <div class="flex gap-2" v-if="selectedOrder.status !== 'CANCELED' && selectedOrder.status !== 'REFUNDED' && selectedOrder.status !== 'COMPLETED'">
+                                    <button v-if="selectedOrder.status === 'CONFIRMED'" @click="updateOrderStatus('REFUND')" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
+                                        <i class="fa-solid fa-money-bill-transfer"></i> 辦理退款
+                                    </button>
+                                    <button @click="updateOrderStatus('CANCEL')" class="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
+                                        <i class="fa-solid fa-ban"></i> 取消訂單
+                                    </button>
+                                </div>
+
+                                <p class="text-center text-xs text-gray-400 pt-2">* 點擊按鈕將同步更新試算表與發送 LINE 通知</p>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
             <div v-else class="flex-1 flex items-center justify-center text-gray-400">
-                <p>請從左側點選訂單查看詳情</p>
+                <p>請從左側選擇一筆訂單查看詳情</p>
             </div>
         </div>
     </div>
 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
     <script>
         const { createApp, ref, computed, onMounted } = Vue;
 
+        const configMap = {
+            '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
+            '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
+            '後車廂驚喜': { time: '抵達時間', location: '施作地點', icon: '🚗' },
+            '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
+        };
+
+        const timeSlots = [
+            "12:30 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", 
+            "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00"
+        ];
+
         createApp({
             setup() {
-                const GAS_URL = 'https://script.google.com/macros/s/AKfycbwfAyj7ktWXv4gPoFo7wVPLn1_nQ6w0hX8kTToggetxt3jqqD7yp67cxlrg5l1N1rsLaA/exec';
+                // ⚠️ 已自動填入您的 GAS Web App 網址
+                const DATA_API_URL = 'https://script.google.com/macros/s/AKfycbwfAyj7ktWXv4gPoFo7wVPLn1_nQ6w0hX8kTToggetxt3jqqD7yp67cxlrg5l1N1rsLaA/exec'; 
                 
+                // 這是發送 LINE 通知的 Make Webhook (維持不變)
+                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/63u0kheb71v9vengzdggfy1ga7r8gmng';
+
                 const reservations = ref([]);
                 const selectedOrder = ref(null);
                 const isEditing = ref(false);
                 const editForm = ref({});
                 const filter = ref('ALL');
                 const loading = ref(false);
+                const isLoginLoading = ref(false);
                 const errorMsg = ref(null);
-                const lastUpdated = ref(null);
+                const rawJsonData = ref(null);
                 const notifyOnUpdate = ref(true);
+                const lastUpdated = ref(null);
+                
+                const isLoggedIn = ref(false);
+                const inputPassword = ref('');
+                const loginError = ref('');
+                const authPassword = ref('');
 
-                // 📖 格式化時間 (修復 1899 錯誤)
-                const formatTime = (timeVal) => {
-                    if (!timeVal) return '';
-                    const timeStr = String(timeVal);
+                const shortUrl = computed(() => {
+                    return DATA_API_URL ? '...' + DATA_API_URL.substr(-10) : '未設定';
+                });
+
+                const login = () => {
+                    if (!inputPassword.value) { loginError.value = '請輸入密碼'; return; }
+                    authPassword.value = inputPassword.value.trim();
+                    loginError.value = '';
+                    isLoginLoading.value = true; 
+                    fetchData(true).then(() => { isLoginLoading.value = false; });
+                };
+
+                const logout = () => {
+                    isLoggedIn.value = false;
+                    authPassword.value = '';
+                    inputPassword.value = '';
+                    localStorage.removeItem('milu_auth');
+                    selectedOrder.value = null;
+                };
+
+                const checkLogin = () => {
+                    const savedPass = localStorage.getItem('milu_auth');
+                    if (savedPass) {
+                        authPassword.value = savedPass;
+                        fetchData(true);
+                    }
+                };
+
+                const safeText = (text) => {
+                    return (text && String(text).trim() !== '') ? String(text) : ' ';
+                };
+
+                const getKey = (item, keys) => {
+                    for (const k of keys) {
+                        if (item[k] !== undefined && item[k] !== null && item[k] !== '') return item[k];
+                    }
+                    return '';
+                };
+
+                const formatMoney = (val) => {
+                    if (!val && val !== 0) return '0';
+                    return val.toLocaleString();
+                };
+
+                const parseMoney = (val) => {
+                    if (!val) return 0;
+                    const str = String(val).replace(/[^\d.-]/g, '');
+                    return parseInt(str) || 0;
+                };
+
+                const isTimeSlotService = (service) => {
+                    return service.includes('外送') || service.includes('自取');
+                };
+
+                // 計算屬性
+                const displayRawPrice = computed({
+                    get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
+                    set: (val) => {
+                        if (isEditing.value) editForm.value.rawPrice = val;
+                        else if (selectedOrder.value) selectedOrder.value.rawPrice = val;
+                    }
+                });
+
+                const displayReceivedPrice = computed({
+                    get: () => isEditing.value ? editForm.value.receivedPrice : (selectedOrder.value ? selectedOrder.value.receivedPrice : 0),
+                    set: (val) => {
+                        if (isEditing.value) editForm.value.receivedPrice = val;
+                        else if (selectedOrder.value) selectedOrder.value.receivedPrice = val;
+                    }
+                });
+
+                const fillFullPayment = () => {
+                    if (isEditing.value) {
+                        editForm.value.receivedPrice = editForm.value.rawPrice;
+                    } else if (selectedOrder.value) {
+                        selectedOrder.value.receivedPrice = selectedOrder.value.rawPrice;
+                    }
+                };
+
+                const calculateDaysDiff = (dateStr) => {
+                    if (!dateStr) return 0;
+                    const targetDate = new Date(dateStr);
+                    const today = new Date();
+                    targetDate.setHours(0, 0, 0, 0);
+                    today.setHours(0, 0, 0, 0);
+                    const diffTime = targetDate - today;
+                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                };
+
+                const getPaymentMessage = (type, dateStr) => {
+                    const diffDays = calculateDaysDiff(dateStr);
+                    const PAYMENT_RULES = {
+                        DECO_NORMAL: "1. 單一時段僅服務一組客人，以先支付訂金者優先。\n2. 匯款期限：請於三日內完成匯款。\n3. 訂金規則：可付全額或 50% 訂金，尾款於活動當日支付。\n4. 改期與取消：僅接受一次改期；個人因素取消收 30% 服務費。",
+                        DECO_URGENT: "⚠️ 3日內急單專用規則\n1. 請於預約時「支付全額款項」並截圖回傳。\n2. 預約前 5 小時未收款視為未成立。\n3. 24小時內急件需加收 $500。\n4. 取消不退還任何款項。",
+                        SIMPLE: "1. 請於預約當下「支付全額款項」並截圖回傳。\n2. 預約前 24 小時未收款視為未成立。\n3. 急件加收 $500。\n4. 24小時內取消不退款。"
+                    };
+                    if (type.includes('佈置') || type.includes('後車廂')) {
+                        return diffDays <= 3 ? PAYMENT_RULES.DECO_URGENT : PAYMENT_RULES.DECO_NORMAL;
+                    } else {
+                        return PAYMENT_RULES.SIMPLE;
+                    }
+                };
+
+                const formatForLine = (htmlText) => {
+                    if (!htmlText) return "無";
+                    let text = htmlText.replace(/<br\s*\/?>/gi, '\n')
+                                       .replace(/<\/p>/gi, '\n\n')
+                                       .replace(/<li>/gi, '• ')
+                                       .replace(/<\/li>/gi, '\n')
+                                       .replace(/<[^>]+>/g, '') 
+                                       .replace(/&nbsp;/g, ' ');
+                    return text.trim();
+                };
+
+                // 🛠️ 格式修正函式
+                const formatGASDate = (val) => {
+                    if (!val) return '';
+                    const s = String(val);
+                    if (s.includes('T')) {
+                        const d = new Date(s);
+                        if (isNaN(d.getTime())) return s;
+                        const y = d.getFullYear();
+                        const m = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        return `${y}-${m}-${day}`;
+                    }
+                    return s;
+                };
+
+                const formatGASTime = (val) => {
+                    if (!val) return '';
+                    const s = String(val);
                     
-                    // 如果包含 1899 或 T 字樣 (ISO 格式)
-                    if (timeStr.includes('1899') || timeStr.includes('T')) {
-                        try {
-                            const d = new Date(timeStr);
-                            if (isNaN(d.getTime())) return timeStr;
+                    // 1. GAS 可能回傳 ISO 時間格式 (如 1899-12-30T14:30:00.000Z)
+                    if (s.includes('T') && s.includes('Z')) {
+                        const d = new Date(s);
+                        if (!isNaN(d.getTime())) {
                             const hh = String(d.getHours()).padStart(2, '0');
                             const mm = String(d.getMinutes()).padStart(2, '0');
                             return `${hh}:${mm}`;
-                        } catch(e) { return timeStr; }
+                        }
                     }
                     
-                    // 處理單純的時間字串 HH:mm:ss
-                    const match = timeStr.match(/(\d{1,2}):(\d{2})/);
+                    // 2. 處理簡單時間字串 (如 9:30 -> 09:30, 14:00:00 -> 14:00)
+                    // 排除時段範圍 (例如 13:00 - 14:00 不處理)
+                    const simpleTimeRegex = /^(\d{1,2}):(\d{2})(:(\d{2}))?$/;
+                    const match = s.trim().match(simpleTimeRegex);
                     if (match) {
-                        return `${match[1].padStart(2, '0')}:${match[2]}`;
+                        const hh = match[1].padStart(2, '0');
+                        const mm = match[2];
+                        return `${hh}:${mm}`;
                     }
                     
-                    return timeStr;
+                    // 3. 其他格式 (如時段範圍) 直接回傳
+                    return s;
                 };
 
-                // 📖 抓取資料
-                const fetchData = async () => {
+                const fetchData = async (isLoginAttempt = false) => {
+                    // 🛑 新增：如果在編輯模式，暫停更新，以免干擾使用者
                     if (isEditing.value) return;
-                    loading.value = true;
+
+                    // 🔒 如果沒密碼且不是嘗試登入，就停下來
+                    if (!authPassword.value) return;
+
+                    if(!isLoginAttempt) loading.value = true; 
                     errorMsg.value = null;
 
+                    if (!DATA_API_URL) {
+                        errorMsg.value = "尚未設定 GAS API 網址"; loading.value = false; return;
+                    }
+
                     try {
-                        const res = await fetch(`${GAS_URL}?mode=api&t=${Date.now()}`, { 
+                        // 🔒 加入 no-referrer 解決部分跨域轉導問題
+                        const url = `${DATA_API_URL}?mode=api&auth=${authPassword.value}&t=${Date.now()}`;
+                        const res = await fetch(url, { 
                             method: "GET",
+                            redirect: "follow",
                             referrerPolicy: "no-referrer"
                         });
                         
-                        if (!res.ok) throw new Error("連線失敗：請檢查 GAS 部署權限是否設為『任何人』");
+                        if (!res.ok) {
+                             throw new Error(`伺服器回應錯誤 (${res.status}) - 請檢查 GAS 部署權限`);
+                        }
+
                         const text = await res.text();
                         let data;
-                        try { data = JSON.parse(text); } catch (e) { throw new Error("資料格式錯誤：系統可能回傳了登入頁面 (請在無痕視窗試試看)"); }
+                        
+                        try { 
+                            data = JSON.parse(text); 
+                        } catch (e) { 
+                            console.error("解析 JSON 失敗:", text);
+                            // 🌟 優化錯誤訊息：檢查是否是權限頁面
+                            if (text.includes("Google Accounts") || text.includes("<!DOCTYPE html")) {
+                                throw new Error("權限不足：請確認 GAS 部署為「任何人 (Anyone)」");
+                            }
+                            throw new Error("無法解析伺服器回應 (請檢查部署權限)"); 
+                        }
 
-                        if (data.error) throw new Error(data.error);
+                        if (data.error) {
+                             if (isLoginAttempt) loginError.value = data.error; 
+                             if (isLoggedIn.value) logout(); 
+                             loading.value = false;
+                             return;
+                        }
 
-                        // 格式化資料
-                        reservations.value = data.filter(item => item[0] && item[3]).map((item, idx) => ({
-                            oid: String(item[0]),
-                            lineName: item[2] || '',
-                            contactName: item[3] || '無名',
-                            phone: item[4] || '',
-                            date: String(item[5]).split('T')[0],
-                            // 🌟 關鍵修正：套用 formatTime 轉換器
-                            time: formatTime(item[6]),
-                            location: item[7] || '',
-                            service: item[8] || '',
-                            userId: item[9] || '',
-                            status: mapRawStatus(item[10]),
-                            rawPrice: parseInt(item[11]) || 0,
-                            receivedPrice: parseInt(item[12]) || 0
-                        })).sort((a, b) => new Date(b.date) - new Date(a.date));
+                        if (isLoginAttempt) {
+                            isLoggedIn.value = true;
+                            localStorage.setItem('milu_auth', authPassword.value);
+                        }
+                        
+                        // ⚡ 極速過濾：移除沒有訂單編號(Index 0)或沒有姓名(Index 3)的空行
+                        data = data.filter(item => {
+                            const hasID = item[0] && String(item[0]).trim() !== '';
+                            const hasName = item[3] && String(item[3]).trim() !== '';
+                            return hasID && hasName;
+                        });
 
-                        lastUpdated.value = new Date().toLocaleTimeString();
-                    } catch (e) {
-                        errorMsg.value = e.message;
+                        rawJsonData.value = data;
+
+                        const formattedData = data.map((item, index) => {
+                            const oid = item[0] || `M-${index}`;
+                            const lineName = item[2] || '未知LINE';
+                            const contactName = item[3] || '未知客戶';
+                            const phone = item[4] || '';
+                            
+                            // 🌟 套用格式修正
+                            const date = formatGASDate(item[5]);
+                            const time = formatGASTime(item[6]);
+                            
+                            const location = item[7] || '未填寫地點'; 
+                            let serviceName = item[8] || '服務';
+                            
+                            if (serviceName.includes('自取')) serviceName = '門市自取'; 
+                            else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
+                            else if (serviceName.includes('外送')) serviceName = '氣球外送';
+                            else if (serviceName.includes('佈置')) serviceName = '專人佈置';
+
+                            const userId = item[9] || '';
+                            const rawStatus = (item[10] || '').trim();
+                            
+                            const rawPrice = parseMoney(item[11]);
+                            const receivedPrice = parseMoney(item[12]);
+
+                            let status = 'UNPAID';
+                            if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
+                            if (rawStatus.includes('取消')) status = 'CANCELED';
+                            if (rawStatus.includes('退款')) status = 'REFUNDED';
+                            if (rawStatus.includes('完成') || rawStatus.includes('結案')) status = 'COMPLETED';
+                            if (rawStatus.includes('等待') || rawStatus.includes('須知')) status = 'WAITING_PAYMENT';
+
+                            return {
+                                id: index.toString(), oid, lineName, contactName, clientName: contactName, 
+                                service: serviceName, date, time, phone, userId, status, 
+                                rawPrice, receivedPrice, location
+                            };
+                        });
+                        reservations.value = formattedData.sort((a, b) => new Date(b.date) - new Date(a.date));
+                        
+                        if (selectedOrder.value) {
+                             const updated = formattedData.find(r => r.oid === selectedOrder.value.oid);
+                             if (updated && !isEditing.value) {
+                                 Object.assign(selectedOrder.value, updated);
+                             }
+                        } else if (formattedData.length > 0) {
+                             // 🛠️ BUG FIX: 手機版 (寬度 < 768px) 不要自動選取第一筆
+                             if (window.innerWidth >= 768 && !selectedOrder.value) {
+                                 selectedOrder.value = formattedData[0];
+                             }
+                        }
+                        
+                        const now = new Date();
+                        lastUpdated.value = now.toLocaleTimeString();
+
+                    } catch (e) { 
                         console.error(e);
-                    } finally {
-                        loading.value = false;
+                        // 🛠️ 專門捕捉 "Failed to fetch"
+                        if (e.message === 'Failed to fetch') {
+                            const msg = "連線失敗：請檢查 GAS 部署設定「誰可以存取」是否為「任何人 (Anyone)」";
+                            if (isLoginAttempt) loginError.value = msg;
+                            else errorMsg.value = msg;
+                        } else {
+                            if (isLoginAttempt) loginError.value = e.message;
+                            else errorMsg.value = e.message;
+                        }
                     }
+                    loading.value = false;
                 };
 
-                const mapRawStatus = (s) => {
-                    s = String(s);
-                    if (s.includes('已付款') || s.includes('CONFIRMED')) return 'CONFIRMED';
-                    if (s.includes('取消') || s.includes('CANCELED')) return 'CANCELED';
-                    if (s.includes('完成') || s.includes('COMPLETED')) return 'COMPLETED';
-                    if (s.includes('等待') || s.includes('WAITING')) return 'WAITING_PAYMENT';
-                    return 'UNPAID';
+                const getStatusText = (status, isEnglish = false) => {
+                    if (isEnglish) return status === 'CONFIRMED' ? 'PAYMENT CONFIRMED' : (status === 'COMPLETED' ? 'ORDER COMPLETED' : 'WAITING FOR PAYMENT');
+                    return status === 'CONFIRMED' ? '已付款' : (status === 'COMPLETED' ? '已完成' : (status === 'CANCELED' ? '已取消' : (status === 'REFUNDED' ? '已退款' : (status === 'WAITING_PAYMENT' ? '等待匯款' : '未付款'))));
                 };
 
-                const getStatusText = (status) => {
-                    const map = {
-                        'CONFIRMED': '🟢 已付款', 'UNPAID': '🔴 未付款', 
-                        'CANCELED': '⚪ 已取消', 'COMPLETED': '🔵 已完成', 
-                        'WAITING_PAYMENT': '🟡 等待匯款', 'REFUNDED': '💸 已退款'
-                    };
-                    return map[status] || status;
-                };
-
-                const selectOrder = (order) => { if (!isEditing.value) selectedOrder.value = order; };
-
+                const getLabel = (type, service) => (configMap[service] || configMap['專人佈置'])[type];
+                const selectOrder = (order) => { if(!isEditing.value) selectedOrder.value = order; };
                 const filteredList = computed(() => {
                     if (filter.value === 'ALL') return reservations.value;
                     if (filter.value === 'UNPAID') return reservations.value.filter(r => r.status === 'UNPAID' || r.status === 'WAITING_PAYMENT');
                     return reservations.value.filter(r => r.status === filter.value);
                 });
 
-                // ✏️ 編輯邏輯
-                const startEdit = () => { editForm.value = { ...selectedOrder.value }; isEditing.value = true; };
-                const cancelEdit = () => { isEditing.value = false; };
-                const saveEdit = async () => {
-                    Swal.fire({ title: '儲存中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                    try {
-                        const payload = {
-                            action: 'UPDATE_ORDER',
-                            orderId: editForm.value.oid,
-                            service: editForm.value.service,
-                            lineName: editForm.value.lineName,
-                            clientName: editForm.value.contactName,
-                            phone: editForm.value.phone,
-                            date: editForm.value.date,
-                            time: editForm.value.time,
-                            location: editForm.value.location,
-                            status: getStatusRawText(editForm.value.status),
-                            price: editForm.value.rawPrice,
-                            received: editForm.value.receivedPrice,
-                            notifyMake: notifyOnUpdate.value ? 'true' : 'false'
-                        };
-                        await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-                        Object.assign(selectedOrder.value, editForm.value);
-                        isEditing.value = false;
-                        Swal.fire('成功', '資料已更新', 'success');
-                    } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
+                const buildRichFlexMessage = (order, actionType) => {
+                      const config = configMap[order.service] || configMap['專人佈置'];
+                      const total = parseInt(order.rawPrice) || 0;
+                      const paid = parseInt(order.receivedPrice) || 0;
+                      const balance = total - paid;
+                      let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
+                      let bodyContents = [];
+
+                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
+                      else if (actionType === 'REFUND') { titleText = 'REFUND COMPLETED'; descText = '退款辦理完成'; statusColor = '#EAB308'; }
+                      else if (actionType === 'COMPLETE') { titleText = 'SERVICE COMPLETED'; descText = '服務已完成'; statusColor = '#2563EB'; }
+                      else if (actionType === 'RESTORE') { titleText = 'ORDER RESTORED'; descText = '訂單狀態已恢復'; statusColor = '#EF4444'; }
+                      else if (actionType === 'UPDATE') { titleText = 'BOOKING UPDATED'; descText = '預約資料已更新'; statusColor = '#3B82F6'; }
+                      else if (actionType === 'PAYMENT_REQUEST') { 
+                          titleText = 'PAYMENT REQUEST'; 
+                          descText = '請詳閱付款規則並完成匯款'; 
+                          statusColor = '#2563EB'; 
+                          const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
+                          bodyContents = [
+                            { "type": "text", "text": `本次訂單總金額: NT$ ${total.toLocaleString()}`, "weight": "bold", "size": "md", "color": "#C69C6D", "align": "center", "margin": "md" },
+                            { "type": "separator", "margin": "md" },
+                            { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
+                            { "type": "text", "text": safeText(ruleText), "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
+                            { "type": "separator", "margin": "lg" },
+                            { "type": "text", "text": "匯款資訊：彰化銀行 (009)", "size": "xs", "color": "#aaaaaa", "margin": "lg" },
+                            { 
+                                // 🌟 匯款帳號區塊：使用 box 包裹以加強視覺，並移除 click action 避免誤發
+                                "type": "box",
+                                "layout": "vertical",
+                                "backgroundColor": "#F5F5F5",
+                                "cornerRadius": "md",
+                                "paddingAll": "lg",
+                                "margin": "md",
+                                "contents": [
+                                    {
+                                        "type": "text", 
+                                        "text": "54320100686300", 
+                                        "weight": "bold", 
+                                        "size": "3xl", // 🌟 放大字體方便長按
+                                        "color": "#4A4A4A", 
+                                        "align": "center",
+                                        "wrap": true
+                                    }
+                                ]
+                            },
+                            { "type": "text", "text": "(請長按上方數字即可複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
+                          ];
+                      }
+
+                      if (bodyContents.length === 0) {
+                          if (actionType === 'COMPLETE') {
+                              bodyContents = [
+                                { "type": "text", "text": "感謝您選擇 MILU BALLOONS！", "weight": "bold", "size": "md", "color": "#4A4A4A", "align": "center", "margin": "lg", "wrap": true },
+                                { "type": "text", "text": "期待再次為您服務 ❤️", "size": "sm", "color": "#666666", "align": "center", "margin": "sm" }
+                             ];
+                          } else {
+                              // 🌟 修正：Flex Message 排版優化 (Header 移除 letterSpacing)
+                              bodyContents = [
+                                {
+                                    "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
+                                    "contents": [
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": safeText(order.contactName), "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": safeText(order.phone), "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": safeText(order.date), "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": safeText(order.time), "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" }, { "type": "text", "text": safeText(order.location), "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
+                                    ]
+                                },
+                                { "type": "separator", "margin": "xl" },
+                                {
+                                    "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm", 
+                                    "contents": [
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "總計金額", "size": "sm", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": `NT$ ${formatMoney(total)}`, "size": "sm", "color": "#666666", "align": "end", "flex": 3 } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "已收款", "size": "sm", "color": "#10B981", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${formatMoney(paid)}`, "size": "sm", "color": "#10B981", "align": "end", "weight": "bold", "flex": 3 } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "尚欠尾款", "size": "sm", "color": "#EF4444", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${formatMoney(balance)}`, "size": "sm", "color": "#EF4444", "align": "end", "weight": "bold", "flex": 3 } ] }
+                                    ]
+                                }
+                             ];
+                          }
+                      }
+
+                      return {
+                         "type": "bubble", "size": "mega",
+                         "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": titleText, "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
+                         "body": {
+                             "type": "box", "layout": "vertical",
+                             "contents": [
+                                 { "type": "text", "text": `${config.icon} ${safeText(order.service)}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A", "wrap": true },
+                                 { "type": "text", "text": safeText(descText), "size": "sm", "color": "#999999", "align": "center", "margin": "xs" },
+                                 { "type": "separator", "margin": "md" },
+                                 ...bodyContents
+                             ]
+                         },
+                         "footer": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" } ] }
+                     };
                 };
 
-                const updateOrderStatus = async (type) => {
+                const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
-                    let nextStatus = '';
-                    if (type === 'PAYMENT_REQUEST') nextStatus = '⏳ 等待匯款';
-                    else if (type === 'CONFIRM') nextStatus = '✅ 已付款';
-                    else if (type === 'COMPLETE') nextStatus = '🏁 已完成';
-                    else if (type === 'CANCEL') nextStatus = '❌ 已取消';
-                    else if (type === 'RESTORE') nextStatus = '❌ 未付款';
-
+                    if (!order) return;
+                    if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID，請手動聯絡。', 'warning');
+                    
                     Swal.fire({
-                        title: '確認執行？',
-                        text: `即將變更狀態為 ${nextStatus}`,
+                        title: '確認發送通知？',
+                        text: `即將發送 LINE 通知給 ${order.contactName}`,
                         icon: 'question',
-                        showCancelButton: true
-                    }).then(async (res) => {
-                        if (res.isConfirmed) {
-                            Swal.fire({ title: '處理中...', didOpen: () => Swal.showLoading() });
+                        showCancelButton: true,
+                        confirmButtonText: '確定發送',
+                        cancelButtonText: '取消'
+                    }).then(async (result) => {
+                        if (result.isConfirmed) {
                             try {
+                                Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                                const flex = buildRichFlexMessage(order, actionType);
+                                
+                                let statusText = '';
+                                if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
+                                else if (actionType === 'PAYMENT_REQUEST') statusText = '⏳ 等待匯款';
+                                else if (actionType === 'COMPLETE') statusText = '🏁 已完成'; 
+                                else if (actionType === 'CANCEL') statusText = '❌ 已取消';
+                                else if (actionType === 'REFUND') statusText = '💸 已退款';
+                                else if (actionType === 'RESTORE') statusText = '❌ 未付款';
+
                                 const payload = {
-                                    action: 'UPDATE_ORDER',
+                                    action: 'UPDATE_ORDER', 
+                                    auth: authPassword.value, // 🔒 傳送密碼
                                     orderId: order.oid,
-                                    service: order.service,
-                                    status: nextStatus,
-                                    price: order.rawPrice,
-                                    received: order.receivedPrice,
-                                    notifyMake: 'true',
-                                    createCalendarEvent: type === 'CONFIRM' ? 'true' : 'false'
+                                    service: order.service, // 用來找分頁
+                                    
+                                    // 資料欄位
+                                    lineName: order.lineName,
+                                    clientName: order.contactName, 
+                                    phone: order.phone,
+                                    date: order.date,
+                                    time: order.time,
+                                    location: order.location,
+                                    status: statusText,
+                                    price: parseMoney(editForm.value.rawPrice),
+                                    received: parseMoney(editForm.value.receivedPrice),
+                                    
+                                    // 邏輯控制
+                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
+                                    notifyMake: 'true', // 因為是按鈕動作，所以要發 LINE
+                                    
+                                    // 傳給 Make 發 LINE 用的資料 (Flex Message)
+                                    to: order.userId,
+                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
+                                    flexContents: flex
                                 };
-                                await fetch(GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
-                                order.status = mapRawStatus(nextStatus);
-                                Swal.fire('成功', '已更新並發送通知', 'success');
-                            } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
+
+                                await fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) });
+                                
+                                if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
+                                else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
+                                else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
+                                else if (actionType === 'CANCEL') order.status = 'CANCELED';
+                                else if (actionType === 'REFUND') order.status = 'REFUNDED';
+                                else if (actionType === 'RESTORE') order.status = 'UNPAID';
+                                
+                                Swal.fire('成功', '通知已送出！', 'success');
+                            } catch (e) {
+                                Swal.fire('錯誤', '發送失敗：' + e.message, 'error');
+                            }
                         }
                     });
                 };
-
-                const getStatusRawText = (s) => {
-                    const map = { 'CONFIRMED': '✅ 已付款', 'UNPAID': '❌ 未付款', 'CANCELED': '❌ 已取消', 'COMPLETED': '🏁 已完成', 'WAITING_PAYMENT': '⏳ 等待匯款' };
-                    return map[s] || '❌ 未付款';
-                };
-
-                const formatMoney = (n) => n ? n.toLocaleString() : '0';
-                const fillFullPayment = () => { if (isEditing.value) editForm.value.receivedPrice = editForm.value.rawPrice; else selectedOrder.value.receivedPrice = selectedOrder.value.rawPrice; };
+                
                 const handlePriceFocus = () => { if (!isEditing.value) startEdit(); };
 
-                const displayRawPrice = computed({
-                    get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
-                    set: (v) => { if (isEditing.value) editForm.value.rawPrice = v; }
-                });
-                const displayReceivedPrice = computed({
-                    get: () => isEditing.value ? editForm.value.receivedPrice : (selectedOrder.value ? selectedOrder.value.receivedPrice : 0),
-                    set: (v) => { if (isEditing.value) editForm.value.receivedPrice = v; }
-                });
+                const startEdit = () => { 
+                    const formData = { ...selectedOrder.value };
+                    if (formData.date && formData.date.includes('/')) formData.date = formData.date.replace(/\//g, '-');
+                    if (formData.time) {
+                        if (isTimeSlotService(formData.service)) {
+                            const cleanTime = formData.time.replace(/\s+/g, '');
+                            const matchedSlot = timeSlots.find(slot => slot.replace(/\s+/g, '') === cleanTime);
+                            if (matchedSlot) formData.time = matchedSlot;
+                        } else {
+                            const timeMatch = formData.time.match(/(\d{1,2}):(\d{2})/);
+                            if (timeMatch) {
+                                let hh = timeMatch[1]; let mm = timeMatch[2];
+                                if (hh.length === 1) hh = '0' + hh; 
+                                formData.time = `${hh}:${mm}`;
+                            }
+                        }
+                    }
+                    editForm.value = formData; isEditing.value = true; 
+                };
+                const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
+                
+                const saveEdit = async () => {
+                    const order = selectedOrder.value;
+                    Swal.fire({ title: '儲存中...', text: '正在更新資料', didOpen: () => Swal.showLoading() });
+                    
+                    let statusText = '';
+                    if (order.status === 'CONFIRMED') statusText = '✅ 已付款';
+                    else if (order.status === 'WAITING_PAYMENT') statusText = '⏳ 等待匯款';
+                    else if (order.status === 'UNPAID') statusText = '❌ 未付款';
+                    else if (order.status === 'COMPLETED') statusText = '🏁 已完成';
 
-                onMounted(() => {
-                    fetchData();
-                    setInterval(fetchData, 10000);
-                });
+                    const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
+                    
+                    const payload = {
+                        action: 'UPDATE_ORDER', 
+                        auth: authPassword.value, // 🔒 傳送密碼
+                        orderId: order.oid,
+                        service: order.service,
+                        
+                        lineName: editForm.value.lineName,
+                        clientName: editForm.value.contactName, 
+                        phone: editForm.value.phone,
+                        date: editForm.value.date,
+                        time: editForm.value.time,
+                        location: editForm.value.location,
+                        status: statusText, 
+                        price: parseMoney(editForm.value.rawPrice),
+                        received: parseMoney(editForm.value.receivedPrice),
+                        
+                        createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false',
+                        notifyMake: notifyOnUpdate.value ? 'true' : 'false',
+                        to: order.userId,
+                        message: { type: "flex", altText: `資料更新：${order.service}`, contents: flex },
+                        flexContents: flex
+                    };
 
-                return {
-                    reservations, selectedOrder, filter, loading, errorMsg, filteredList,
-                    selectOrder, fetchData, getStatusText, startEdit, cancelEdit, saveEdit,
-                    isEditing, editForm, updateOrderStatus, formatMoney, fillFullPayment,
-                    lastUpdated, handlePriceFocus, displayRawPrice, displayReceivedPrice,
-                    notifyOnUpdate
+                    try {
+                        await fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) });
+                        Object.assign(selectedOrder.value, editForm.value);
+                        selectedOrder.value.contactName = editForm.value.contactName; 
+                        selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
+                        selectedOrder.value.receivedPrice = parseMoney(editForm.value.receivedPrice);
+                        isEditing.value = false;
+                        Swal.fire('成功', '資料已更新！', 'success');
+                    } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
+                };
+
+                const showDebug = () => {
+                    Swal.fire({
+                        title: '原始資料診斷',
+                        html: `<div class="debug-modal text-left"><p class="text-[10px] mb-2 font-bold text-red-500">檢測到 ${rawJsonData.value.length} 筆資料</p><pre>${JSON.stringify(rawJsonData.value[0], null, 2)}</pre></div>`,
+                        width: '600px'
+                    });
+                };
+
+                // 將自動更新頻率改為 10 秒
+                onMounted(() => { checkLogin(); setInterval(() => fetchData(), 10000); });
+                return { 
+                    reservations, selectedOrder, filter, loading, errorMsg, filteredList, 
+                    selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel, showDebug,
+                    isEditing, editForm, startEdit, cancelEdit, saveEdit, formatMoney, displayRawPrice, displayReceivedPrice,
+                    isTimeSlotService, timeSlots, notifyOnUpdate, fillFullPayment, lastUpdated,
+                    handlePriceFocus, isLoggedIn, inputPassword, loginError, login, logout, isLoginLoading, shortUrl
                 };
             }
         }).mount('#app');
