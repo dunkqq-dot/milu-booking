@@ -665,32 +665,41 @@
                       };
                 };
 
-                // ⚡ 專門負責發送 LINE 訊息的函式 (修正版)
+                // ⚡ 專門負責發送 LINE 訊息的函式 (修正版：傳送所有欄位 + 強制覆寫設定)
                 const sendToMake = async (payload, flex) => {
-                    // 1. 建構資料：修正結構與 GAS 一致
+                    // 1. 合併完整資料，確保 Make 收到所有欄位 (解決"資料很少"的問題)
+                    // 2. 強制設定 notifyMake 為 'true'，確保 Make 收到正確訊號
                     const makePayload = {
-                        to: payload.to,
+                        ...payload, // 包含 orderId, service, date, time, price, balance 等所有欄位
+                        
+                        // Override specific fields for Make to ensure success
+                        notifyMake: 'true', 
                         flexContents: flex, 
-                        flexJson: JSON.stringify(flex), // 確保這是純字串
+                        flexJson: JSON.stringify(flex), 
                         altText: payload.message ? payload.message.altText : '新通知',
                         
-                        // 額外資訊 (Make 可能需要)
+                        // 額外確保這些欄位存在
                         lineName: payload.lineName,
-                        clientName: payload.clientName
+                        clientName: payload.clientName,
+                        
+                        // 模擬 LINE Bot API 格式 (備用)
+                        messages: [ 
+                            { 
+                                type: "flex", 
+                                altText: payload.message ? payload.message.altText : '新通知', 
+                                contents: flex 
+                            } 
+                        ]
                     };
 
-                    // 2. 深拷貝移除 Vue Proxy 殘留 (關鍵步驟)
-                    // 這一步是為了解決傳送給 Make 的資料結構可能包含 Vue 內部的 getter/setter
+                    // 3. 深拷貝移除 Vue Proxy 殘留
                     const cleanBody = JSON.parse(JSON.stringify(makePayload));
 
-                    console.log("Sending to Make (Clean):", cleanBody);
+                    console.log("Sending to Make (Full Payload):", cleanBody);
 
-                    // 3. 發送
                     return fetch(SEND_MSG_WEBHOOK, {
                         method: 'POST',
-                        headers: { 
-                            'Content-Type': 'application/json; charset=UTF-8' // 強制 UTF-8
-                        },
+                        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                         body: JSON.stringify(cleanBody)
                     });
                 };
@@ -725,6 +734,7 @@
                                 const received = parseInt(order.receivedPrice) || 0;
                                 const balance = price - received;
 
+                                // 這是給 GAS 用的 payload (notifyMake 為 false，因為我們自己發)
                                 const payload = {
                                     action: 'UPDATE_ORDER',
                                     orderId: order.oid,
@@ -740,16 +750,16 @@
                                     received: received,
                                     balance: balance,
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
-                                    notifyMake: 'false', // ⛔ 告訴 GAS 不要發送，因為我們自己發
+                                    notifyMake: 'false', // ⛔ 告訴 GAS 不要發送
                                     to: order.userId,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex
                                 };
 
-                                // 🚀 平行處理
+                                // 🚀 平行處理：同時發 LINE (快，傳送完整資料) 和存 GAS (慢)
                                 await Promise.all([
-                                    sendToMake(payload, flex), // 直接發 LINE (格式已修正)
-                                    fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) }) // 存 GAS
+                                    sendToMake(payload, flex), 
+                                    fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) }) 
                                 ]);
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
@@ -809,6 +819,7 @@
                     const received = parseMoney(editForm.value.receivedPrice);
                     const balance = price - received;
 
+                    // 這是給 GAS 用的 payload
                     const payload = {
                         action: 'UPDATE_ORDER',
                         orderId: order.oid,
@@ -826,7 +837,7 @@
                         
                         // 邏輯控制
                         createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false',
-                        notifyMake: 'false', // ⛔ 告訴 GAS 不要發送，因為我們自己發
+                        notifyMake: 'false', // ⛔ 告訴 GAS 不要發送
                         
                         to: shouldNotify ? order.userId : '', 
                         message: shouldNotify ? { type: "flex", altText: `資料更新：${order.service}`, contents: flex } : null,
