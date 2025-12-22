@@ -132,6 +132,7 @@
                 <button @click="selectedOrder = null" class="bg-white p-2 rounded-full shadow text-gray-500">⬅</button>
             </div>
 
+            <!-- 🛠️ 修正：移除 flex items-center，改用 min-h-full 與 py-10 來確保捲動時上方不會被切掉 -->
             <div v-if="selectedOrder" class="flex-1 overflow-y-auto relative">
                 <div class="min-h-full flex flex-col items-center justify-center p-4 md:p-10 py-16 md:py-10">
                     <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-md mx-auto">
@@ -146,10 +147,12 @@
                                  'bg-blue-400': selectedOrder.status === 'WAITING_PAYMENT'
                              }">
                             
+                            <!-- 編輯模式按鈕 -->
                             <button v-if="!isEditing" @click="startEdit" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition backdrop-blur-sm" title="編輯資料">
                                 <i class="fa-solid fa-pen"></i>
                             </button>
                             <div v-else class="absolute top-4 right-4 flex items-center gap-2">
+                                 <!-- 新增：同步發送開關 -->
                                 <label class="flex items-center space-x-2 text-xs text-white/90 bg-black/20 px-2 py-1 rounded cursor-pointer select-none">
                                     <input type="checkbox" v-model="notifyOnUpdate" class="form-checkbox h-3 w-3 text-green-500 rounded focus:ring-0">
                                     <span>發送通知</span>
@@ -220,6 +223,7 @@
                                 </div>
                                 <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                     <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
+                                    
                                     <template v-if="isEditing">
                                         <select v-if="isTimeSlotService(selectedOrder.service)" v-model="editForm.time" class="edit-input">
                                             <option value="" disabled>請選擇時段</option>
@@ -227,6 +231,7 @@
                                         </select>
                                         <input v-else type="time" v-model="editForm.time" class="edit-input">
                                     </template>
+                                    
                                     <p v-else class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                                 </div>
                             </div>
@@ -237,22 +242,31 @@
                                     <p class="text-xs text-gray-500 font-bold">總金額 (填入報價)</p>
                                     <div class="flex items-center">
                                         <span class="text-xs mr-1 text-gray-400">NT$</span>
-                                        <input type="number" v-model.number="displayRawPrice" @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none" placeholder="0">
+                                        <input type="number" v-model.number="displayRawPrice" 
+                                               @focus="handlePriceFocus"
+                                               class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none" 
+                                               placeholder="0">
                                     </div>
                                 </div>
                                 <div class="flex justify-between items-center mb-2">
                                     <p class="text-xs text-green-600 font-bold">已收款 (對帳)</p>
                                     <div class="flex items-center gap-2">
-                                        <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">⚡同上</button>
+                                        <!-- ⚡ 一鍵全額按鈕 -->
+                                        <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">
+                                            ⚡同上
+                                        </button>
                                         <span class="text-xs mr-1 text-green-600">NT$</span>
-                                        <input type="number" v-model.number="displayReceivedPrice" @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" placeholder="0">
+                                        <input type="number" v-model.number="displayReceivedPrice" 
+                                               @focus="handlePriceFocus"
+                                               class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" 
+                                               placeholder="0">
                                     </div>
                                 </div>
                                 <div class="border-t pt-2 flex justify-between items-center border-yellow-200">
                                     <p class="text-xs text-red-500 font-bold">尚欠尾款</p>
-                                    <p class="font-bold text-xl text-red-500">NT$ {{ formatMoney(displayRawPrice - displayReceivedPrice) }}</p>
+                                    <p class="font-bold text-xl text-red-500">
+                                        NT$ {{ formatMoney(displayRawPrice - displayReceivedPrice) }}
+                                    </p>
                                 </div>
                             </div>
                             
@@ -265,18 +279,24 @@
 
                             <!-- 動作按鈕 -->
                             <div v-if="!isEditing" class="pt-2 space-y-3">
+                                
+                                <!-- 付款須知 -->
                                 <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知 & 帳號
                                 </button>
+
+                                <!-- 確認收款 -->
                                 <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-check-circle"></i> 確認收款並登記
                                 </button>
+                                
                                 <div v-if="selectedOrder.status === 'CONFIRMED'" class="space-y-2">
                                     <button @click="updateOrderStatus('COMPLETE')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                         <i class="fa-solid fa-flag-checkered"></i> 完成訂單 (結案)
                                     </button>
                                     <p class="text-center text-xs text-gray-400">已付款，可進行結案</p>
                                 </div>
+
                                 <div v-if="selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELED' || selectedOrder.status === 'REFUNDED'" class="space-y-3">
                                     <div class="text-center py-3 bg-gray-100 text-gray-500 rounded-xl font-bold border border-gray-200">
                                         此訂單已結案 ({{ getStatusText(selectedOrder.status) }})
@@ -285,6 +305,7 @@
                                         <i class="fa-solid fa-rotate-left"></i> 恢復訂單 (重設為未付款)
                                     </button>
                                 </div>
+
                                 <div class="flex gap-2" v-if="selectedOrder.status !== 'CANCELED' && selectedOrder.status !== 'REFUNDED' && selectedOrder.status !== 'COMPLETED'">
                                     <button v-if="selectedOrder.status === 'CONFIRMED'" @click="updateOrderStatus('REFUND')" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
                                         <i class="fa-solid fa-money-bill-transfer"></i> 辦理退款
@@ -293,6 +314,7 @@
                                         <i class="fa-solid fa-ban"></i> 取消訂單
                                     </button>
                                 </div>
+
                                 <p class="text-center text-xs text-gray-400 pt-2">* 點擊按鈕將同步更新試算表與發送 LINE 通知</p>
                             </div>
                         </div>
@@ -324,10 +346,8 @@
 
         createApp({
             setup() {
-                // ⚠️ 已自動填入您的 GAS Web App 網址
+                // ⚠️ 自動使用您提供的 GAS URL
                 const DATA_API_URL = 'https://script.google.com/macros/s/AKfycbwfAyj7ktWXv4gPoFo7wVPLn1_nQ6w0hX8kTToggetxt3jqqD7yp67cxlrg5l1N1rsLaA/exec'; 
-                
-                // 這是發送 LINE 通知的 Make Webhook (維持不變)
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/63u0kheb71v9vengzdggfy1ga7r8gmng';
 
                 const reservations = ref([]);
@@ -336,29 +356,23 @@
                 const editForm = ref({});
                 const filter = ref('ALL');
                 const loading = ref(false);
-                const isLoginLoading = ref(false); // 新增：登入中狀態
+                const isLoginLoading = ref(false);
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
                 const notifyOnUpdate = ref(true);
                 const lastUpdated = ref(null);
                 
-                // 🔒 登入相關狀態
                 const isLoggedIn = ref(false);
                 const inputPassword = ref('');
                 const loginError = ref('');
                 const authPassword = ref('');
 
-                // 🔐 登入邏輯
                 const login = () => {
                     if (!inputPassword.value) { loginError.value = '請輸入密碼'; return; }
-                    
                     authPassword.value = inputPassword.value;
                     loginError.value = '';
-                    isLoginLoading.value = true; // 開啟轉圈圈
-
-                    fetchData(true).then(() => {
-                        isLoginLoading.value = false; // 關閉轉圈圈
-                    });
+                    isLoginLoading.value = true; 
+                    fetchData(true).then(() => { isLoginLoading.value = false; });
                 };
 
                 const logout = () => {
@@ -369,7 +383,6 @@
                     selectedOrder.value = null;
                 };
 
-                // 檢查是否已登入 (從 LocalStorage)
                 const checkLogin = () => {
                     const savedPass = localStorage.getItem('milu_auth');
                     if (savedPass) {
@@ -500,7 +513,6 @@
                 };
 
                 const fetchData = async (isLoginAttempt = false) => {
-                    // 如果沒密碼且不是嘗試登入，就停下來
                     if (!authPassword.value) return;
                     if (isEditing.value && !isLoginAttempt) return;
 
@@ -512,35 +524,20 @@
                     }
 
                     try {
-                        // 🔒 傳送密碼參數
                         const url = `${DATA_API_URL}?mode=api&auth=${authPassword.value}`;
                         const res = await fetch(url);
-                        
-                        // 檢查 response status
-                        if (!res.ok) {
-                             throw new Error(`伺服器回應錯誤 (${res.status})`);
-                        }
-
+                        if (!res.ok) throw new Error(`伺服器回應錯誤 (${res.status})`);
                         const text = await res.text();
                         let data;
-                        
-                        try { 
-                            data = JSON.parse(text); 
-                        } catch (e) { 
-                            // 這裡通常是因為 GAS 網址錯了、沒部署、或是權限不是 Anyone
-                            console.error("解析 JSON 失敗，原始回應:", text);
-                            throw new Error("無法解析伺服器回應 (請檢查部署權限)"); 
-                        }
+                        try { data = JSON.parse(text); } catch (e) { throw new Error("無法解析伺服器回應 (請檢查部署權限)"); }
 
-                        // 🔒 檢查後端是否拒絕 (GAS 回傳 error)
                         if (data.error) {
-                             if (isLoginAttempt) loginError.value = data.error; // 顯示後端回傳的具體錯誤
-                             if (isLoggedIn.value) logout(); // 踢出使用者
+                             if (isLoginAttempt) loginError.value = data.error; 
+                             if (isLoggedIn.value) logout(); 
                              loading.value = false;
                              return;
                         }
 
-                        // 登入成功
                         if (isLoginAttempt) {
                             isLoggedIn.value = true;
                             localStorage.setItem('milu_auth', authPassword.value);
@@ -604,7 +601,6 @@
 
                     } catch (e) { 
                         console.error(e);
-                        // 如果是登入嘗試，顯示具體錯誤在登入框
                         if (isLoginAttempt) {
                             loginError.value = '無法連線或權限不足 (請檢查 GAS 部署)';
                         } else {
@@ -755,15 +751,12 @@
                                 else if (actionType === 'REFUND') statusText = '💸 已退款';
                                 else if (actionType === 'RESTORE') statusText = '❌ 未付款';
 
-                                // 👉 關鍵修改：使用 action: 'UPDATE_ORDER' 呼叫 GAS
-                                // 如果是純修改 (Save)，notifyMake 為 'false'，如果是按鈕動作，則為 'true'
                                 const payload = {
-                                    action: 'UPDATE_ORDER', // 告訴 GAS 這是寫入動作
+                                    action: 'UPDATE_ORDER', 
                                     auth: authPassword.value, // 🔒 傳送密碼
                                     orderId: order.oid,
-                                    service: order.service, // 用來找分頁
+                                    service: order.service, 
                                     
-                                    // 資料欄位
                                     lineName: order.lineName,
                                     clientName: order.contactName, 
                                     phone: order.phone,
@@ -774,11 +767,9 @@
                                     price: order.rawPrice,
                                     received: order.receivedPrice,
                                     
-                                    // 邏輯控制
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
                                     notifyMake: 'true', // 因為是按鈕動作，所以要發 LINE
                                     
-                                    // 傳給 Make 發 LINE 用的資料 (Flex Message)
                                     to: order.userId,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex
@@ -837,37 +828,30 @@
                     const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
                     
                     const payload = {
-                        action: 'UPDATE_ORDER', // 告訴 GAS 這是寫入動作
+                        action: 'UPDATE_ORDER', 
                         auth: authPassword.value, // 🔒 傳送密碼
                         orderId: order.oid,
                         service: order.service,
                         
-                        // 更新後的資料
                         lineName: editForm.value.lineName,
                         clientName: editForm.value.contactName, 
                         phone: editForm.value.phone,
                         date: editForm.value.date,
                         time: editForm.value.time,
                         location: editForm.value.location,
-                        status: statusText, // 狀態通常不因編輯而改變，除非連動邏輯
+                        status: statusText, 
                         price: parseMoney(editForm.value.rawPrice),
                         received: parseMoney(editForm.value.receivedPrice),
                         
-                        // 邏輯控制
-                        // 只有在狀態是「已付款/已完成」時，編輯才同步行事曆
                         createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false',
                         notifyMake: notifyOnUpdate.value ? 'true' : 'false',
-                        
-                        // 傳給 Make 發 LINE 用的資料
                         to: order.userId,
                         message: { type: "flex", altText: `資料更新：${order.service}`, contents: flex },
                         flexContents: flex
                     };
 
                     try {
-                        // 👉 改為 POST 到 GAS
                         await fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) });
-                        
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
