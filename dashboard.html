@@ -42,10 +42,14 @@
                        class="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 outline-none focus:border-milu-gold transition text-center tracking-widest text-lg"
                        placeholder="請輸入後台密碼">
             </div>
-            <button @click="login" class="w-full bg-milu-gold text-white font-bold py-3 rounded-lg mt-4 hover:bg-[#b08b60] transition shadow-lg active:scale-95">
-                登入系統
+            
+            <button @click="login" :disabled="isLoginLoading" class="w-full bg-milu-gold text-white font-bold py-3 rounded-lg mt-4 hover:bg-[#b08b60] transition shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                <span v-if="isLoginLoading"><i class="fa-solid fa-circle-notch fa-spin"></i> 驗證中...</span>
+                <span v-else>登入系統</span>
             </button>
-            <p class="text-xs text-red-400 mt-3 h-4">{{ loginError }}</p>
+            
+            <!-- 錯誤訊息顯示區 -->
+            <p class="text-xs text-red-500 mt-4 font-bold min-h-[20px]">{{ loginError }}</p>
         </div>
         <p class="mt-8 text-gray-300 text-xs">© MILU BALLOONS</p>
     </div>
@@ -332,6 +336,7 @@
                 const editForm = ref({});
                 const filter = ref('ALL');
                 const loading = ref(false);
+                const isLoginLoading = ref(false); // 新增：登入中狀態
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
                 const notifyOnUpdate = ref(true);
@@ -346,10 +351,14 @@
                 // 🔐 登入邏輯
                 const login = () => {
                     if (!inputPassword.value) { loginError.value = '請輸入密碼'; return; }
-                    // 暫存密碼並嘗試連線
+                    
                     authPassword.value = inputPassword.value;
                     loginError.value = '';
-                    fetchData(true); // 強制嘗試連線
+                    isLoginLoading.value = true; // 開啟轉圈圈
+
+                    fetchData(true).then(() => {
+                        isLoginLoading.value = false; // 關閉轉圈圈
+                    });
                 };
 
                 const logout = () => {
@@ -495,7 +504,9 @@
                     if (!authPassword.value) return;
                     if (isEditing.value && !isLoginAttempt) return;
 
-                    loading.value = true; errorMsg.value = null;
+                    if(!isLoginAttempt) loading.value = true; 
+                    errorMsg.value = null;
+
                     if (!DATA_API_URL) {
                         errorMsg.value = "尚未設定 GAS API 網址"; loading.value = false; return;
                     }
@@ -504,13 +515,26 @@
                         // 🔒 傳送密碼參數
                         const url = `${DATA_API_URL}?mode=api&auth=${authPassword.value}`;
                         const res = await fetch(url);
+                        
+                        // 檢查 response status
+                        if (!res.ok) {
+                             throw new Error(`伺服器回應錯誤 (${res.status})`);
+                        }
+
                         const text = await res.text();
                         let data;
-                        try { data = JSON.parse(text); } catch (e) { throw new Error("API 回傳格式錯誤或權限不足"); }
+                        
+                        try { 
+                            data = JSON.parse(text); 
+                        } catch (e) { 
+                            // 這裡通常是因為 GAS 網址錯了、沒部署、或是權限不是 Anyone
+                            console.error("解析 JSON 失敗，原始回應:", text);
+                            throw new Error("無法解析伺服器回應 (請檢查部署權限)"); 
+                        }
 
                         // 🔒 檢查後端是否拒絕 (GAS 回傳 error)
                         if (data.error) {
-                             if (isLoginAttempt) loginError.value = '密碼錯誤';
+                             if (isLoginAttempt) loginError.value = data.error; // 顯示後端回傳的具體錯誤
                              if (isLoggedIn.value) logout(); // 踢出使用者
                              loading.value = false;
                              return;
@@ -578,7 +602,15 @@
                         const now = new Date();
                         lastUpdated.value = now.toLocaleTimeString();
 
-                    } catch (e) { errorMsg.value = e.message; }
+                    } catch (e) { 
+                        console.error(e);
+                        // 如果是登入嘗試，顯示具體錯誤在登入框
+                        if (isLoginAttempt) {
+                            loginError.value = '無法連線或權限不足 (請檢查 GAS 部署)';
+                        } else {
+                            errorMsg.value = e.message; 
+                        }
+                    }
                     loading.value = false;
                 };
 
@@ -802,7 +834,6 @@
                     else if (order.status === 'UNPAID') statusText = '❌ 未付款';
                     else if (order.status === 'COMPLETED') statusText = '🏁 已完成';
 
-                    // 準備 Flex Message (只有在 notifyOnUpdate 開啟時才需要完整內容，但產生也無妨)
                     const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
                     
                     const payload = {
@@ -861,7 +892,7 @@
                     selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel, showDebug,
                     isEditing, editForm, startEdit, cancelEdit, saveEdit, formatMoney, displayRawPrice, displayReceivedPrice,
                     isTimeSlotService, timeSlots, notifyOnUpdate, fillFullPayment, lastUpdated,
-                    handlePriceFocus, isLoggedIn, inputPassword, loginError, login, logout
+                    handlePriceFocus, isLoggedIn, inputPassword, loginError, login, logout, isLoginLoading
                 };
             }
         }).mount('#app');
