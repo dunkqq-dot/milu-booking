@@ -32,7 +32,26 @@
 </head>
 <body id="app" v-cloak>
 
-    <div class="flex h-full">
+    <!-- 🔒 登入畫面 -->
+    <div v-if="!isLoggedIn" class="fixed inset-0 bg-[#F9F7F2] z-50 flex flex-col items-center justify-center p-4">
+        <div class="bg-white p-8 rounded-2xl shadow-xl border border-milu-gold/20 w-full max-w-sm text-center">
+            <h1 class="text-3xl font-serif text-milu-gold font-bold mb-2">MILU ADMIN</h1>
+            <p class="text-gray-400 text-xs mb-6 tracking-widest">系統鎖定中</p>
+            <div class="relative">
+                <input type="password" v-model="inputPassword" @keyup.enter="login"
+                       class="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 outline-none focus:border-milu-gold transition text-center tracking-widest text-lg"
+                       placeholder="請輸入後台密碼">
+            </div>
+            <button @click="login" class="w-full bg-milu-gold text-white font-bold py-3 rounded-lg mt-4 hover:bg-[#b08b60] transition shadow-lg active:scale-95">
+                登入系統
+            </button>
+            <p class="text-xs text-red-400 mt-3 h-4">{{ loginError }}</p>
+        </div>
+        <p class="mt-8 text-gray-300 text-xs">© MILU BALLOONS</p>
+    </div>
+
+    <!-- 🔓 主畫面 -->
+    <div v-else class="flex h-full">
         <!-- 左側列表 -->
         <div class="w-full md:w-1/3 bg-white border-r border-gray-200 flex flex-col h-full z-10" :class="{'hidden md:flex': selectedOrder}">
             <div class="p-5 border-b border-gray-100 bg-[#F9F7F2]">
@@ -43,6 +62,7 @@
                     </div>
                     <div class="flex flex-col items-end gap-1">
                         <div class="flex gap-2">
+                            <button @click="logout" class="text-xs px-2 py-1 bg-red-100 text-red-500 rounded hover:bg-red-200" title="登出"><i class="fa-solid fa-lock"></i></button>
                             <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
                             <div class="text-xs px-2 py-1 bg-white rounded text-gray-400 border flex items-center gap-1" v-if="loading">
                                 <i class="fa-solid fa-circle-notch fa-spin"></i> 更新中...
@@ -108,7 +128,6 @@
                 <button @click="selectedOrder = null" class="bg-white p-2 rounded-full shadow text-gray-500">⬅</button>
             </div>
 
-            <!-- 🛠️ 修正：移除 flex items-center，改用 min-h-full 與 py-10 來確保捲動時上方不會被切掉 -->
             <div v-if="selectedOrder" class="flex-1 overflow-y-auto relative">
                 <div class="min-h-full flex flex-col items-center justify-center p-4 md:p-10 py-16 md:py-10">
                     <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-md mx-auto">
@@ -123,12 +142,10 @@
                                  'bg-blue-400': selectedOrder.status === 'WAITING_PAYMENT'
                              }">
                             
-                            <!-- 編輯模式按鈕 -->
                             <button v-if="!isEditing" @click="startEdit" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition backdrop-blur-sm" title="編輯資料">
                                 <i class="fa-solid fa-pen"></i>
                             </button>
                             <div v-else class="absolute top-4 right-4 flex items-center gap-2">
-                                 <!-- 新增：同步發送開關 -->
                                 <label class="flex items-center space-x-2 text-xs text-white/90 bg-black/20 px-2 py-1 rounded cursor-pointer select-none">
                                     <input type="checkbox" v-model="notifyOnUpdate" class="form-checkbox h-3 w-3 text-green-500 rounded focus:ring-0">
                                     <span>發送通知</span>
@@ -172,11 +189,9 @@
                                         <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                     </div>
                                     <div v-else>
-                                        <!-- LINE 名稱 -->
                                         <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
                                             <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                         </p>
-                                        <!-- 聯絡人姓名 -->
                                         <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
                                         <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
                                             <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
@@ -201,7 +216,6 @@
                                 </div>
                                 <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
                                     <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
-                                    
                                     <template v-if="isEditing">
                                         <select v-if="isTimeSlotService(selectedOrder.service)" v-model="editForm.time" class="edit-input">
                                             <option value="" disabled>請選擇時段</option>
@@ -209,7 +223,6 @@
                                         </select>
                                         <input v-else type="time" v-model="editForm.time" class="edit-input">
                                     </template>
-                                    
                                     <p v-else class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
                                 </div>
                             </div>
@@ -220,31 +233,22 @@
                                     <p class="text-xs text-gray-500 font-bold">總金額 (填入報價)</p>
                                     <div class="flex items-center">
                                         <span class="text-xs mr-1 text-gray-400">NT$</span>
-                                        <input type="number" v-model.number="displayRawPrice" 
-                                               @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none" 
-                                               placeholder="0">
+                                        <input type="number" v-model.number="displayRawPrice" @focus="handlePriceFocus"
+                                               class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none" placeholder="0">
                                     </div>
                                 </div>
                                 <div class="flex justify-between items-center mb-2">
                                     <p class="text-xs text-green-600 font-bold">已收款 (對帳)</p>
                                     <div class="flex items-center gap-2">
-                                        <!-- ⚡ 一鍵全額按鈕 -->
-                                        <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">
-                                            ⚡同上
-                                        </button>
+                                        <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">⚡同上</button>
                                         <span class="text-xs mr-1 text-green-600">NT$</span>
-                                        <input type="number" v-model.number="displayReceivedPrice" 
-                                               @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" 
-                                               placeholder="0">
+                                        <input type="number" v-model.number="displayReceivedPrice" @focus="handlePriceFocus"
+                                               class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" placeholder="0">
                                     </div>
                                 </div>
                                 <div class="border-t pt-2 flex justify-between items-center border-yellow-200">
                                     <p class="text-xs text-red-500 font-bold">尚欠尾款</p>
-                                    <p class="font-bold text-xl text-red-500">
-                                        NT$ {{ formatMoney(displayRawPrice - displayReceivedPrice) }}
-                                    </p>
+                                    <p class="font-bold text-xl text-red-500">NT$ {{ formatMoney(displayRawPrice - displayReceivedPrice) }}</p>
                                 </div>
                             </div>
                             
@@ -257,24 +261,18 @@
 
                             <!-- 動作按鈕 -->
                             <div v-if="!isEditing" class="pt-2 space-y-3">
-                                
-                                <!-- 付款須知 -->
                                 <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知 & 帳號
                                 </button>
-
-                                <!-- 確認收款 -->
                                 <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-check-circle"></i> 確認收款並登記
                                 </button>
-                                
                                 <div v-if="selectedOrder.status === 'CONFIRMED'" class="space-y-2">
                                     <button @click="updateOrderStatus('COMPLETE')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                         <i class="fa-solid fa-flag-checkered"></i> 完成訂單 (結案)
                                     </button>
                                     <p class="text-center text-xs text-gray-400">已付款，可進行結案</p>
                                 </div>
-
                                 <div v-if="selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELED' || selectedOrder.status === 'REFUNDED'" class="space-y-3">
                                     <div class="text-center py-3 bg-gray-100 text-gray-500 rounded-xl font-bold border border-gray-200">
                                         此訂單已結案 ({{ getStatusText(selectedOrder.status) }})
@@ -283,7 +281,6 @@
                                         <i class="fa-solid fa-rotate-left"></i> 恢復訂單 (重設為未付款)
                                     </button>
                                 </div>
-
                                 <div class="flex gap-2" v-if="selectedOrder.status !== 'CANCELED' && selectedOrder.status !== 'REFUNDED' && selectedOrder.status !== 'COMPLETED'">
                                     <button v-if="selectedOrder.status === 'CONFIRMED'" @click="updateOrderStatus('REFUND')" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
                                         <i class="fa-solid fa-money-bill-transfer"></i> 辦理退款
@@ -292,7 +289,6 @@
                                         <i class="fa-solid fa-ban"></i> 取消訂單
                                     </button>
                                 </div>
-
                                 <p class="text-center text-xs text-gray-400 pt-2">* 點擊按鈕將同步更新試算表與發送 LINE 通知</p>
                             </div>
                         </div>
@@ -335,13 +331,44 @@
                 const isEditing = ref(false);
                 const editForm = ref({});
                 const filter = ref('ALL');
-                const loading = ref(true);
+                const loading = ref(false);
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
                 const notifyOnUpdate = ref(true);
                 const lastUpdated = ref(null);
+                
+                // 🔒 登入相關狀態
+                const isLoggedIn = ref(false);
+                const inputPassword = ref('');
+                const loginError = ref('');
+                const authPassword = ref('');
 
-                // 🛡️ 新增：安全文字過濾器，確保傳給 LINE 的文字絕對不為空
+                // 🔐 登入邏輯
+                const login = () => {
+                    if (!inputPassword.value) { loginError.value = '請輸入密碼'; return; }
+                    // 暫存密碼並嘗試連線
+                    authPassword.value = inputPassword.value;
+                    loginError.value = '';
+                    fetchData(true); // 強制嘗試連線
+                };
+
+                const logout = () => {
+                    isLoggedIn.value = false;
+                    authPassword.value = '';
+                    inputPassword.value = '';
+                    localStorage.removeItem('milu_auth');
+                    selectedOrder.value = null;
+                };
+
+                // 檢查是否已登入 (從 LocalStorage)
+                const checkLogin = () => {
+                    const savedPass = localStorage.getItem('milu_auth');
+                    if (savedPass) {
+                        authPassword.value = savedPass;
+                        fetchData(true);
+                    }
+                };
+
                 const safeText = (text) => {
                     return (text && String(text).trim() !== '') ? String(text) : ' ';
                 };
@@ -428,7 +455,6 @@
                     return text.trim();
                 };
 
-                // 🛠️ 格式修正函式
                 const formatGASDate = (val) => {
                     if (!val) return '';
                     const s = String(val);
@@ -446,8 +472,6 @@
                 const formatGASTime = (val) => {
                     if (!val) return '';
                     const s = String(val);
-                    
-                    // 1. GAS 可能回傳 ISO 時間格式 (如 1899-12-30T14:30:00.000Z)
                     if (s.includes('T') && s.includes('Z')) {
                         const d = new Date(s);
                         if (!isNaN(d.getTime())) {
@@ -456,9 +480,6 @@
                             return `${hh}:${mm}`;
                         }
                     }
-                    
-                    // 2. 處理簡單時間字串 (如 9:30 -> 09:30, 14:00:00 -> 14:00)
-                    // 排除時段範圍 (例如 13:00 - 14:00 不處理)
                     const simpleTimeRegex = /^(\d{1,2}):(\d{2})(:(\d{2}))?$/;
                     const match = s.trim().match(simpleTimeRegex);
                     if (match) {
@@ -466,29 +487,41 @@
                         const mm = match[2];
                         return `${hh}:${mm}`;
                     }
-                    
-                    // 3. 其他格式 (如時段範圍) 直接回傳
                     return s;
                 };
 
-                const fetchData = async () => {
-                    // 🛑 新增：如果在編輯模式，暫停更新，以免干擾使用者
-                    if (isEditing.value) return;
+                const fetchData = async (isLoginAttempt = false) => {
+                    // 如果沒密碼且不是嘗試登入，就停下來
+                    if (!authPassword.value) return;
+                    if (isEditing.value && !isLoginAttempt) return;
 
                     loading.value = true; errorMsg.value = null;
                     if (!DATA_API_URL) {
-                        errorMsg.value = "尚未設定 GAS API 網址，請在程式碼中填入。";
-                        loading.value = false;
-                        return;
+                        errorMsg.value = "尚未設定 GAS API 網址"; loading.value = false; return;
                     }
 
                     try {
-                        const res = await fetch(DATA_API_URL);
+                        // 🔒 傳送密碼參數
+                        const url = `${DATA_API_URL}?mode=api&auth=${authPassword.value}`;
+                        const res = await fetch(url);
                         const text = await res.text();
-                        if (text.trim() === "Accepted") throw new Error("Make API 目前沒有回傳資料。");
-                        let data = JSON.parse(text);
+                        let data;
+                        try { data = JSON.parse(text); } catch (e) { throw new Error("API 回傳格式錯誤或權限不足"); }
+
+                        // 🔒 檢查後端是否拒絕 (GAS 回傳 error)
+                        if (data.error) {
+                             if (isLoginAttempt) loginError.value = '密碼錯誤';
+                             if (isLoggedIn.value) logout(); // 踢出使用者
+                             loading.value = false;
+                             return;
+                        }
+
+                        // 登入成功
+                        if (isLoginAttempt) {
+                            isLoggedIn.value = true;
+                            localStorage.setItem('milu_auth', authPassword.value);
+                        }
                         
-                        // ⚡ 極速過濾：移除沒有訂單編號(Index 0)或沒有姓名(Index 3)的空行
                         data = data.filter(item => {
                             const hasID = item[0] && String(item[0]).trim() !== '';
                             const hasName = item[3] && String(item[3]).trim() !== '';
@@ -502,14 +535,10 @@
                             const lineName = item[2] || '未知LINE';
                             const contactName = item[3] || '未知客戶';
                             const phone = item[4] || '';
-                            
-                            // 🌟 套用格式修正
                             const date = formatGASDate(item[5]);
                             const time = formatGASTime(item[6]);
-                            
                             const location = item[7] || '未填寫地點'; 
                             let serviceName = item[8] || '服務';
-                            
                             if (serviceName.includes('自取')) serviceName = '門市自取'; 
                             else if (serviceName.includes('後車廂')) serviceName = '後車廂驚喜';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
@@ -517,7 +546,6 @@
 
                             const userId = item[9] || '';
                             const rawStatus = (item[10] || '').trim();
-                            
                             const rawPrice = parseMoney(item[11]);
                             const receivedPrice = parseMoney(item[12]);
 
@@ -538,13 +566,11 @@
                         
                         if (selectedOrder.value) {
                              const updated = formattedData.find(r => r.oid === selectedOrder.value.oid);
-                             // 如果正在編輯，不要覆蓋資料，以免打到一半被洗掉
                              if (updated && !isEditing.value) {
                                  Object.assign(selectedOrder.value, updated);
                              }
                         } else if (formattedData.length > 0) {
-                             // 🛠️ BUG FIX: 手機版 (寬度 < 768px) 不要自動選取第一筆，否則會一直跳轉到詳情頁
-                             if (window.innerWidth >= 768) {
+                             if (window.innerWidth >= 768 && !selectedOrder.value) {
                                  selectedOrder.value = formattedData[0];
                              }
                         }
@@ -570,7 +596,6 @@
                 });
 
                 const buildRichFlexMessage = (order, actionType) => {
-                      // 完整版 Flex 邏輯 (無 letterSpacing)
                       const config = configMap[order.service] || configMap['專人佈置'];
                       const total = parseInt(order.rawPrice) || 0;
                       const paid = parseInt(order.receivedPrice) || 0;
@@ -596,15 +621,24 @@
                             { "type": "separator", "margin": "lg" },
                             { "type": "text", "text": "匯款資訊：彰化銀行 (009)", "size": "xs", "color": "#aaaaaa", "margin": "lg" },
                             { 
-                                "type": "text", 
-                                "text": "54320100686300", 
-                                "weight": "bold", 
-                                "size": "3xl", // 🌟 放大字體方便長按
-                                "color": "#4A4A4A", 
+                                // 🌟 匯款帳號區塊：使用 box 包裹以加強視覺，並移除 click action 避免誤發
+                                "type": "box",
+                                "layout": "vertical",
+                                "backgroundColor": "#F5F5F5",
+                                "cornerRadius": "md",
+                                "paddingAll": "lg",
                                 "margin": "md",
-                                "align": "center",
-                                "wrap": true
-                                // ❌ 移除 action，改為純文字顯示
+                                "contents": [
+                                    {
+                                        "type": "text", 
+                                        "text": "54320100686300", 
+                                        "weight": "bold", 
+                                        "size": "3xl", // 🌟 放大字體方便長按
+                                        "color": "#4A4A4A", 
+                                        "align": "center",
+                                        "wrap": true
+                                    }
+                                ]
                             },
                             { "type": "text", "text": "(請長按上方數字即可複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
                           ];
@@ -633,9 +667,9 @@
                                 {
                                     "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm", 
                                     "contents": [
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "總計金額", "size": "sm", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": `NT$ ${total.toLocaleString()}`, "size": "sm", "color": "#666666", "align": "end", "flex": 3 } ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "已收款", "size": actionType === 'CONFIRM' ? "md" : "sm", "color": "#10B981", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${paid.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "sm" : "sm", "color": "#10B981", "align": "end", "weight": "bold", "flex": 3 } ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "尚欠尾款", "size": actionType === 'CONFIRM' ? "sm" : "md", "color": "#EF4444", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${balance.toLocaleString()}`, "size": actionType === 'CONFIRM' ? "sm" : "sm", "color": "#EF4444", "align": "end", "weight": "bold", "flex": 3 } ] }
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "總計金額", "size": "sm", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": `NT$ ${formatMoney(total)}`, "size": "sm", "color": "#666666", "align": "end", "flex": 3 } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "已收款", "size": "sm", "color": "#10B981", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${formatMoney(paid)}`, "size": "sm", "color": "#10B981", "align": "end", "weight": "bold", "flex": 3 } ] },
+                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "尚欠尾款", "size": "sm", "color": "#EF4444", "weight": "bold", "flex": 2 }, { "type": "text", "text": `NT$ ${formatMoney(balance)}`, "size": "sm", "color": "#EF4444", "align": "end", "weight": "bold", "flex": 3 } ] }
                                     ]
                                 }
                              ];
@@ -693,6 +727,7 @@
                                 // 如果是純修改 (Save)，notifyMake 為 'false'，如果是按鈕動作，則為 'true'
                                 const payload = {
                                     action: 'UPDATE_ORDER', // 告訴 GAS 這是寫入動作
+                                    auth: authPassword.value, // 🔒 傳送密碼
                                     orderId: order.oid,
                                     service: order.service, // 用來找分頁
                                     
@@ -734,18 +769,11 @@
                     });
                 };
                 
-                // 🔥 新增：當點擊價格輸入框時，自動觸發編輯模式，避免資料被刷新覆蓋
-                const handlePriceFocus = () => {
-                    if (!isEditing.value) {
-                        startEdit();
-                    }
-                };
+                const handlePriceFocus = () => { if (!isEditing.value) startEdit(); };
 
                 const startEdit = () => { 
                     const formData = { ...selectedOrder.value };
-                    if (formData.date && formData.date.includes('/')) {
-                        formData.date = formData.date.replace(/\//g, '-');
-                    }
+                    if (formData.date && formData.date.includes('/')) formData.date = formData.date.replace(/\//g, '-');
                     if (formData.time) {
                         if (isTimeSlotService(formData.service)) {
                             const cleanTime = formData.time.replace(/\s+/g, '');
@@ -754,15 +782,13 @@
                         } else {
                             const timeMatch = formData.time.match(/(\d{1,2}):(\d{2})/);
                             if (timeMatch) {
-                                let hh = timeMatch[1];
-                                let mm = timeMatch[2];
+                                let hh = timeMatch[1]; let mm = timeMatch[2];
                                 if (hh.length === 1) hh = '0' + hh; 
                                 formData.time = `${hh}:${mm}`;
                             }
                         }
                     }
-                    editForm.value = formData; 
-                    isEditing.value = true; 
+                    editForm.value = formData; isEditing.value = true; 
                 };
                 const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
                 
@@ -781,6 +807,7 @@
                     
                     const payload = {
                         action: 'UPDATE_ORDER', // 告訴 GAS 這是寫入動作
+                        auth: authPassword.value, // 🔒 傳送密碼
                         orderId: order.oid,
                         service: order.service,
                         
@@ -828,13 +855,13 @@
                 };
 
                 // 將自動更新頻率改為 10 秒
-                onMounted(() => { fetchData(); setInterval(fetchData, 10000); });
+                onMounted(() => { checkLogin(); setInterval(() => fetchData(), 10000); });
                 return { 
                     reservations, selectedOrder, filter, loading, errorMsg, filteredList, 
                     selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel, showDebug,
                     isEditing, editForm, startEdit, cancelEdit, saveEdit, formatMoney, displayRawPrice, displayReceivedPrice,
                     isTimeSlotService, timeSlots, notifyOnUpdate, fillFullPayment, lastUpdated,
-                    handlePriceFocus // 👈 記得匯出這個新函式
+                    handlePriceFocus, isLoggedIn, inputPassword, loginError, login, logout
                 };
             }
         }).mount('#app');
