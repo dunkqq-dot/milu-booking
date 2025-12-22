@@ -352,29 +352,7 @@
                     return DATA_API_URL ? '...' + DATA_API_URL.substr(-10) : '未設定';
                 });
 
-                const login = () => {
-                    if (!inputPassword.value) { loginError.value = '請輸入密碼'; return; }
-                    authPassword.value = inputPassword.value.trim();
-                    loginError.value = '';
-                    isLoginLoading.value = true; 
-                    fetchData(true).then(() => { isLoginLoading.value = false; });
-                };
-
-                const logout = () => {
-                    isLoggedIn.value = false;
-                    authPassword.value = '';
-                    inputPassword.value = '';
-                    localStorage.removeItem('milu_auth');
-                    selectedOrder.value = null;
-                };
-
-                const checkLogin = () => {
-                    const savedPass = localStorage.getItem('milu_auth');
-                    if (savedPass) {
-                        authPassword.value = savedPass;
-                        fetchData(true);
-                    }
-                };
+            
 
                 const safeText = (text) => {
                     return (text && String(text).trim() !== '') ? String(text) : ' ';
