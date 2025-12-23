@@ -122,6 +122,7 @@
                     </div>
                     <div class="flex justify-between items-center">
                         <h3 class="font-bold text-gray-800">
+                            <!-- 簡單的高亮搜尋字 -->
                             <span v-html="highlightText(order.contactName)"></span>
                         </h3>
                         <span class="text-xs text-gray-400">{{ order.service }}</span>
@@ -340,7 +341,8 @@
 
         const configMap = {
             '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
-            '工作室取貨': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
+            '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
+            '工作室取貨': { time: '取貨時間', location: '取貨門市', icon: '🛍️' }, 
             '後車廂佈置': { time: '抵達時間', location: '施作地點', icon: '🚗' },
             '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
@@ -353,7 +355,6 @@
         createApp({
             setup() {
                 const DATA_API_URL = 'https://script.google.com/macros/s/AKfycbwfAyj7ktWXv4gPoFo7wVPLn1_nQ6w0hX8kTToggetxt3jqqD7yp67cxlrg5l1N1rsLaA/exec'; 
-                // ⚠️ Make Webhook URL (用於直接發送 LINE 訊息)
                 const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/63u0kheb71v9vengzdggfy1ga7r8gmng';
 
                 const reservations = ref([]);
@@ -362,7 +363,6 @@
                 const editForm = ref({});
                 const filter = ref('ALL');
                 
-                // 🔍 新增篩選變數
                 const searchQuery = ref('');
                 const filterDate = ref('');
                 const filterService = ref('');
@@ -380,7 +380,7 @@
                     return parseInt(str) || 0;
                 };
 
-                const isTimeSlotService = (service) => service.includes('外送') || service.includes('自取');
+                const isTimeSlotService = (service) => service.includes('外送') || service.includes('自取') || service.includes('取貨');
 
                 const displayRawPrice = computed({
                     get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
@@ -464,7 +464,7 @@
                 };
 
                 const fetchData = async () => {
-                    if (isEditing.value) return; // 編輯中不更新
+                    if (isEditing.value) return; 
                     loading.value = true; errorMsg.value = null;
                     if (!DATA_API_URL) { errorMsg.value = "尚未設定 GAS API 網址"; loading.value = false; return; }
 
@@ -479,7 +479,7 @@
 
                         const formattedData = data.map((item, index) => {
                             let serviceName = item[8] || '服務';
-                            if (serviceName.includes('自取')) serviceName = '工作室取貨'; 
+                            if (serviceName.includes('自取')) serviceName = '門市自取'; 
                             else if (serviceName.includes('後車廂')) serviceName = '後車廂佈置';
                             else if (serviceName.includes('外送')) serviceName = '氣球外送';
                             else if (serviceName.includes('佈置')) serviceName = '專人佈置';
@@ -534,11 +534,9 @@
                 const filteredList = computed(() => {
                     let result = reservations.value;
 
-                    // 1. 狀態篩選
                     if (filter.value === 'UNPAID') result = result.filter(r => r.status === 'UNPAID' || r.status === 'WAITING_PAYMENT');
                     else if (filter.value !== 'ALL') result = result.filter(r => r.status === filter.value);
 
-                    // 2. 關鍵字搜尋 (支援姓名、電話、LINE)
                     if (searchQuery.value) {
                         const q = searchQuery.value.toLowerCase();
                         result = result.filter(r => 
@@ -548,12 +546,10 @@
                         );
                     }
 
-                    // 3. 日期篩選
                     if (filterDate.value) {
                         result = result.filter(r => r.date === filterDate.value);
                     }
 
-                    // 4. 服務篩選
                     if (filterService.value) {
                         result = result.filter(r => r.service === filterService.value);
                     }
@@ -566,9 +562,8 @@
                     filterService.value = '';
                 };
                 
-                // 簡單的高亮文字功能 (增加防呆)
                 const highlightText = (text) => {
-                    if (!text) return ''; // 👈 防呆
+                    if (!text) return ''; 
                     if (!searchQuery.value) return text;
                     const regex = new RegExp(`(${searchQuery.value})`, 'gi');
                     return text.replace(regex, '<span class="bg-yellow-200 text-black">$1</span>');
@@ -665,24 +660,14 @@
                       };
                 };
 
-                // ⚡ 專門負責發送 LINE 訊息的函式 (修正版：傳送所有欄位 + 強制覆寫設定)
                 const sendToMake = async (payload, flex) => {
-                    // 1. 合併完整資料，確保 Make 收到所有欄位 (解決"資料很少"的問題)
-                    // 2. 強制設定 notifyMake 為 'true'，確保 Make 收到正確訊號
                     const makePayload = {
-                        ...payload, // 包含 orderId, service, date, time, price, balance 等所有欄位
-                        
-                        // Override specific fields for Make to ensure success
-                        notifyMake: 'true', 
+                        to: payload.to,
                         flexContents: flex, 
                         flexJson: JSON.stringify(flex), 
                         altText: payload.message ? payload.message.altText : '新通知',
-                        
-                        // 額外確保這些欄位存在
                         lineName: payload.lineName,
                         clientName: payload.clientName,
-                        
-                        // 模擬 LINE Bot API 格式 (備用)
                         messages: [ 
                             { 
                                 type: "flex", 
@@ -692,9 +677,7 @@
                         ]
                     };
 
-                    // 3. 深拷貝移除 Vue Proxy 殘留
                     const cleanBody = JSON.parse(JSON.stringify(makePayload));
-
                     console.log("Sending to Make (Full Payload):", cleanBody);
 
                     return fetch(SEND_MSG_WEBHOOK, {
@@ -749,17 +732,24 @@
                                     received: received,
                                     balance: balance,
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
-                                    notifyMake: 'false', // ⛔ 告訴 GAS 不要發送，因為我們自己發
+                                    notifyMake: 'false', 
                                     to: order.userId,
                                     message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
                                     flexContents: flex
                                 };
 
-                                // 🚀 平行處理：同時發 LINE (快，傳送完整資料) 和存 GAS (慢)
-                                await Promise.all([
+                                // 🚀 平行處理：同時發 LINE (快) 和存 GAS (慢)
+                                const results = await Promise.allSettled([
                                     sendToMake(payload, flex), 
                                     fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) }) 
                                 ]);
+
+                                // 檢查 Make 發送狀態 (處理 429 等錯誤)
+                                const makeResult = results[0];
+                                let warningMsg = '';
+                                if (makeResult.status === 'rejected' || (makeResult.value && !makeResult.value.ok)) {
+                                    warningMsg = '⚠️ 資料已儲存，但 LINE 發送失敗 (可能是額度不足)';
+                                }
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
@@ -768,7 +758,7 @@
                                 else if (actionType === 'REFUND') order.status = 'REFUNDED';
                                 else if (actionType === 'RESTORE') order.status = 'UNPAID';
                                 
-                                Swal.fire('成功', '通知已送出！', 'success');
+                                Swal.fire('成功', warningMsg || '通知已送出！', warningMsg ? 'warning' : 'success');
                             } catch (e) { Swal.fire('錯誤', '發送失敗：' + e.message, 'error'); }
                         }
                     });
@@ -783,26 +773,24 @@
                 };
                 const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
                 
-                // 🔥 修改後的儲存邏輯 (解決問題 1)
                 const saveEdit = async () => {
-                    // 1. 先詢問使用者意願
                     const { isConfirmed, isDenied } = await Swal.fire({
                         title: '儲存變更',
                         text: '您希望同時發送 LINE 通知給客人嗎？',
                         icon: 'question',
                         showDenyButton: true,
                         showCancelButton: true,
-                        confirmButtonText: '儲存並發送通知', // isConfirmed = true
-                        denyButtonText: '僅儲存 (不通知)',   // isDenied = true
+                        confirmButtonText: '儲存並發送通知', 
+                        denyButtonText: '僅儲存 (不通知)',   
                         cancelButtonText: '取消',
-                        confirmButtonColor: '#10B981', // 綠色
-                        denyButtonColor: '#6B7280'     // 灰色
+                        confirmButtonColor: '#10B981', 
+                        denyButtonColor: '#6B7280'
                     });
 
-                    if (!isConfirmed && !isDenied) return; // 按下取消
+                    if (!isConfirmed && !isDenied) return; 
 
                     const order = selectedOrder.value;
-                    const shouldNotify = isConfirmed; // true=發送, false=靜音
+                    const shouldNotify = isConfirmed; 
 
                     Swal.fire({ title: '儲存中...', text: shouldNotify ? '正在更新並發送通知...' : '正在安靜儲存...', didOpen: () => Swal.showLoading() });
                     
@@ -837,7 +825,6 @@
                         createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false',
                         notifyMake: 'false', // ⛔ 告訴 GAS 不要發送
                         
-                        // 關鍵：如果選擇不通知，將 to 設為空字串，讓 Make 的 Filter 擋下
                         to: shouldNotify ? order.userId : '', 
                         
                         message: shouldNotify ? { type: "flex", altText: `資料更新：${order.service}`, contents: flex } : null,
@@ -849,18 +836,31 @@
                         // 1. 存檔到 GAS (永遠執行)
                         requests.push(fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) }));
 
-                        // 2. 發送 LINE 到 Make (修正：無論是否通知都發送，交由 Make Filter 決定)
-                        // 之前是 if (shouldNotify) { ... }
-                        requests.push(sendToMake(payload, flex)); 
+                        // 2. 發送 LINE 到 Make (永遠發送，由 Make 過濾)
+                        requests.push(sendToMake(payload, flex));
 
-                        await Promise.all(requests);
+                        // 🚀 使用 allSettled 確保 GAS 存檔成功就算 LINE 失敗也不會擋住
+                        const results = await Promise.allSettled(requests);
                         
+                        // 檢查 Make 結果 (索引 1)
+                        const makeResult = results[1];
+                        let warningMsg = '';
+                        // 如果需要通知 (shouldNotify=true) 但 Make 失敗了，才顯示警告
+                        if (shouldNotify && (makeResult.status === 'rejected' || (makeResult.value && !makeResult.value.ok))) {
+                             warningMsg = '⚠️ 資料已儲存，但 LINE 發送失敗 (可能是額度不足)';
+                        }
+
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
                         selectedOrder.value.receivedPrice = parseMoney(editForm.value.receivedPrice);
                         isEditing.value = false;
-                        Swal.fire('成功', shouldNotify ? '資料已更新並發送通知！' : '資料已更新 (未發送通知)', 'success');
+                        
+                        if (warningMsg) {
+                            Swal.fire('部分成功', warningMsg, 'warning');
+                        } else {
+                            Swal.fire('成功', shouldNotify ? '資料已更新並發送通知！' : '資料已更新 (未發送通知)', 'success');
+                        }
                     } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
                 };
 
@@ -872,14 +872,12 @@
                     });
                 };
 
-                // 將自動更新頻率改為 30 秒 (解決問題 3)
                 onMounted(() => { fetchData(); setInterval(fetchData, 30000); });
                 return { 
                     reservations, selectedOrder, filter, loading, errorMsg, filteredList, 
                     selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel, showDebug,
                     isEditing, editForm, startEdit, cancelEdit, saveEdit, formatMoney, displayRawPrice, displayReceivedPrice,
                     isTimeSlotService, timeSlots, fillFullPayment, lastUpdated, handlePriceFocus,
-                    // 新增的搜尋與篩選變數
                     searchQuery, filterDate, filterService, clearFilters, configMap, highlightText
                 };
             }
