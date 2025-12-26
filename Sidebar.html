@@ -1,69 +1,252 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <base target="_top">
-    <style>
-      body { font-family: sans-serif; padding: 15px; }
-      .field { margin-bottom: 15px; }
-      label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; }
-      input, textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ddd; }
-      button { width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; }
-      #msg { color: green; margin-top: 10px; text-align: center; }
-    </style>
-  </head>
-  <body>
-    <h3>修改訂單內容</h3>
-    <div id="form">
-      <input type="hidden" id="row">
-      <div class="field">
-        <label>單號 (不可改)</label>
-        <input type="text" id="orderId" disabled>
-      </div>
-      <div class="field">
-        <label>收件人姓名</label>
-        <input type="text" id="name">
-      </div>
-      <div class="field">
-        <label>收件人電話</label>
-        <input type="text" id="phone">
-      </div>
-      <div class="field">
-        <label>地址</label>
-        <textarea id="address" rows="2"></textarea>
-      </div>
-      <div class="field">
-        <label>備註</label>
-        <textarea id="remark" rows="3"></textarea>
-      </div>
-      <button onclick="save()">確認修改並同步</button>
-      <div id="msg"></div>
+<head>
+  <base target="_top">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #8EACCD;      /* 麋鹿藍 */
+      --secondary: #D7E5CA;    /* 清新綠 */
+      --accent: #F9F3CC;       /* 柔和金 */
+      --text: #4A4A4A;
+      --bg: #F8F9FA;
+      --white: #FFFFFF;
+    }
+
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      margin: 0;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* 標題區域 */
+    .header {
+      text-align: center;
+      padding: 8px 0;
+      border-bottom: 2px solid var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .header h3 {
+      margin: 0;
+      color: var(--primary);
+      font-size: 20px;
+      letter-spacing: 1.5px;
+    }
+
+    .header p {
+      margin: 4px 0 0;
+      font-size: 12px;
+      color: #999;
+    }
+
+    /* 卡片容器 */
+    .card {
+      background: var(--white);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+
+    /* 輸入區塊 */
+    .field {
+      margin-bottom: 16px;
+    }
+
+    label {
+      display: block;
+      font-weight: 500;
+      font-size: 13px;
+      color: #777;
+      margin-bottom: 6px;
+      padding-left: 4px;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 12px 14px;
+      border: 1px solid #E0E0E0;
+      border-radius: 10px;
+      font-size: 14px;
+      background-color: #FAFAFA;
+      transition: all 0.3s ease;
+      outline: none;
+    }
+
+    input:focus, textarea:focus, select:focus {
+      border-color: var(--primary);
+      background-color: var(--white);
+      box-shadow: 0 0 0 3px rgba(142, 172, 205, 0.2);
+    }
+
+    textarea {
+      resize: none;
+    }
+
+    /* 下拉選單特別樣式 */
+    select {
+      cursor: pointer;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%23777' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+
+    /* 按鈕樣式 */
+    button {
+      width: 100%;
+      padding: 14px;
+      background-color: var(--primary);
+      color: var(--white);
+      border: none;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.2s, background-color 0.3s;
+      box-shadow: 0 4px 10px rgba(142, 172, 205, 0.3);
+      margin-top: 10px;
+    }
+
+    button:hover {
+      background-color: #7A9BBD;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    /* 狀態提示 */
+    #msg {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 14px;
+      min-height: 20px;
+      transition: color 0.3s;
+    }
+
+    .success { color: #527853; font-weight: 500; }
+    .loading { color: #888; font-style: italic; }
+
+    /* 唯讀單號樣式 */
+    .order-id-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: var(--accent);
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      color: #B2A59B;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h3>🦌 麋鹿工具</h3>
+    <p>MOOSE BALLOON ORDER MANAGER</p>
+  </div>
+
+  <div class="card">
+    <div id="order-badge" class="order-id-badge">讀取中...</div>
+    <input type="hidden" id="row">
+
+    <div class="field">
+      <label>🎈 品項分類</label>
+      <select id="category">
+        <option value="一般">一般品項</option>
+        <option value="性別">性別氣球</option>
+        <option value="空飄">空飄氣球</option>
+        <option value="性別空飄">性別 + 空飄</option>
+      </select>
     </div>
 
-    <script>
-      // 初始化：抓取目前選中的行
-      google.script.run.withSuccessHandler(function(data) {
-        if (data) {
-          document.getElementById('row').value = data.row;
-          document.getElementById('orderId').value = data.id;
-          document.getElementById('name').value = data.name;
-          document.getElementById('phone').value = data.phone;
-          document.getElementById('address').value = data.address;
-          document.getElementById('remark').value = data.remark;
-        }
-      }).getSelectedRowData();
+    <div class="field">
+      <label>📅 送貨日期</label>
+      <input type="text" id="date" placeholder="YYYY/MM/DD">
+    </div>
 
-      function save() {
-        var formData = {
-          row: document.getElementById('row').value,
-          name: document.getElementById('name').value,
-          phone: document.getElementById('phone').value,
-          address: document.getElementById('address').value,
-          remark: document.getElementById('remark').value
-        };
-        google.script.run.withSuccessHandler(function(res) {
-          document.getElementById('msg').innerHTML = res;
-        }).updateOrderData(formData);
+    <div class="field">
+      <label>🕒 送貨時間</label>
+      <input type="text" id="time" placeholder="例如 13:00 - 15:00">
+    </div>
+
+    <div class="field">
+      <label>👤 收件人姓名</label>
+      <input type="text" id="name">
+    </div>
+
+    <div class="field">
+      <label>📞 連絡電話</label>
+      <input type="text" id="phone">
+    </div>
+
+    <div class="field">
+      <label>📍 配送地址</label>
+      <textarea id="address" rows="2"></textarea>
+    </div>
+
+    <div class="field">
+      <label>📝 訂單備註</label>
+      <textarea id="remark" rows="2"></textarea>
+    </div>
+
+    <button onclick="save()">更新訂單並同步</button>
+    <p id="msg"></p>
+  </div>
+
+  <script>
+    // 初始化：抓取資料
+    window.onload = function() {
+      google.script.run.withSuccessHandler(show).getSelectedRowData();
+    };
+
+    function show(d) {
+      if(!d) {
+        document.getElementById('msg').innerHTML = "❌ 請先點選試算表中的訂單行";
+        return;
       }
-    </script>
-  </body>
+      document.getElementById('row').value = d.row; 
+      document.getElementById('order-badge').innerText = "單號 " + d.id;
+      document.getElementById('date').value = d.date;
+      document.getElementById('time').value = d.time; 
+      document.getElementById('name').value = d.name;
+      document.getElementById('phone').value = d.phone; 
+      document.getElementById('address').value = d.address;
+      document.getElementById('remark').value = d.remark;
+      document.getElementById('category').value = d.category;
+    }
+
+    function save() {
+      const msg = document.getElementById('msg');
+      msg.className = "loading";
+      msg.innerText = "⏳ 正在處理中...";
+
+      var f = {
+        row: document.getElementById('row').value, 
+        date: document.getElementById('date').value,
+        time: document.getElementById('time').value, 
+        name: document.getElementById('name').value,
+        phone: document.getElementById('phone').value, 
+        address: document.getElementById('address').value,
+        remark: document.getElementById('remark').value, 
+        category: document.getElementById('category').value
+      };
+
+      google.script.run.withSuccessHandler(function(r){
+        msg.className = "success";
+        msg.innerText = r;
+        // 3秒後清除訊息
+        setTimeout(() => { msg.innerText = ""; }, 3000);
+      }).updateOrderData(f);
+    }
+  </script>
+</body>
 </html>
