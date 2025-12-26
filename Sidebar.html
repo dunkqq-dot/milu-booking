@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <style>
+      body { font-family: sans-serif; padding: 15px; }
+      .field { margin-bottom: 15px; }
+      label { display: block; font-weight: bold; margin-bottom: 5px; color: #555; }
+      input, textarea { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ddd; }
+      button { width: 100%; padding: 10px; background: #4CAF50; color: white; border: none; cursor: pointer; }
+      #msg { color: green; margin-top: 10px; text-align: center; }
+    </style>
+  </head>
+  <body>
+    <h3>修改訂單內容</h3>
+    <div id="form">
+      <input type="hidden" id="row">
+      <div class="field">
+        <label>單號 (不可改)</label>
+        <input type="text" id="orderId" disabled>
+      </div>
+      <div class="field">
+        <label>收件人姓名</label>
+        <input type="text" id="name">
+      </div>
+      <div class="field">
+        <label>收件人電話</label>
+        <input type="text" id="phone">
+      </div>
+      <div class="field">
+        <label>地址</label>
+        <textarea id="address" rows="2"></textarea>
+      </div>
+      <div class="field">
+        <label>備註</label>
+        <textarea id="remark" rows="3"></textarea>
+      </div>
+      <button onclick="save()">確認修改並同步</button>
+      <div id="msg"></div>
+    </div>
+
+    <script>
+      // 初始化：抓取目前選中的行
+      google.script.run.withSuccessHandler(function(data) {
+        if (data) {
+          document.getElementById('row').value = data.row;
+          document.getElementById('orderId').value = data.id;
+          document.getElementById('name').value = data.name;
+          document.getElementById('phone').value = data.phone;
+          document.getElementById('address').value = data.address;
+          document.getElementById('remark').value = data.remark;
+        }
+      }).getSelectedRowData();
+
+      function save() {
+        var formData = {
+          row: document.getElementById('row').value,
+          name: document.getElementById('name').value,
+          phone: document.getElementById('phone').value,
+          address: document.getElementById('address').value,
+          remark: document.getElementById('remark').value
+        };
+        google.script.run.withSuccessHandler(function(res) {
+          document.getElementById('msg').innerHTML = res;
+        }).updateOrderData(formData);
+      }
+    </script>
+  </body>
+</html>
