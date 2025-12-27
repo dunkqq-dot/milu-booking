@@ -15,8 +15,8 @@
         /* 隱藏捲軸 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* 選中狀態（電腦版側邊欄） */
-        .selected-order { border-left: 6px solid #3b82f6; background-color: #f8fafc; position: relative; }
+        /* 選中狀態（側邊欄） */
+        .selected-order { border-left: 6px solid #3b82f6 !important; background-color: #f8fafc; position: relative; }
         .selected-order::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 4px; background: #3b82f6; border-radius: 4px 0 0 4px; }
     </style>
 </head>
@@ -62,35 +62,36 @@
             <div id="sidebar-list" class="flex-1 overflow-y-auto no-scrollbar">
                 <div class="p-20 text-center flex flex-col items-center">
                     <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full spin mb-4"></div>
-                    <p class="text-slate-300 font-bold text-xs uppercase tracking-widest animate-pulse">Loading orders...</p>
+                    <p class="text-slate-300 font-bold text-xs uppercase tracking-widest animate-pulse">Fetching orders...</p>
                 </div>
             </div>
 
             <!-- 載入更多 -->
             <div id="load-more-area" class="p-4 border-t border-slate-50 hidden bg-white">
-                <button id="load-more-btn" class="w-full py-3 bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-blue-50 hover:text-blue-500 transition-all">Load More Orders</button>
+                <button id="load-more-btn" class="w-full py-3 bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-blue-50 hover:text-blue-500 transition-all">Load More</button>
             </div>
         </aside>
 
         <!-- 右側：詳情視窗 -->
-        <main id="main-content" class="absolute inset-0 md:relative md:flex-1 bg-slate-50 overflow-y-auto z-20 translate-x-full md:translate-x-0 transition-transform duration-300 scroll-smooth">
+        <main id="main-content" class="absolute inset-0 md:relative md:flex-1 bg-slate-50 overflow-y-auto z-20 translate-x-full md:translate-x-0 transition-transform duration-300">
             
+            <!-- 置頂專用透明點 -->
+            <div id="top-anchor" style="height: 1px;"></div>
+
             <!-- 手機版 Header -->
             <div class="md:hidden bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex items-center gap-4 sticky top-0 z-50">
                 <button onclick="backToList()" class="p-2 -ml-2 text-slate-800 bg-slate-100 rounded-xl btn-active">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
                 </button>
-                <h2 id="mobile-title" class="font-black text-slate-900 tracking-tighter">Order Detail</h2>
+                <h2 id="mobile-title" class="font-black text-slate-900 tracking-tighter uppercase text-sm">Order Info</h2>
             </div>
 
-            <!-- 預設畫面 -->
-            <div id="empty-state" class="hidden md:flex h-full flex-col items-center justify-center text-slate-300">
-                <div class="text-center">
-                    <div class="w-32 h-32 bg-white rounded-[3rem] shadow-2xl shadow-slate-200 flex items-center justify-center mx-auto mb-8 border border-slate-50">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-slate-200"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    </div>
-                    <p class="font-black text-xl text-[#0f172a] tracking-widest uppercase">Select an order</p>
-                    <p class="text-slate-400 text-xs font-bold mt-2 uppercase tracking-[0.3em]">點擊左側列表開始編輯</p>
+            <!-- 初始加載中的提示 (只有還沒選中時顯示) -->
+            <div id="empty-state" class="flex h-full flex-col items-center justify-center text-slate-300">
+                <div class="text-center p-12">
+                    <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full spin mx-auto mb-6"></div>
+                    <p class="font-black text-xl text-[#0f172a] tracking-widest uppercase">Initializing...</p>
+                    <p class="text-slate-400 text-xs font-bold mt-2 uppercase tracking-[0.3em]">系統正在自動讀取首筆訂單</p>
                 </div>
             </div>
 
@@ -167,6 +168,17 @@
             return String(v);
         }
 
+        function forceScrollTop() {
+            const mainContent = document.getElementById('main-content');
+            if (mainContent) {
+                mainContent.scrollTop = 0;
+                mainContent.scrollTo({ top: 0, behavior: 'instant' });
+                // 輔助：對齊頂部錨點
+                const anchor = document.getElementById('top-anchor');
+                if (anchor) anchor.scrollIntoView({ block: 'start', behavior: 'instant' });
+            }
+        }
+
         function showToast(msg) {
             const toast = document.getElementById('toast');
             document.getElementById('toast-msg').innerText = msg;
@@ -182,21 +194,21 @@
             
             filteredOrders = allOrders.filter(o => !search || [getVal(o, 'id'), getVal(o, 'name')].some(v => v.toLowerCase().includes(search)));
             filteredOrders.sort((a, b) => {
-                const valA = getVal(a, currentSort.key), valB = getVal(b, currentSort.key);
+                const valA = String(getVal(a, currentSort.key)), valB = String(getVal(b, currentSort.key));
                 let res = valA.localeCompare(valB, undefined, {numeric: true});
                 return currentSort.desc ? -res : res;
             });
 
             const toShow = filteredOrders.slice(0, displayedCount);
             if (toShow.length === 0) {
-                list.innerHTML = `<div class="p-10 text-center text-slate-300 font-bold text-sm uppercase tracking-widest">No matching results</div>`;
+                list.innerHTML = `<div class="p-10 text-center text-slate-300 font-bold text-sm uppercase tracking-widest">No Results</div>`;
             } else {
                 list.innerHTML = toShow.map(o => {
                     const id = getVal(o, 'id'), name = getVal(o, 'name'), date = getVal(o, 'date');
-                    const isSelected = selectedId === id;
+                    const isSelected = selectedId && selectedId.toString() === id.toString();
                     const displayId = id.toString().startsWith('#') ? id : '#'+id;
                     return `
-                    <div onclick="selectOrder('${id}')" class="p-6 border-b border-slate-50 cursor-pointer hover:bg-slate-50/80 transition-all ${isSelected ? 'selected-order' : ''}">
+                    <div onclick="selectOrder('${id}')" class="p-6 border-b border-slate-50 cursor-pointer hover:bg-slate-50 transition-all ${isSelected ? 'selected-order' : ''}">
                         <div class="flex justify-between items-start mb-2">
                             <span class="font-mono font-black ${isSelected ? 'text-blue-600' : 'text-slate-400'} text-sm tracking-tighter">${displayId}</span>
                             <span class="text-[9px] text-slate-400 font-black uppercase tracking-wider">${date}</span>
@@ -213,34 +225,23 @@
             const emptyState = document.getElementById('empty-state');
             const mainContent = document.getElementById('main-content');
             
-            // 情況 1：尚未選擇任何訂單
             if (!selectedId) {
                 detailView.classList.add('hidden');
-                emptyState.classList.add('md:flex'); emptyState.classList.remove('hidden');
+                emptyState.classList.remove('hidden');
                 if (window.innerWidth < 768) mainContent.classList.add('translate-x-full');
                 return;
             }
 
-            // 尋找訂單時採用更寬鬆的比對
             const order = allOrders.find(o => getVal(o, 'id').toString().trim() === selectedId.toString().trim());
             
-            // 情況 2：已點選但找不到資料（例如同步中）
             if (!order) {
-                detailView.classList.remove('hidden');
-                emptyState.classList.add('hidden');
-                mainContent.classList.remove('translate-x-full');
-                detailView.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full text-slate-400 py-20">
-                        <div class="w-12 h-12 border-4 border-slate-200 border-t-blue-500 rounded-full spin mb-4"></div>
-                        <p class="font-bold tracking-widest text-lg">正在讀取訂單 #${selectedId} 資料...</p>
-                        <p class="text-xs mt-2">如果長時間無反應，請點擊上方 Sync Data</p>
-                    </div>`;
+                detailView.classList.remove('hidden'); emptyState.classList.add('hidden');
+                detailView.innerHTML = `<div class="p-20 text-center text-slate-300 font-bold tracking-widest animate-pulse">載入中...</div>`;
+                forceScrollTop();
                 return;
             }
 
-            // 情況 3：正常渲染詳情
-            detailView.classList.remove('hidden');
-            emptyState.classList.add('hidden');
+            detailView.classList.remove('hidden'); emptyState.classList.add('hidden');
             mainContent.classList.remove('translate-x-full');
 
             const id = getVal(order, 'id');
@@ -248,80 +249,53 @@
             document.getElementById('mobile-title').innerText = displayId;
 
             detailView.innerHTML = `
-                <!-- 頂部資訊條 -->
-                <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-12">
+                <!-- 頂部標題與操作區 -->
+                <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6 border-b border-slate-100 pb-6">
                     <div>
-                        <div class="flex items-center gap-3">
-                            <h2 class="text-5xl lg:text-6xl font-black text-[#0f172a] tracking-tighter">${displayId}</h2>
-                            ${isEditing ? '<span class="px-3 py-1 bg-amber-100 text-amber-600 text-[10px] font-black rounded-lg uppercase tracking-widest animate-pulse">Editing</span>' : ''}
-                        </div>
-                        <p class="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mt-3">Advanced Delivery Management System</p>
+                        <h2 class="text-5xl font-black text-[#0f172a] tracking-tighter">${displayId}</h2>
+                        <p class="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mt-1">Management Console</p>
                     </div>
                     <div class="flex gap-3 w-full xl:w-auto">
                         ${isEditing ? `
-                            <button onclick="saveOrder('${id}')" class="flex-1 xl:flex-none flex items-center justify-center gap-3 px-10 py-5 bg-blue-600 text-white rounded-[1.5rem] font-black shadow-2xl shadow-blue-200 btn-active text-xs uppercase tracking-widest">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                Confirm Save
-                            </button>
-                            <button onclick="isEditing=false; renderDetail();" class="px-8 py-5 bg-white border border-slate-200 text-slate-400 rounded-[1.5rem] font-black text-xs uppercase tracking-widest btn-active">Cancel</button>
+                            <button onclick="saveOrder('${id}')" class="flex-1 xl:flex-none flex items-center justify-center gap-3 px-8 py-3.5 bg-blue-600 text-white rounded-2xl font-black shadow-xl shadow-blue-100 btn-active text-xs uppercase">Confirm Save</button>
+                            <button onclick="isEditing=false; renderDetail();" class="px-8 py-3.5 bg-white border border-slate-200 text-slate-400 rounded-2xl font-black text-xs uppercase btn-active">Cancel</button>
                         ` : `
-                            <button onclick="isEditing=true; renderDetail();" class="flex-1 xl:flex-none flex items-center justify-center gap-3 px-10 py-5 bg-[#0f172a] text-white rounded-[1.5rem] font-black shadow-2xl shadow-slate-300 btn-active hover:bg-blue-600 text-xs uppercase tracking-widest transition-all">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                                Edit Order
-                            </button>
+                            <button onclick="isEditing=true; renderDetail();" class="flex-1 xl:flex-none flex items-center justify-center gap-3 px-8 py-3.5 bg-[#0f172a] text-white rounded-2xl font-black shadow-2xl shadow-slate-300 btn-active hover:bg-blue-600 text-xs uppercase transition-all">Edit Order</button>
                         `}
                     </div>
                 </div>
 
-                <!-- 資訊網格佈局 (全屏三欄式) -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 h-fit">
-                    
-                    <!-- 欄位 1：人員資訊 -->
-                    <div class="space-y-8">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-white">
-                            <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-8">基本聯絡人</h3>
-                            <div class="space-y-8">
-                                ${detailField("訂購人姓名", "name", order)}
-                                ${detailField("訂購電話", "phone", order)}
-                            </div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 h-fit items-start">
+                    <!-- 第一欄 -->
+                    <div class="space-y-6">
+                        <div class="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-white">
+                            <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-6">Contact</h3>
+                            <div class="space-y-6">${detailField("訂購人姓名", "name", order)}${detailField("訂購電話", "phone", order)}</div>
                         </div>
-
-                        <div class="bg-blue-50/50 p-8 rounded-[2.5rem] shadow-sm border border-blue-100/50">
-                            <h3 class="text-[10px] font-black text-blue-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-8">收件人資訊</h3>
-                            <div class="space-y-8">
-                                ${detailField("收件人姓名", "recipientName", order)}
-                                ${detailField("收件電話", "recipientPhone", order)}
-                            </div>
+                        <div class="bg-blue-50/50 p-6 rounded-[2rem] shadow-sm border border-blue-100/50">
+                            <h3 class="text-[10px] font-black text-blue-300 uppercase tracking-[0.3em] mb-6">Recipient</h3>
+                            <div class="space-y-6">${detailField("收件人姓名", "recipientName", order)}${detailField("收件電話", "recipientPhone", order)}</div>
                         </div>
                     </div>
-
-                    <!-- 欄位 2：地址與備註 -->
-                    <div class="space-y-8">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-white h-full flex flex-col">
-                            <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-8">完整配送地址</h3>
-                            <div class="flex-1">
-                                ${detailField("配送詳細地址", "address", order, "textarea")}
-                            </div>
-                        </div>
-                        <div class="bg-slate-100/50 p-8 rounded-[2.5rem]">
-                            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6">備註事項</h3>
-                            ${detailField("內部管理備註", "note", order, "textarea")}
-                        </div>
+                    <!-- 第二欄 -->
+                    <div class="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-white lg:min-h-[400px] flex flex-col">
+                        <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-6">Address</h3>
+                        <div class="flex-1">${detailField("詳細配送地址", "address", order, "textarea")}</div>
                     </div>
-
-                    <!-- 欄位 3：配送排程 -->
-                    <div class="lg:col-span-2 xl:col-span-1">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-white h-full">
-                            <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-8">派送時間與時段</h3>
-                            <div class="space-y-10">
-                                ${detailField("預約配送日期", "date", order, "date")}
-                                ${detailField("指定配送時間", "time", order, "time")}
-                                ${detailField("配送時段標籤", "period", order, "period-tags")}
-                            </div>
-                        </div>
+                    <!-- 第三欄 -->
+                    <div class="bg-white p-6 rounded-[2rem] shadow-xl shadow-slate-200/40 border border-white h-full">
+                        <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-6">Logistics</h3>
+                        <div class="space-y-8">${detailField("配送日期", "date", order, "date")}${detailField("配送時間", "time", order, "time")}${detailField("時段標籤", "period", order, "period-tags")}</div>
+                    </div>
+                    <!-- 備註 -->
+                    <div class="xl:col-span-3 bg-slate-100/50 p-6 rounded-[2rem]">
+                        <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-4">Internal Notes</h3>
+                        ${detailField("備註說明", "note", order, "textarea")}
                     </div>
                 </div>
             `;
+            // 渲染後強制置頂
+            forceScrollTop();
         }
 
         function detailField(label, type, order, inputType = "text") {
@@ -334,36 +308,29 @@
                 if (inputType === "period-tags") {
                     return `<div class="flex flex-col gap-3">
                         <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${label}</span>
-                        <div class="flex flex-wrap gap-2">${PERIOD_TAGS.map(tag => `<button onclick="setPeriodValue('${tag}')" class="px-4 py-2 rounded-xl text-[10px] font-black border transition-all ${val === tag ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100 shadow-sm'}">${tag}</button>`).join('')}</div>
-                        <input id="edit-period" type="text" class="w-full border-2 border-slate-100 p-4 rounded-2xl text-sm focus:border-blue-500 focus:bg-white outline-none font-bold bg-slate-50 transition-all" value="${val}" placeholder="或手動修改...">
+                        <div class="flex flex-wrap gap-2">${PERIOD_TAGS.map(tag => `<button onclick="setPeriodValue('${tag}')" class="px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all ${val === tag ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100 shadow-sm'}">${tag}</button>`).join('')}</div>
+                        <input id="edit-period" type="text" class="w-full border-2 border-slate-100 p-3 rounded-xl text-sm focus:border-blue-500 focus:bg-white outline-none font-bold bg-slate-50 transition-all shadow-inner" value="${val}">
                     </div>`;
                 }
                 if (inputType === "textarea") {
-                    return `<div class="flex flex-col gap-2 h-full"><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${label}</span><textarea id="edit-${type}" class="w-full border-2 border-slate-100 p-4 rounded-2xl text-sm focus:border-blue-500 focus:bg-white outline-none font-bold bg-slate-50 transition-all flex-1 min-h-[120px]">${val}</textarea></div>`;
+                    return `<div class="flex flex-col gap-1 h-full"><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${label}</span><textarea id="edit-${type}" class="w-full border-2 border-slate-100 p-3 rounded-xl text-sm focus:border-blue-500 focus:bg-white outline-none font-bold bg-slate-50 transition-all min-h-[100px] shadow-inner">${val}</textarea></div>`;
                 }
-                return `<div class="flex flex-col gap-2"><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${label}</span><input id="edit-${type}" type="${type === 'time' ? 'time' : inputType}" class="w-full border-2 border-slate-100 p-4 rounded-2xl text-sm focus:border-blue-500 focus:bg-white outline-none font-bold bg-slate-50 transition-all" value="${val}"></div>`;
+                return `<div class="flex flex-col gap-2"><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${label}</span><input id="edit-${type}" type="${type === 'time' ? 'time' : inputType}" class="w-full border-2 border-slate-100 p-4 rounded-2xl text-sm focus:border-blue-500 focus:bg-white outline-none font-bold bg-slate-50 transition-all shadow-inner" value="${val}"></div>`;
             }
-            return `<div class="flex flex-col text-left group"><span class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-3">${label}</span><span class="text-[17px] font-bold text-slate-800 leading-relaxed">${val || "---"}</span></div>`;
+            return `<div class="flex flex-col text-left group"><span class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-3 leading-none">${label}</span><span class="text-[16px] font-bold text-slate-800 leading-tight">${val || "---"}</span></div>`;
         }
 
         // --- 4. 行為控制 ---
 
         function selectOrder(id) {
-            selectedId = id; 
-            isEditing = false;
-            
-            // 強制回到頂部
-            const mainContent = document.getElementById('main-content');
-            if (mainContent) mainContent.scrollTop = 0;
-            
+            selectedId = id; isEditing = false;
+            // 先強制重置視角
+            forceScrollTop();
             renderSidebar(); 
             renderDetail();
         }
 
-        function backToList() {
-            selectedId = null; isEditing = false;
-            renderSidebar(); renderDetail();
-        }
+        function backToList() { selectedId = null; isEditing = false; renderSidebar(); renderDetail(); }
 
         function setPeriodValue(val) {
             const input = document.getElementById('edit-period');
@@ -371,7 +338,7 @@
                 input.value = val;
                 const btns = input.parentElement.querySelectorAll('button');
                 btns.forEach(b => {
-                    b.className = b.innerText === val ? 'px-4 py-2 rounded-xl text-[10px] font-black border transition-all bg-blue-600 text-white border-blue-600 shadow-lg' : 'px-4 py-2 rounded-xl text-[10px] font-black border transition-all bg-white text-slate-400 border-slate-100 shadow-sm';
+                    b.className = b.innerText === val ? 'px-4 py-2 rounded-xl text-[10px] font-black border transition-all bg-blue-600 text-white border-blue-600 shadow-lg' : 'px-3 py-1.5 rounded-xl text-[10px] font-black border transition-all bg-white text-slate-400 border-slate-100 shadow-sm';
                 });
             }
         }
@@ -382,17 +349,23 @@
             try {
                 const res = await fetch(`${GAS_API_URL}?action=getOrders`);
                 allOrders = await res.json();
-                document.getElementById('sync-status').innerText = `最後更新：${new Date().toLocaleTimeString()} | 共 ${allOrders.length} 筆`;
-                renderSidebar(); 
-                renderDetail(); // 抓取完畢後重新嘗試渲染詳情
+                document.getElementById('sync-status').innerText = `最後同步：${new Date().toLocaleTimeString()} | 共 ${allOrders.length} 筆`;
+                
+                // --- 重點修正：如果還沒選中任何訂單，自動選取清單中的第一筆 ---
+                if (allOrders.length > 0 && !selectedId) {
+                    const firstId = getVal(allOrders[0], 'id');
+                    selectOrder(firstId);
+                } else {
+                    renderSidebar(); 
+                    renderDetail(); 
+                }
             } catch (e) { showToast("連線失敗"); }
             finally { document.getElementById('refresh-icon').classList.remove('spin'); }
         }
 
         async function saveOrder(id) {
             document.getElementById('sync-status').innerText = "等待同步中...";
-            showToast("正在更新雲端試算表...");
-            
+            showToast("正在傳送更新...");
             const order = allOrders.find(o => getVal(o, 'id').toString().trim() === id.toString().trim());
             const dataToSend = { "訂單編號": id };
             const syncHeader = Object.keys(order).find(k => FIELD_MAPS.syncStatus.includes(k.trim())) || "同步狀態";
@@ -414,32 +387,20 @@
                 await fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateOrder', data: dataToSend }) });
                 showToast("雲端同步完成");
                 setTimeout(fetchOrders, 800);
-            } catch (e) {
-                alert("儲存失敗");
-                document.getElementById('sync-status').innerText = "同步失敗";
-            }
+            } catch (e) { alert("儲存失敗"); document.getElementById('sync-status').innerText = "同步失敗"; }
         }
 
-        // --- 5. 事件監聽 ---
         document.getElementById('refresh-btn').onclick = fetchOrders;
         document.getElementById('search-input').oninput = () => { displayedCount = PAGE_SIZE; renderSidebar(); };
         document.getElementById('load-more-btn').onclick = () => { displayedCount += PAGE_SIZE; renderSidebar(); };
         
         document.getElementById('sort-id-btn').onclick = () => {
             currentSort = { key: 'id', desc: currentSort.key === 'id' ? !currentSort.desc : true };
-            document.getElementById('sort-id-btn').className = `flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase border bg-blue-600 text-white border-blue-600 shadow-lg`;
-            document.getElementById('sort-date-btn').className = `flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase border bg-white text-slate-400 border-slate-100`;
-            document.getElementById('sort-id-icon').innerText = currentSort.desc ? '▼' : '▲';
-            document.getElementById('sort-date-icon').innerText = '';
             renderSidebar();
         };
 
         document.getElementById('sort-date-btn').onclick = () => {
             currentSort = { key: 'date', desc: currentSort.key === 'date' ? !currentSort.desc : true };
-            document.getElementById('sort-date-btn').className = `flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase border bg-blue-600 text-white border-blue-600 shadow-lg`;
-            document.getElementById('sort-id-btn').className = `flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase border bg-white text-slate-400 border-slate-100`;
-            document.getElementById('sort-id-icon').innerText = '';
-            document.getElementById('sort-date-icon').innerText = currentSort.desc ? '▼' : '▲';
             renderSidebar();
         };
 
