@@ -13,33 +13,50 @@
         .glass { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        input { font-size: 16px !important; } /* 防止手機縮放 */
+        /* 防止手機輸入時自動縮放 */
+        input { font-size: 16px !important; }
     </style>
 </head>
 <body class="min-h-screen flex items-center justify-center p-4">
 
-    <div id="appContainer" class="w-full max-w-md glass p-8 rounded-[2.5rem] shadow-2xl border border-white">
-        <div class="text-center mb-10">
-            <div class="w-20 h-20 bg-blue-600 rounded-3xl shadow-lg shadow-blue-200 flex items-center justify-center mx-auto mb-6">
-                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <div id="appContainer" class="w-full max-w-md glass p-6 md:p-8 rounded-[2.5rem] shadow-2xl border border-white">
+        <div class="text-center mb-6">
+            <div class="w-16 h-16 bg-blue-600 rounded-3xl shadow-lg shadow-blue-200 flex items-center justify-center mx-auto mb-4">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
             </div>
-            <h1 class="text-3xl font-black text-slate-800 tracking-tighter italic uppercase">East Store <span class="text-blue-600">Verify</span></h1>
-            <p id="statusText" class="text-slate-400 text-xs font-bold mt-2 uppercase tracking-[0.2em]">正在建立安全連線...</p>
+            <h1 class="text-2xl font-black text-slate-800 tracking-tighter italic uppercase leading-none">East Store <span class="text-blue-600">Verify</span></h1>
+            <p id="statusText" class="text-slate-400 text-[10px] font-bold mt-2 uppercase tracking-[0.2em]">正在建立安全連線...</p>
+        </div>
+
+        <!-- 提示區塊 -->
+        <div id="hintBox" class="hidden mb-6 bg-blue-50/50 border border-blue-100 p-4 rounded-2xl">
+            <h3 class="text-blue-600 text-[11px] font-black uppercase tracking-widest flex items-center gap-2 mb-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+                哪裡找訂單編號？
+            </h3>
+            <ul class="text-[10px] text-slate-500 font-bold space-y-1 ml-1">
+                <li>• 請查看您的「訂單確認信 (Email)」</li>
+                <li>• 或下單後收到的「簡訊通知」</li>
+                <li>• 編號開頭必須帶有 <span class="text-blue-600">#</span> (例如：#3864)</li>
+            </ul>
         </div>
 
         <form id="verifyForm" class="space-y-6 hidden">
             <!-- 訂單編號 -->
             <div class="space-y-2">
-                <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Order ID / 訂單編號</label>
-                <input type="text" id="orderId" placeholder="例如：3864" required
-                    class="w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-600 rounded-2xl outline-none font-bold text-slate-800 transition-all placeholder:text-slate-300 shadow-inner">
+                <div class="flex justify-between items-end px-1">
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Order ID / 訂單編號</label>
+                </div>
+                <input type="text" id="orderId" placeholder="#例如：3864" required
+                    class="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-600 rounded-2xl outline-none font-bold text-slate-800 transition-all placeholder:text-slate-300 shadow-inner">
+                <p class="text-[9px] text-slate-400 font-medium ml-1">* 請務必包含 # 符號</p>
             </div>
 
             <!-- 電話號碼 -->
             <div class="space-y-2">
                 <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone / 訂購人電話</label>
                 <input type="tel" id="phone" placeholder="例如：0912345678" required
-                    class="w-full px-6 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-600 rounded-2xl outline-none font-bold text-slate-800 transition-all placeholder:text-slate-300 shadow-inner">
+                    class="w-full px-5 py-4 bg-slate-50 border-2 border-transparent focus:border-blue-600 rounded-2xl outline-none font-bold text-slate-800 transition-all placeholder:text-slate-300 shadow-inner">
             </div>
 
             <button type="submit" id="submitBtn"
@@ -49,12 +66,12 @@
             </button>
         </form>
 
-        <div id="resultArea" class="hidden mt-8 p-6 rounded-2xl text-center border-2"></div>
+        <div id="resultArea" class="hidden mt-6 p-6 rounded-2xl text-center border-2"></div>
     </div>
 
     <script>
         const GAS_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec";
-        const LIFF_ID = "2004044468-VfhTsAq4"; // 使用您提供的 LIFF ID
+        const LIFF_ID = "2004044468-VfhTsAq4"; 
         
         let userUid = null;
 
@@ -66,8 +83,9 @@
                 } else {
                     const profile = await liff.getProfile();
                     userUid = profile.userId;
-                    document.getElementById('statusText').innerText = "請輸入資訊以完成身份驗證";
+                    document.getElementById('statusText').innerText = "身份驗證模式已就緒";
                     document.getElementById('verifyForm').classList.remove('hidden');
+                    document.getElementById('hintBox').classList.remove('hidden');
                 }
             } catch (err) {
                 document.getElementById('statusText').innerText = "連線失敗，請稍後再試";
@@ -80,19 +98,27 @@
             const icon = document.getElementById('loadingIcon');
             const result = document.getElementById('resultArea');
             
+            // 取得輸入值並清理格式
+            let orderId = document.getElementById('orderId').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+
+            // 如果客人沒輸入 #，幫他補上 (提高成功率)
+            if (!orderId.startsWith('#')) {
+                orderId = '#' + orderId;
+            }
+
             btn.disabled = true;
             icon.classList.remove('hidden');
 
             try {
-                // 傳送到後端進行 webVerify
                 await fetch(GAS_URL, {
                     method: 'POST',
                     mode: 'no-cors',
                     body: JSON.stringify({
                         action: "webVerify",
                         data: {
-                            orderId: document.getElementById('orderId').value.trim(),
-                            phone: document.getElementById('phone').value.trim(),
+                            orderId: orderId,
+                            phone: phone,
                             uid: userUid
                         }
                     })
@@ -100,17 +126,16 @@
 
                 result.innerHTML = `
                     <div class="text-emerald-600 font-black mb-1">驗證指令已送出</div>
-                    <div class="text-[10px] text-slate-500">若資料吻合，聊天室將收到確認小卡。</div>
+                    <div class="text-[10px] text-slate-500">若資料吻合，聊天室將收到確認小卡。<br>視窗即將關閉。</div>
                 `;
-                result.className = "mt-8 p-6 rounded-2xl text-center border-2 bg-emerald-50 border-emerald-100";
+                result.className = "mt-6 p-6 rounded-2xl text-center border-2 bg-emerald-50 border-emerald-100";
                 result.classList.remove('hidden');
 
-                // 2.5 秒後自動關閉視窗
                 setTimeout(() => liff.closeWindow(), 2500);
 
             } catch (err) {
-                result.innerHTML = `<div class="text-rose-600 font-black">傳送失敗，請重試</div>`;
-                result.className = "mt-8 p-6 rounded-2xl text-center border-2 bg-rose-50 border-rose-100";
+                result.innerHTML = `<div class="text-rose-600 font-black">通訊失敗</div>`;
+                result.className = "mt-6 p-6 rounded-2xl text-center border-2 bg-rose-50 border-rose-100";
                 result.classList.remove('hidden');
                 btn.disabled = false;
             } finally {
