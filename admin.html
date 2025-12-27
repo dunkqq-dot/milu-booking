@@ -91,7 +91,7 @@
         const configMap = {
             '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
             '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🎁' },
-            '後車廂驚喜': { time: '抵達工作室時間', location: '佈置工作室地點', icon: '🚗' },
+            '後車廂佈置': { time: '抵達工作室時間', location: '佈置工作室地點', icon: '🚗' },
             '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
 
@@ -140,7 +140,7 @@
                 
                 // 修正：針對不同表單的名稱做模糊對應
                 if (serviceFromUrl.includes('自取')) mappedService = '門市自取'; 
-                if (serviceFromUrl.includes('後車廂') || serviceFromUrl.includes('後車箱')) mappedService = '後車廂驚喜';
+                if (serviceFromUrl.includes('後車廂') || serviceFromUrl.includes('後車廂')) mappedService = '後車廂佈置';
                 if (serviceFromUrl.includes('外送')) mappedService = '氣球外送';
 
                 const select = document.getElementById('cust-service');
