@@ -2,433 +2,268 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>East Store 系統 - 專業全屏版</title>
-    <!-- 載入 Tailwind CSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MILU 專業預約發送器</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f1f5f9; height: 100vh; overflow: hidden; }
-        .spin { animation: spin 1s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .btn-active:active { transform: scale(0.95); }
-        /* 隱藏捲軸 */
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        /* 選中狀態（電腦版側邊欄） */
-        .selected-order { border-left: 6px solid #3b82f6; background-color: #f8fafc; position: relative; }
-        .selected-order::after { content: ''; position: absolute; right: 0; top: 0; bottom: 0; width: 4px; background: #3b82f6; border-radius: 4px 0 0 4px; }
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f8f9fa; padding: 15px; }
+        .card { background: white; padding: 25px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); max-width: 450px; margin: 0 auto; }
+        .label-text { display: block; font-size: 0.875rem; font-weight: 700; color: #4b5563; margin-bottom: 4px; }
+        .input-style { width: 100%; padding: 12px; border: 1px solid #e5e7eb; border-radius: 10px; margin-bottom: 12px; outline-color: #C69C6D; font-size: 14px; }
+        .btn-send { width: 100%; padding: 15px; background-color: #4A4A4A; color: white; border-radius: 12px; font-weight: 700; margin-top: 10px; }
+        .section-title { border-left: 4px solid #C69C6D; padding-left: 8px; margin-bottom: 15px; font-weight: bold; color: #4A4A4A; }
     </style>
 </head>
-<body class="flex flex-col">
+<body>
 
-    <!-- 頂部導覽列 -->
-    <header class="bg-[#0f172a] text-white p-4 shadow-xl flex justify-between items-center z-40">
-        <div class="flex items-center gap-3">
-            <div class="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-900/20">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 2H7c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM12 18h.01"/></svg>
-            </div>
-            <div>
-                <h1 class="text-base md:text-xl font-black tracking-tighter uppercase italic leading-none">East Store <span class="text-blue-400">Admin</span></h1>
-                <p id="sync-status" class="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-[0.3em] mt-1">系統準備就緒</p>
-            </div>
+    <div class="card">
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-[#C69C6D]">MILU Reservation</h2>
+            <p class="text-xs text-gray-400">發送客製化預約確認小卡</p>
         </div>
-        <div class="flex items-center gap-3">
-            <button id="refresh-btn" class="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold transition-all btn-active border border-slate-700">
-                <svg id="refresh-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/></svg>
-                <span class="hidden sm:inline uppercase">Sync Data</span>
-            </button>
-        </div>
-    </header>
 
-    <!-- 主內容區 -->
-    <div class="flex flex-1 overflow-hidden relative">
-        
-        <!-- 左側：訂單選單 -->
-        <aside id="sidebar" class="w-full md:w-[320px] lg:w-[380px] xl:w-[420px] border-r border-slate-200 bg-white flex flex-col h-full z-10 shadow-sm transition-all duration-300">
-            <!-- 搜尋區 -->
-            <div class="p-5 border-b border-slate-100 space-y-4 bg-white sticky top-0 z-10">
-                <div class="relative group">
-                    <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-blue-500 transition-colors" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-                    <input id="search-input" type="text" placeholder="搜尋訂單或姓名..." class="w-full pl-10 pr-4 py-3 bg-slate-50 border-none rounded-2xl text-sm outline-none focus:ring-2 ring-blue-100 transition-all font-bold">
-                </div>
-                <div class="flex gap-2">
-                    <button id="sort-id-btn" class="flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100 transition-all">編號 <span id="sort-id-icon">▼</span></button>
-                    <button id="sort-date-btn" class="flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest border bg-white text-slate-400 border-slate-100 transition-all">日期 <span id="sort-date-icon"></span></button>
-                </div>
-            </div>
-
-            <!-- 列表 -->
-            <div id="sidebar-list" class="flex-1 overflow-y-auto no-scrollbar">
-                <div class="p-20 text-center flex flex-col items-center">
-                    <div class="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full spin mb-4"></div>
-                    <p class="text-slate-300 font-bold text-xs uppercase tracking-widest animate-pulse">Loading orders...</p>
-                </div>
-            </div>
-
-            <!-- 載入更多 -->
-            <div id="load-more-area" class="p-4 border-t border-slate-50 hidden bg-white">
-                <button id="load-more-btn" class="w-full py-3 bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl hover:bg-blue-50 hover:text-blue-500 transition-all">Load More Orders</button>
-            </div>
-        </aside>
-
-        <!-- 右側：詳情視窗 -->
-        <main id="main-content" class="absolute inset-0 md:relative md:flex-1 bg-slate-50 overflow-y-auto z-20 translate-x-full md:translate-x-0 transition-transform duration-300">
+        <form id="booking-form">
+            <div class="section-title">服務與客戶資訊</div>
             
-            <!-- 手機版 Header -->
-            <div class="md:hidden bg-white/80 backdrop-blur-md p-4 border-b border-slate-200 flex items-center gap-4 sticky top-0 z-50">
-                <button onclick="backToList()" class="p-2 -ml-2 text-slate-800 bg-slate-100 rounded-xl btn-active">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
-                </button>
-                <h2 id="mobile-title" class="font-black text-slate-900 tracking-tighter">Order Detail</h2>
-            </div>
+            <label class="label-text">服務項目</label>
+            <select id="cust-service" class="input-style" onchange="updateDynamicLabels()" required>
+                <option value="專人佈置">✨ 專人佈置</option>
+                <option value="門市自取">🛍️ 門市自取</option>
+                <option value="後車廂驚喜">🚗 後車廂驚喜</option>
+                <option value="氣球外送">🚚 氣球外送</option>
+            </select>
 
-            <!-- 預設畫面 -->
-            <div id="empty-state" class="hidden md:flex h-full flex-col items-center justify-center text-slate-300">
-                <div class="text-center">
-                    <div class="w-32 h-32 bg-white rounded-[3rem] shadow-2xl shadow-slate-200 flex items-center justify-center mx-auto mb-8 border border-slate-50">
-                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-slate-200"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    </div>
-                    <p class="font-black text-xl text-[#0f172a] tracking-widest uppercase">Select an order</p>
-                    <p class="text-slate-400 text-xs font-bold mt-2 uppercase tracking-[0.3em]">點擊左側列表開始編輯</p>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="label-text">LINE 名稱</label>
+                    <input type="text" id="line-name" class="input-style bg-gray-50" readonly placeholder="自動載入">
+                </div>
+                <div>
+                    <label class="label-text">聯絡人姓名</label>
+                    <input type="text" id="cust-name" class="input-style" placeholder="林小姐" required>
                 </div>
             </div>
 
-            <!-- 詳情內容區 (改為流體寬度) -->
-            <div id="detail-content" class="hidden p-4 md:p-10 w-full h-full pb-32">
-                <!-- 由 JavaScript 渲染 -->
-            </div>
-        </main>
-    </div>
+            <label class="label-text">聯絡電話</label>
+            <input type="tel" id="cust-phone" class="input-style" placeholder="0912-345-678" required>
 
-    <!-- 狀態通知 -->
-    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 md:left-auto md:right-10 md:translate-x-0 px-8 py-4 rounded-[2rem] shadow-2xl z-50 font-black text-xs uppercase bg-[#0f172a] text-white flex items-center gap-4 transition-all opacity-0 pointer-events-none transform translate-y-10">
-        <div class="w-2 h-2 bg-blue-400 rounded-full animate-ping"></div>
-        <span id="toast-msg">Success</span>
+            <div class="section-title">預約細節</div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="label-text">預約日期</label>
+                    <input type="date" id="cust-date" class="input-style" required>
+                </div>
+                <div>
+                    <label id="label-time" class="label-text">進場佈置時間</label>
+                    <input type="text" id="cust-time" class="input-style" placeholder="14:30" required>
+                </div>
+            </div>
+
+            <label id="label-location" class="label-text">佈置地址</label>
+            <input type="text" id="cust-location" class="input-style" placeholder="請輸入完整地址或門市名稱" required>
+
+            <div class="input-group mt-2">
+                <label class="label-text">訂單編號 (自動填入)</label>
+                <input type="text" id="cust-oid" class="input-style bg-gray-50 text-xs" readonly>
+            </div>
+            
+            <div class="input-group mt-2">
+                 <label class="label-text">確認金額</label>
+                 <input type="number" id="cust-price" class="input-style" placeholder="2500" required>
+            </div>
+
+            <input type="hidden" id="cust-to-id">
+            
+            <button type="button" onclick="submitToMake()" class="btn-send">發送確認通知</button>
+        </form>
     </div>
 
     <script>
-        // --- 1. 配置 ---
-        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec";
-        const PAGE_SIZE = 10; 
-        let allOrders = [];
-        let filteredOrders = [];
-        let displayedCount = PAGE_SIZE;
-        let currentSort = { key: 'id', desc: true };
-        let selectedId = null;
-        let isEditing = false;
-
-        const FIELD_MAPS = {
-            id: ["訂單編號", "編號", "OrderID", "ID"],
-            name: ["姓名", "名字", "客戶姓名"],
-            phone: ["電話", "聯絡電話", "手機"],
-            recipientName: ["收件人", "收件者"],
-            recipientPhone: ["收件電話", "收件人電話"],
-            address: ["配送地址", "送貨地址", "收件地址", "地址"],
-            date: ["取貨/送貨日期", "取貨日期", "送貨日期"],
-            time: ["時間", "送貨時間"],
-            period: ["時段", "配送時段"],
-            note: ["備註"],
-            syncStatus: ["同步狀態"]
-        };
-
-        const PERIOD_TAGS = ["不指定", "13:00 前", "14:00-18:00"];
-
-        // --- 2. 核心工具 ---
-        function getVal(order, type) {
-            if (!order) return "";
-            const keys = Object.keys(order);
-            const targets = FIELD_MAPS[type];
-            let key = keys.find(k => targets.includes(k.trim()));
-            if (!key) key = keys.find(k => targets.some(t => k.includes(t)));
-            let v = order[key] || "";
-            if (type === 'phone' || type === 'recipientPhone') {
-                v = String(v).trim();
-                if (v.length === 9 && v.startsWith('9')) v = '0' + v;
-            }
-            if (type === 'date' && v) {
-                const d = new Date(v);
-                return (isNaN(d.getTime()) || d.getFullYear() === 1899) ? String(v) : d.toLocaleDateString('zh-TW');
-            }
-            if (type === 'time' || type === 'period') {
-                let tKey = keys.find(k => FIELD_MAPS.time.includes(k.trim()));
-                let pKey = keys.find(k => FIELD_MAPS.period.includes(k.trim()));
-                let tv = order[tKey] || "";
-                let pv = order[pKey] || "";
-                if (String(tv).includes("1899")) {
-                    const d = new Date(tv);
-                    tv = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                }
-                if (String(tv).includes("-") || String(tv).includes("下午")) {
-                    if (!pv) { pv = tv; tv = ""; }
-                }
-                return type === 'time' ? String(tv) : String(pv);
-            }
-            return String(v);
-        }
-
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            document.getElementById('toast-msg').innerText = msg;
-            toast.style.opacity = '1'; toast.style.transform = 'translateY(0)';
-            setTimeout(() => { toast.style.opacity = '0'; toast.style.transform = 'translateY(2.5rem)'; }, 3000);
-        }
-
-        // --- 3. 渲染視圖 ---
-
-        function renderSidebar() {
-            const list = document.getElementById('sidebar-list');
-            const search = document.getElementById('search-input').value.toLowerCase();
-            
-            filteredOrders = allOrders.filter(o => !search || [getVal(o, 'id'), getVal(o, 'name')].some(v => v.toLowerCase().includes(search)));
-            filteredOrders.sort((a, b) => {
-                const valA = getVal(a, currentSort.key), valB = getVal(b, currentSort.key);
-                let res = valA.localeCompare(valB, undefined, {numeric: true});
-                return currentSort.desc ? -res : res;
-            });
-
-            const toShow = filteredOrders.slice(0, displayedCount);
-            if (toShow.length === 0) {
-                list.innerHTML = `<div class="p-10 text-center text-slate-300 font-bold text-sm uppercase tracking-widest">No matching results</div>`;
-            } else {
-                list.innerHTML = toShow.map(o => {
-                    const id = getVal(o, 'id'), name = getVal(o, 'name'), date = getVal(o, 'date');
-                    const isSelected = selectedId === id;
-                    const displayId = id.startsWith('#') ? id : '#'+id;
-                    return `
-                    <div onclick="selectOrder('${id}')" class="p-6 border-b border-slate-50 cursor-pointer hover:bg-slate-50/80 transition-all ${isSelected ? 'selected-order' : ''}">
-                        <div class="flex justify-between items-start mb-2">
-                            <span class="font-mono font-black ${isSelected ? 'text-blue-600' : 'text-slate-400'} text-sm tracking-tighter">${displayId}</span>
-                            <span class="text-[9px] text-slate-400 font-black uppercase tracking-wider">${date}</span>
-                        </div>
-                        <div class="text-[15px] font-bold text-slate-800">${name || "Guest"}</div>
-                    </div>`;
-                }).join('');
-            }
-            document.getElementById('load-more-area').classList.toggle('hidden', filteredOrders.length <= displayedCount);
-        }
-
-        function renderDetail() {
-            const detailView = document.getElementById('detail-content');
-            const emptyState = document.getElementById('empty-state');
-            const mainContent = document.getElementById('main-content');
-            
-            if (!selectedId) {
-                detailView.classList.add('hidden');
-                emptyState.classList.add('md:flex'); emptyState.classList.remove('hidden');
-                mainContent.classList.add('translate-x-full');
-                return;
-            }
-
-            detailView.classList.remove('hidden');
-            emptyState.classList.add('hidden');
-            mainContent.classList.remove('translate-x-full');
-
-            const order = allOrders.find(o => getVal(o, 'id') === selectedId);
-            if (!order) return;
-
-            const id = getVal(order, 'id');
-            const displayId = id.startsWith('#') ? id : `#${id}`;
-            document.getElementById('mobile-title').innerText = displayId;
-
-            detailView.innerHTML = `
-                <!-- 頂部資訊條 -->
-                <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-6 mb-12">
-                    <div>
-                        <div class="flex items-center gap-3">
-                            <h2 class="text-5xl lg:text-6xl font-black text-[#0f172a] tracking-tighter">${displayId}</h2>
-                            ${isEditing ? '<span class="px-3 py-1 bg-amber-100 text-amber-600 text-[10px] font-black rounded-lg uppercase tracking-widest animate-pulse">Editing</span>' : ''}
-                        </div>
-                        <p class="text-[11px] font-black text-slate-400 uppercase tracking-[0.4em] mt-3">Advanced Delivery Management System</p>
-                    </div>
-                    <div class="flex gap-3 w-full xl:w-auto">
-                        ${isEditing ? `
-                            <button onclick="saveOrder('${id}')" class="flex-1 xl:flex-none flex items-center justify-center gap-3 px-10 py-5 bg-blue-600 text-white rounded-[1.5rem] font-black shadow-2xl shadow-blue-200 btn-active text-xs uppercase tracking-widest">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                                Confirm Save
-                            </button>
-                            <button onclick="isEditing=false; renderDetail();" class="px-8 py-5 bg-white border border-slate-200 text-slate-400 rounded-[1.5rem] font-black text-xs uppercase tracking-widest btn-active">Cancel</button>
-                        ` : `
-                            <button onclick="isEditing=true; renderDetail();" class="flex-1 xl:flex-none flex items-center justify-center gap-3 px-10 py-5 bg-[#0f172a] text-white rounded-[1.5rem] font-black shadow-2xl shadow-slate-300 btn-active hover:bg-blue-600 text-xs uppercase tracking-widest transition-all">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/><path d="m15 5 4 4"/></svg>
-                                Edit Order
-                            </button>
-                        `}
-                    </div>
-                </div>
-
-                <!-- 資訊網格佈局 (全屏三欄式) -->
-                <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 h-fit">
-                    
-                    <!-- 欄位 1：人員資訊 -->
-                    <div class="space-y-8">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-white">
-                            <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-8">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                                基本聯絡人
-                            </h3>
-                            <div class="space-y-8">
-                                ${detailField("訂購人姓名", "name", order)}
-                                ${detailField("訂購電話", "phone", order)}
-                            </div>
-                        </div>
-
-                        <div class="bg-blue-50/50 p-8 rounded-[2.5rem] shadow-sm border border-blue-100/50">
-                            <h3 class="text-[10px] font-black text-blue-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-8">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                                收件人資訊
-                            </h3>
-                            <div class="space-y-8">
-                                ${detailField("收件人姓名", "recipientName", order)}
-                                ${detailField("收件電話", "recipientPhone", order)}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 欄位 2：地址與備註 -->
-                    <div class="space-y-8">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-white h-full flex flex-col">
-                            <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-8">完整配送地址</h3>
-                            <div class="flex-1">
-                                ${detailField("配送詳細地址", "address", order, "textarea")}
-                            </div>
-                        </div>
-                        <div class="bg-slate-100/50 p-8 rounded-[2.5rem]">
-                            <h3 class="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mb-6">備註事項</h3>
-                            ${detailField("內部管理備註", "note", order, "textarea")}
-                        </div>
-                    </div>
-
-                    <!-- 欄位 3：配送排程 (在 XL 下獨立成一欄) -->
-                    <div class="lg:col-span-2 xl:col-span-1">
-                        <div class="bg-white p-8 rounded-[2.5rem] shadow-xl shadow-slate-200/40 border border-white h-full">
-                            <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] flex items-center gap-2 mb-8">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></svg>
-                                派送時間與時段
-                            </h3>
-                            <div class="space-y-10">
-                                ${detailField("預約配送日期", "date", order, "date")}
-                                ${detailField("指定配送時間", "time", order, "time")}
-                                ${detailField("配送時段標籤", "period", order, "period-tags")}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function detailField(label, type, order, inputType = "text") {
-            let val = getVal(order, type);
-            if (isEditing) {
-                if (inputType === "date" && val) {
-                    const d = new Date(val);
-                    if (!isNaN(d.getTime())) val = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-                }
-                if (inputType === "period-tags") {
-                    return `<div class="flex flex-col gap-3">
-                        <span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${label}</span>
-                        <div class="flex flex-wrap gap-2">${PERIOD_TAGS.map(tag => `<button onclick="setPeriodValue('${tag}')" class="px-4 py-2 rounded-xl text-[10px] font-black border transition-all ${val === tag ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-400 border-slate-100 shadow-sm'}">${tag}</button>`).join('')}</div>
-                        <input id="edit-period" type="text" class="w-full border-2 border-slate-100 p-4 rounded-2xl text-sm focus:border-blue-500 focus:bg-white outline-none font-bold bg-slate-50 transition-all" value="${val}" placeholder="或手動修改...">
-                    </div>`;
-                }
-                if (inputType === "textarea") {
-                    return `<div class="flex flex-col gap-2 h-full"><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${label}</span><textarea id="edit-${type}" class="w-full border-2 border-slate-100 p-4 rounded-2xl text-sm focus:border-blue-500 focus:bg-white outline-none font-bold bg-slate-50 transition-all flex-1 min-h-[120px]">${val}</textarea></div>`;
-                }
-                return `<div class="flex flex-col gap-2"><span class="text-[10px] font-black text-slate-400 uppercase tracking-widest">${label}</span><input id="edit-${type}" type="${type === 'time' ? 'time' : inputType}" class="w-full border-2 border-slate-100 p-4 rounded-2xl text-sm focus:border-blue-500 focus:bg-white outline-none font-bold bg-slate-50 transition-all" value="${val}"></div>`;
-            }
-            return `<div class="flex flex-col text-left group"><span class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-3">${label}</span><span class="text-[17px] font-bold text-slate-800 leading-relaxed">${val || "---"}</span></div>`;
-        }
-
-        // --- 4. 行為控制 ---
-
-        function selectOrder(id) {
-            selectedId = id; isEditing = false;
-            renderSidebar(); renderDetail();
-        }
-
-        function backToList() {
-            selectedId = null; isEditing = false;
-            renderSidebar(); renderDetail();
-        }
-
-        function setPeriodValue(val) {
-            const input = document.getElementById('edit-period');
-            if (input) {
-                input.value = val;
-                const btns = input.parentElement.querySelectorAll('button');
-                btns.forEach(b => {
-                    b.className = b.innerText === val ? 'px-4 py-2 rounded-xl text-[10px] font-black border transition-all bg-blue-600 text-white border-blue-600 shadow-lg' : 'px-4 py-2 rounded-xl text-[10px] font-black border transition-all bg-white text-slate-400 border-slate-100 shadow-sm';
-                });
-            }
-        }
-
-        async function fetchOrders() {
-            document.getElementById('sync-status').innerText = "雲端同步中...";
-            document.getElementById('refresh-icon').classList.add('spin');
-            try {
-                const res = await fetch(`${GAS_API_URL}?action=getOrders`);
-                allOrders = await res.json();
-                document.getElementById('sync-status').innerText = `最後更新：${new Date().toLocaleTimeString()} | 共 ${allOrders.length} 筆`;
-                renderSidebar(); renderDetail();
-            } catch (e) { showToast("連線失敗"); }
-            finally { document.getElementById('refresh-icon').classList.remove('spin'); }
-        }
-
-        async function saveOrder(id) {
-            document.getElementById('sync-status').innerText = "等待同步中...";
-            showToast("正在更新雲端試算表...");
-            
-            const order = allOrders.find(o => getVal(o, 'id') === id);
-            const dataToSend = { "訂單編號": id };
-            const syncHeader = Object.keys(order).find(k => FIELD_MAPS.syncStatus.includes(k.trim())) || "同步狀態";
-            dataToSend[syncHeader] = "等待同步";
-
-            ['name', 'phone', 'recipientName', 'recipientPhone', 'address', 'date', 'time', 'period', 'note'].forEach(type => {
-                const el = document.getElementById(`edit-${type === 'period' ? 'period' : type}`);
-                if (el) {
-                    const rk = Object.keys(order).find(k => FIELD_MAPS[type].includes(k.trim())) || FIELD_MAPS[type][0];
-                    let val = el.value;
-                    if (type === 'date' && val) val = val.replace(/-/g, '/');
-                    if ((type === 'phone' || type === 'recipientPhone') && val) val = "'" + val;
-                    dataToSend[rk] = val;
-                }
-            });
-
-            isEditing = false; renderDetail();
-            try {
-                await fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'updateOrder', data: dataToSend }) });
-                showToast("雲端同步完成");
-                setTimeout(fetchOrders, 800);
-            } catch (e) {
-                alert("儲存失敗");
-                document.getElementById('sync-status').innerText = "同步失敗";
-            }
-        }
-
-        // --- 5. 事件監聽 ---
-        document.getElementById('refresh-btn').onclick = fetchOrders;
-        document.getElementById('search-input').oninput = () => { displayedCount = PAGE_SIZE; renderSidebar(); };
-        document.getElementById('load-more-btn').onclick = () => { displayedCount += PAGE_SIZE; renderSidebar(); };
+        const WEBHOOK_URL = 'https://hook.eu1.make.com/mhwhl6m6nqii8zfbv9p3ggz2ih12dpt6';
         
-        document.getElementById('sort-id-btn').onclick = () => {
-            currentSort = { key: 'id', desc: currentSort.key === 'id' ? !currentSort.desc : true };
-            document.getElementById('sort-id-btn').className = `flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase border bg-blue-600 text-white border-blue-600 shadow-lg`;
-            document.getElementById('sort-date-btn').className = `flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase border bg-white text-slate-400 border-slate-100`;
-            document.getElementById('sort-id-icon').innerText = currentSort.desc ? '▼' : '▲';
-            document.getElementById('sort-date-icon').innerText = '';
-            renderSidebar();
+        // ⚠️ 修正重點：改回「管理員專用」的 LIFF ID
+        const LIFF_ID = '2004044468-KFCOlJSB'; 
+
+        const configMap = {
+            '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
+            '門市自取': { time: '取貨時間', location: '取貨門市', icon: '🎁' },
+            '後車廂佈置': { time: '抵達工作室時間', location: '佈置工作室地點', icon: '🚗' },
+            '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
 
-        document.getElementById('sort-date-btn').onclick = () => {
-            currentSort = { key: 'date', desc: currentSort.key === 'date' ? !currentSort.desc : true };
-            document.getElementById('sort-date-btn').className = `flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase border bg-blue-600 text-white border-blue-600 shadow-lg`;
-            document.getElementById('sort-id-btn').className = `flex-1 py-2.5 rounded-xl text-[10px] font-black uppercase border bg-white text-slate-400 border-slate-100`;
-            document.getElementById('sort-date-icon').innerText = currentSort.desc ? '▼' : '▲';
-            document.getElementById('sort-id-icon').innerText = '';
-            renderSidebar();
+        window.onload = function() {
+            liff.init({ liffId: LIFF_ID }).then(() => {
+                // 初始化成功後，執行資料抓取
+                getUrlParams(); 
+                if (!liff.isLoggedIn()) { liff.login(); }
+            }).catch(err => {
+                console.error('LIFF Init Error:', err);
+                // 即使 LIFF 初始化失敗 (例如在電腦瀏覽器測試)，也嘗試抓取網址參數顯示
+                getUrlParams(); 
+            });
         };
 
-        window.onload = fetchOrders;
+        function updateDynamicLabels() {
+            const service = document.getElementById('cust-service').value;
+            const config = configMap[service] || configMap['專人佈置'];
+            document.getElementById('label-time').innerText = config.time;
+            document.getElementById('label-location').innerText = config.location;
+        }
+
+        function getUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            let params = urlParams;
+            
+            // 處理 LIFF 轉址後的參數
+            if (urlParams.has('liff.state')) {
+                // LIFF 會將參數放在 liff.state 中，需要解碼
+                params = new URLSearchParams(decodeURIComponent(urlParams.get('liff.state')));
+            }
+
+            document.getElementById('cust-to-id').value = params.get('to') || '';
+            document.getElementById('cust-oid').value = params.get('oid') || '';
+            document.getElementById('line-name').value = params.get('name') || ''; 
+            document.getElementById('cust-name').value = params.get('name') || ''; 
+            document.getElementById('cust-date').value = params.get('date') || '';
+            document.getElementById('cust-time').value = params.get('time') || '';
+            document.getElementById('cust-price').value = params.get('price') || '';
+            document.getElementById('cust-phone').value = params.get('phone') || '';
+            document.getElementById('cust-location').value = params.get('location') || '';
+            
+            const serviceFromUrl = params.get('service');
+            if (serviceFromUrl) {
+                let mappedService = serviceFromUrl;
+                
+                // 修正：針對不同表單的名稱做模糊對應
+                if (serviceFromUrl.includes('自取')) mappedService = '門市自取'; 
+                if (serviceFromUrl.includes('後車廂') || serviceFromUrl.includes('後車廂')) mappedService = '後車廂佈置';
+                if (serviceFromUrl.includes('外送')) mappedService = '氣球外送';
+
+                const select = document.getElementById('cust-service');
+                // 嘗試自動選取
+                for(let i=0; i<select.options.length; i++) {
+                    if(select.options[i].value === mappedService) {
+                        select.value = mappedService;
+                        break;
+                    }
+                }
+                updateDynamicLabels();
+            }
+        }
+
+        function buildProfessionalFlex(service, lineName, contactName, phone, date, time, location, oid, price) {
+            const config = configMap[service] || configMap['專人佈置'];
+            const displayPrice = price ? parseInt(price).toLocaleString() : '0';
+            
+            return {
+                "type": "bubble",
+                "size": "mega",
+                "header": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
+                        { "type": "text", "text": "RESERVATION CONFIRMED", "weight": "bold", "color": "#10B981", "size": "xs", "align": "center" }
+                    ],
+                    "paddingBottom": "none"
+                },
+                "body": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
+                        { "type": "text", "text": `${config.icon} ${service}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A" },
+                        { "type": "separator", "margin": "md" },
+                        {
+                            "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
+                            "contents": [
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "LINE名稱", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": lineName, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡姓名", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": contactName, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": phone, "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": date, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
+                                { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": time, "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold", "color": "#C69C6D" } ] },
+                                { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ 
+                                    { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" },
+                                    { "type": "text", "text": location, "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } 
+                                ] }
+                            ]
+                        },
+                         { "type": "separator", "margin": "xl" },
+                        {
+                            "type": "box",
+                            "layout": "horizontal",
+                            "margin": "xl",
+                            "contents": [
+                                { "type": "text", "text": "總計金額", "size": "md", "color": "#4A4A4A", "gravity": "center", "weight": "bold" },
+                                { "type": "text", "text": `NT$ ${displayPrice}`, "size": "xl", "align": "end", "color": "#C69C6D", "weight": "bold" }
+                            ]
+                        }
+                    ]
+                },
+                "footer": {
+                    "type": "box",
+                    "layout": "vertical",
+                    "contents": [
+                        { "type": "text", "text": "如有任何問題請隨時Line聯繫我們", "size": "xxs", "color": "#cccccc", "align": "center" }
+                    ]
+                }
+            };
+        }
+
+        async function submitToMake() {
+            const fields = ['cust-service', 'line-name', 'cust-name', 'cust-phone', 'cust-date', 'cust-time', 'cust-location', 'cust-price'];
+            for (const f of fields) {
+                if (!document.getElementById(f).value) return Swal.fire('請填寫完整', '所有欄位均為必填', 'warning');
+            }
+
+            Swal.fire({ title: '發送中...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            const service = document.getElementById('cust-service').value;
+            const flexContent = buildProfessionalFlex(
+                service,
+                document.getElementById('line-name').value,
+                document.getElementById('cust-name').value,
+                document.getElementById('cust-phone').value,
+                document.getElementById('cust-date').value,
+                document.getElementById('cust-time').value,
+                document.getElementById('cust-location').value,
+                document.getElementById('cust-oid').value,
+                document.getElementById('cust-price').value
+            );
+
+            const payload = {
+                to: document.getElementById('cust-to-id').value,
+                service: service,
+                clientName: document.getElementById('cust-name').value,
+                // ✅ 關鍵：傳送完整的 flexContents 結構
+                flexContents: flexContent, 
+                price: document.getElementById('cust-price').value,
+                message: {
+                    type: 'flex',
+                    altText: `🛎️ 您的${service}預約已確認成功！`,
+                    contents: flexContent
+                }
+            };
+
+            try {
+                const response = await fetch(WEBHOOK_URL, {
+                    method: 'POST',
+                    mode: 'cors',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (response.ok) {
+                    Swal.fire('發送成功！', '預約確認小卡已送出。', 'success');
+                } else {
+                    throw new Error('伺服器回傳錯誤');
+                }
+            } catch (error) {
+                Swal.fire('發送失敗', '原因: ' + error.message, 'error');
+            }
+        }
     </script>
 </body>
 </html>
