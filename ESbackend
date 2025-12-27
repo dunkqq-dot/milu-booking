@@ -1,0 +1,370 @@
+import React, { useState, useEffect } from 'react';
+import { Search, Edit2, Save, X, CheckCircle, AlertCircle, RefreshCw, Database, AlertTriangle, Calendar, Clock, MapPin, Phone, User, Copy, ExternalLink, Hash, Info, Smartphone, Truck, UserPlus, PhoneForwarded } from 'lucide-react';
+
+/**
+ * East Store 員工訂單管理系統
+ * 部署說明：
+ * 1. 請將 GAS_API_URL 替換為您的 Google Apps Script 部署網址
+ * 2. 部署時建議設為「Private」或加上簡單的存取機制
+ */
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec"; 
+
+const App = () => {
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState({});
+  const [statusMessage, setStatusMessage] = useState(null);
+  const [lastSyncTime, setLastSyncTime] = useState(null);
+
+  // 受管理欄位定義
+  const FIELD_MAPS = {
+    id: ["訂單編號", "編號", "OrderID", "ID"],
+    name: ["姓名", "名字", "客戶姓名"],
+    phone: ["電話", "聯絡電話", "手機", "訂購人電話"],
+    recipientName: ["收件人", "收件者", "收件人姓名"],
+    recipientPhone: ["收件電話", "收件人電話", "收件人手機"],
+    address: ["配送地址", "送貨地址", "收件地址", "地址"],
+    date: ["取貨/送貨日期", "取貨日期", "送貨日期", "配送日期", "預約日期"],
+    time: ["時間", "送貨時間", "配送時間"],
+    period: ["時段", "配送時段", "時間段"],
+    delivery: ["配送方式", "送貨方式", "物流方式"],
+    note: ["備註", "訂單備註", "內部備註", "留言"]
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fixPhoneNumber = (val) => {
+    if (!val) return "";
+    let str = String(val).trim();
+    if (str.length === 9 && str.startsWith('9')) return '0' + str;
+    return str;
+  };
+
+  const findBestMatchingKey = (orderObj, targetType) => {
+    if (!orderObj) return null;
+    const keys = Object.keys(orderObj);
+    const targets = FIELD_MAPS[targetType];
+    for (const t of targets) {
+      const found = keys.find(k => k.trim() === t);
+      if (found) return found;
+    }
+    for (const t of targets) {
+      const found = keys.find(k => {
+        const cleanK = k.trim();
+        if (targetType === 'date' && (cleanK.includes("支付") || cleanK.includes("付款") || cleanK.includes("下單"))) return false;
+        return cleanK.includes(t) && cleanK.length < 15;
+      });
+      if (found) return found;
+    }
+    return null;
+  };
+
+  const processTimeValue = (val) => {
+    if (!val) return "";
+    const str = String(val).trim();
+    if (str.includes("1899") || (str.includes("T") && str.includes("Z"))) {
+      try {
+        const d = new Date(val);
+        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+      } catch (e) { return str; }
+    }
+    return str;
+  };
+
+  const processTimeAndPeriod = (order) => {
+    const timeKey = findBestMatchingKey(order, 'time');
+    const periodKey = findBestMatchingKey(order, 'period');
+    let timeVal = timeKey ? String(order[timeKey] || "").trim() : "";
+    let periodVal = periodKey ? String(order[periodKey] || "").trim() : "";
+    timeVal = processTimeValue(timeVal);
+    if (timeVal.includes("-") || timeVal.includes("下午") || timeVal.includes("上午") || timeVal.includes("後") || timeVal.includes("前")) {
+      if (!periodVal) { periodVal = timeVal; timeVal = ""; }
+    }
+    return { time: timeVal, period: periodVal };
+  };
+
+  const formatDateForInput = (dateVal) => {
+    if (!dateVal) return "";
+    try {
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime()) || d.getFullYear() === 1899) return ""; 
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    } catch (e) { return ""; }
+  };
+
+  const getDisplayValue = (order, fieldType) => {
+    if (fieldType === 'time' || fieldType === 'period') {
+      const { time, period } = processTimeAndPeriod(order);
+      return fieldType === 'time' ? time : period;
+    }
+    const key = findBestMatchingKey(order, fieldType);
+    if (!key) return "";
+    const val = order[key];
+    if (fieldType === 'phone' || fieldType === 'recipientPhone') return fixPhoneNumber(val);
+    if (fieldType === 'date' && val) {
+        const d = new Date(val);
+        if (isNaN(d.getTime()) || d.getFullYear() === 1899) return String(val);
+        return d.toLocaleDateString('zh-TW');
+    }
+    return String(val || "");
+  };
+
+  const fetchOrders = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${GAS_API_URL}?action=getOrders`);
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      if (Array.isArray(data)) {
+        setOrders(data);
+        setLastSyncTime(new Date().toLocaleTimeString());
+        showStatus('資料同步成功', 'success');
+      }
+    } catch (err) { setError(err.message); }
+    finally { setLoading(false); }
+  };
+
+  const showStatus = (msg, type) => {
+    setStatusMessage({ msg, type });
+    setTimeout(() => setStatusMessage(null), 3000);
+  };
+
+  const handleEdit = (order) => {
+    const idKey = findBestMatchingKey(order, 'id') || "訂單編號";
+    setEditingId(order[idKey]);
+    const { time: smartTime, period: smartPeriod } = processTimeAndPeriod(order);
+    const processedForm = { ...order };
+    const dateKey = findBestMatchingKey(order, 'date');
+    const timeKey = findBestMatchingKey(order, 'time');
+    const periodKey = findBestMatchingKey(order, 'period');
+    const phoneKey = findBestMatchingKey(order, 'phone');
+    const rPhoneKey = findBestMatchingKey(order, 'recipientPhone');
+    if (dateKey) processedForm[dateKey] = formatDateForInput(order[dateKey]);
+    if (timeKey) processedForm[timeKey] = smartTime;
+    if (periodKey) processedForm[periodKey] = smartPeriod;
+    if (phoneKey) processedForm[phoneKey] = fixPhoneNumber(order[phoneKey]);
+    if (rPhoneKey) processedForm[rPhoneKey] = fixPhoneNumber(order[rPhoneKey]);
+    setEditForm(processedForm);
+  };
+
+  const handleSave = async () => {
+    setLoading(true);
+    try {
+      const idKey = findBestMatchingKey(editForm, 'id') || "訂單編號";
+      const dataToSend = {};
+      dataToSend[idKey] = editingId;
+      Object.keys(FIELD_MAPS).forEach(type => {
+        if (type === 'id') return;
+        const realKey = findBestMatchingKey(editForm, type);
+        if (realKey) {
+          let value = editForm[realKey];
+          if (type === 'date' && value) {
+            const d = new Date(value);
+            if (!isNaN(d.getTime())) value = `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+          }
+          if ((type === 'phone' || type === 'recipientPhone') && value) {
+            value = "'" + fixPhoneNumber(value);
+          }
+          dataToSend[realKey] = value;
+        }
+      });
+      await fetch(GAS_API_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify({ action: 'updateOrder', data: dataToSend })
+      });
+      setOrders(orders.map(o => o[idKey] === editingId ? { ...o, ...dataToSend } : o));
+      setEditingId(null);
+      showStatus('修改已儲存至雲端', 'success');
+      setTimeout(fetchOrders, 1000);
+    } catch (error) {
+      showStatus('儲存失敗，請重試', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredOrders = orders.filter(o => {
+    const s = searchTerm.toLowerCase();
+    const id = String(getDisplayValue(o, 'id')).toLowerCase();
+    const name = String(getDisplayValue(o, 'name')).toLowerCase();
+    const addr = String(getDisplayValue(o, 'address')).toLowerCase();
+    return id.includes(s) || name.includes(s) || addr.includes(s);
+  });
+
+  const RenderField = ({ label, type, fieldType, order, icon: Icon }) => {
+    const originalKey = findBestMatchingKey(order, fieldType) || FIELD_MAPS[fieldType][0];
+    const isEditing = editingId === getDisplayValue(order, 'id');
+
+    if (isEditing) {
+      return (
+        <div className="flex flex-col gap-1 w-full text-left">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{label}</span>
+          {type === 'textarea' ? (
+            <textarea className="w-full border-2 border-blue-100 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500 h-20 resize-none font-medium shadow-sm" value={editForm[originalKey] || ""} onChange={e => setEditForm({...editForm, [originalKey]: e.target.value})} />
+          ) : (
+            <input type={type} className="w-full border-2 border-blue-100 p-2.5 rounded-xl text-sm outline-none focus:border-blue-500 font-bold shadow-sm" value={editForm[originalKey] || ""} onChange={e => setEditForm({...editForm, [originalKey]: e.target.value})} />
+          )}
+        </div>
+      );
+    }
+
+    const val = getDisplayValue(order, fieldType);
+    return (
+      <div className="flex flex-col text-left">
+        <span className="text-[9px] font-bold text-slate-300 uppercase flex items-center gap-1 mb-1">
+          {Icon && <Icon size={10} />} {label}
+        </span>
+        <span className={`text-sm font-bold leading-tight ${fieldType === 'address' ? 'text-xs text-slate-600 line-clamp-3' : 'text-slate-700'} ${fieldType === 'id' ? 'font-mono text-blue-600' : ''}`}>
+          {val || "---"}
+        </span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] p-4 md:p-10 font-sans text-slate-800">
+      {/* 標題欄位 */}
+      <div className="max-w-[1500px] mx-auto mb-8 flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-4">
+          <div className="bg-[#1e293b] p-3 rounded-2xl shadow-xl text-white">
+            <Smartphone size={28} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-[#1e293b] tracking-tighter uppercase italic">East Store Admin</h1>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.3em]">
+               最後同步：{lastSyncTime || '尚未連線'}
+            </p>
+          </div>
+        </div>
+        <button onClick={fetchOrders} className="w-full md:w-auto flex items-center justify-center gap-2 px-8 py-3.5 bg-white border border-slate-200 text-[#1e293b] rounded-2xl shadow-sm hover:border-[#1e293b] transition-all font-black text-xs uppercase active:scale-95">
+          <RefreshCw size={18} className={loading ? "animate-spin" : ""} /> {loading ? "正在同步" : "刷新資料庫"}
+        </button>
+      </div>
+
+      {statusMessage && (
+        <div className={`fixed top-8 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-50 font-black text-xs uppercase tracking-[0.2em] flex items-center gap-3 animate-in fade-in slide-in-from-top-6 ${statusMessage.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white'}`}>
+          {statusMessage.type === 'success' ? <CheckCircle size={20} /> : <AlertTriangle size={20} />}
+          {statusMessage.msg}
+        </div>
+      )}
+
+      {!loading && error ? (
+        <div className="max-w-xl mx-auto mt-20 p-12 bg-white rounded-[3rem] text-center shadow-2xl border-b-8 border-rose-500">
+          <AlertTriangle className="mx-auto mb-6 text-rose-500" size={64} />
+          <h2 className="text-2xl font-black text-slate-900 mb-2 tracking-tight">系統連線異常</h2>
+          <p className="text-slate-500 text-sm mb-10 leading-relaxed font-medium">{error}</p>
+          <button onClick={fetchOrders} className="px-12 py-4 bg-[#1e293b] text-white rounded-2xl font-black hover:scale-105 active:scale-95 transition-all">重新載入</button>
+        </div>
+      ) : (
+        <div className="max-w-[1500px] mx-auto">
+          {/* 搜尋列 */}
+          <div className="mb-8 relative group">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-[#1e293b] transition-colors" size={28} />
+            <input type="text" placeholder="搜尋：訂單編號、訂購人、地址..." className="w-full pl-16 pr-8 py-6 bg-white border-2 border-transparent focus:border-[#1e293b] rounded-[2.2rem] outline-none shadow-xl shadow-slate-200/50 font-bold text-slate-800 text-lg transition-all" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            {searchTerm && <div className="absolute right-8 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400 bg-slate-100 px-3 py-1 rounded-full uppercase">找到 {filteredOrders.length} 筆</div>}
+          </div>
+
+          {/* 手機版：員工友善卡片佈局 */}
+          <div className="grid grid-cols-1 gap-6 md:hidden">
+            {filteredOrders.map((order, idx) => {
+              const orderId = getDisplayValue(order, 'id');
+              const isEditing = editingId === orderId;
+              return (
+                <div key={idx} className={`bg-white p-8 rounded-[3rem] shadow-sm border-2 transition-all ${isEditing ? "border-[#1e293b] ring-8 ring-slate-100 scale-[1.02]" : "border-slate-50"}`}>
+                  <div className="flex justify-between items-center mb-8 border-b border-slate-50 pb-6">
+                    <span className="font-mono font-black text-[#1e293b] text-xl tracking-tighter">#{orderId}</span>
+                    {isEditing ? (
+                      <div className="flex gap-2">
+                        <button onClick={handleSave} className="p-4 bg-emerald-600 text-white rounded-2xl shadow-lg active:scale-90 transition-all"><Save size={24} /></button>
+                        <button onClick={() => setEditingId(null)} className="p-4 bg-slate-100 text-slate-400 rounded-2xl active:scale-90 transition-all"><X size={24} /></button>
+                      </div>
+                    ) : (
+                      <button onClick={() => handleEdit(order)} className="p-4 bg-slate-50 text-[#1e293b] rounded-2xl active:scale-90 transition-all"><Edit2 size={24} /></button>
+                    )}
+                  </div>
+                  <div className="space-y-8">
+                    <div className="bg-slate-50 p-5 rounded-2xl grid grid-cols-2 gap-4 border border-slate-100">
+                      <RenderField label="訂購人" fieldType="name" order={order} icon={User} />
+                      <RenderField label="訂購電話" fieldType="phone" order={order} icon={Phone} />
+                    </div>
+                    <div className="bg-blue-50/30 p-5 rounded-2xl border border-blue-100/50 grid grid-cols-2 gap-4">
+                      <RenderField label="收件人" fieldType="recipientName" order={order} icon={UserPlus} />
+                      <RenderField label="收件電話" fieldType="recipientPhone" order={order} icon={PhoneForwarded} />
+                    </div>
+                    <RenderField label="配送方式" fieldType="delivery" order={order} icon={Truck} />
+                    <RenderField label="配送地址" fieldType="address" order={order} type="textarea" icon={MapPin} />
+                    <div className="grid grid-cols-2 gap-6">
+                      <RenderField label="送貨日期" fieldType="date" order={order} type="date" icon={Calendar} />
+                      <RenderField label="送貨時間" fieldType="time" order={order} type="text" icon={Clock} />
+                    </div>
+                    <RenderField label="時段範圍" fieldType="period" order={order} type="text" icon={Info} />
+                    <RenderField label="內部備註" fieldType="note" order={order} icon={Info} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 電腦版：專業表格佈局 */}
+          <div className="hidden md:block bg-white rounded-[3.5rem] shadow-2xl border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left table-fixed border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 text-[#64748b] text-[10px] font-black uppercase tracking-[0.3em] border-b border-slate-100">
+                    <th className="px-8 py-8 w-[120px]">編號</th>
+                    <th className="px-8 py-8 w-[180px]">訂購人</th>
+                    <th className="px-8 py-8 w-[180px]">收件人</th>
+                    <th className="px-8 py-8 w-[140px]">物流方式</th>
+                    <th className="px-8 py-8 w-[280px]">配送地址</th>
+                    <th className="px-8 py-8 w-[150px]">送貨日期</th>
+                    <th className="px-8 py-8 w-[180px]">時間 / 時段</th>
+                    <th className="px-8 py-8 w-[120px] text-right pr-12">管理</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredOrders.map((order, idx) => {
+                    const orderId = getDisplayValue(order, 'id');
+                    const isEditing = editingId === orderId;
+                    return (
+                      <tr key={idx} className={`group transition-all ${isEditing ? "bg-slate-50" : "hover:bg-slate-50/50"}`}>
+                        <td className="px-8 py-10"><RenderField label="ID" fieldType="id" order={order} /></td>
+                        <td className="px-8 py-10"><div className="flex flex-col gap-4"><RenderField label="姓名" fieldType="name" order={order} /><RenderField label="電話" fieldType="phone" order={order} /></div></td>
+                        <td className="px-8 py-10"><div className="flex flex-col gap-4 bg-blue-50/20 p-2 rounded-xl border border-blue-100/10"><RenderField label="姓名" fieldType="recipientName" order={order} /><RenderField label="電話" fieldType="recipientPhone" order={order} /></div></td>
+                        <td className="px-8 py-10"><RenderField label="配送" fieldType="delivery" order={order} icon={Truck} /></td>
+                        <td className="px-8 py-10"><RenderField label="地址" fieldType="address" order={order} type="textarea" /></td>
+                        <td className="px-8 py-10"><RenderField label="日期" fieldType="date" order={order} type="date" /></td>
+                        <td className="px-8 py-10"><div className="flex flex-col gap-4"><RenderField label="時間" fieldType="time" order={order} type="text" /><RenderField label="時段" fieldType="period" order={order} type="text" /></div></td>
+                        <td className="px-8 py-10 text-right pr-12">
+                          {isEditing ? (
+                            <div className="flex justify-end gap-3"><button onClick={handleSave} className="p-4 bg-emerald-600 text-white rounded-[1.5rem] shadow-xl hover:scale-110 active:scale-90 transition-all"><Save size={24} /></button><button onClick={() => setEditingId(null)} className="p-4 bg-slate-100 text-slate-400 rounded-[1.5rem] transition-all"><X size={24} /></button></div>
+                          ) : (
+                            <button onClick={() => handleEdit(order)} className="p-6 text-slate-300 hover:text-[#1e293b] hover:bg-slate-100 rounded-[2rem] opacity-0 group-hover:opacity-100 transition-all ml-auto flex border border-transparent shadow-sm"><Edit2 size={28} /></button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="max-w-[1500px] mx-auto mt-16 flex justify-between items-center text-[10px] text-slate-400 font-black uppercase tracking-[0.5em]">
+        <span>&copy; 2025 East Store Logistics</span>
+        <div className="flex gap-8">
+           <a href={`https://docs.google.com/spreadsheets/d/1bUNQf1tq24GLD-lzxgkm1dbDFw6uJR6JfRtHmARC_9o`} target="_blank" className="hover:text-[#1e293b] transition-all">開啟試算表</a>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default App;
