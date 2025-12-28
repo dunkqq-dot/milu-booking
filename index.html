@@ -246,6 +246,7 @@
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>關於殘膠風險： 我了解工作室使用 3M 不易殘膠布膠，並同意於 36 小時內 拆除。</span></label>
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>若超過 36 小時未拆除導致殘膠或漆面脫落，或因牆面材質特殊造成損損，我同意工作室不負修復或賠償責任。</span></label>
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>關於作業時間：我了解專人佈置需預留 至少 2 小時 的施作時間。</span></label>
+                        <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>我已詳細閱讀預約須知與條款</span></label>
                     </div>
                     
                     <div class="pt-2">
@@ -315,6 +316,7 @@
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>關於商品驗收： 商品送達後，我（或收件人）會立即確認氣球完整性。</span></label>
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>若送達當下有疑慮，我會立即向司機或 LINE 客服反映。</span></label>
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>若商品送達後無立即反應，後續破損或消氣會自行負責。</span></label>
+                        <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>我已詳細閱讀預約須知與條款</span></label>
                     </div>
                     
                     <div class="pt-2">
@@ -382,6 +384,7 @@
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>關於商品驗收： 我（或代取人）會在**「取貨當下」**確認商品完整性，如有疑慮會立即反映。</span></label>
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>離店後免責： 商品交付離店後，因運送過程、環境溫度或人為擠壓造成的消氣或破損，工作室恕不負責。</span></label>
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>關於時效： 我了解空飄氣球時效約 6～8 小時（依環境而異），會隨時間氧化變霧 或 消氣。</span></label>
+                        <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>我已詳細閱讀預約須知與條款</span></label>
                     </div>
                     
                     <div class="pt-2">
@@ -444,6 +447,7 @@
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>關於時效： 如有訂購空飄氣球我了解空飄氣球時效約 6～8 小時（依環境而異），建議於活動前 1～2 小時內完成佈置以達最佳效果。</span></label>
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>關於空間： 我會提前清空後車廂雜物，以便現場人員直接進行佈置。</span></label>
                         <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>離場後免責： 佈置完成驗收離場後，因行駛過程晃動、溫度變化或人為因素導致的破損或位移，工作室恕不負責。</span></label>
+                        <label class="checkbox-item"><input type="checkbox" class="checkbox-input dummy-term" required><span>我已詳細閱讀預約須知與條款</span></label>
                     </div>
                     
                     <div class="pt-2">
@@ -619,7 +623,7 @@
                 payInput.value = '未付款';
             }
             if (configEntry.SERVICE_ID) {
-                const serviceNameMap = { 'deco': '專人佈置', 'delivery': '氣球外送', 'trunk': '後車廂驚喜', 'pickup': '工作室自取' };
+                const serviceNameMap = { 'deco': '專人佈置', 'delivery': '氣球外送', 'trunk': '後車廂佈置', 'pickup': '工作室自取' };
                 let serviceInput = form.querySelector(`input[name="entry.${configEntry.SERVICE_ID}"]`);
                 if (!serviceInput) {
                     serviceInput = document.createElement('input');
@@ -651,13 +655,13 @@
 
             let terms = [];
             if(type === 'deco') {
-                terms = ["我已確認場地允許進行氣球佈置，並已通知場方。", "我了解空飄氣球漂浮時間約 6～8 小時，會安排在活動前 1-2 小時完成佈置以達最佳效果。", "關於殘膠風險： 我了解工作室使用 3M 不易殘膠布膠，並同意於 36 小時內 拆除。", "若超過 36 小時未拆除導致殘膠或漆面脫落，或因牆面材質特殊造成損損，我同意工作室不負修復或賠償責任。", "關於作業時間：我了解專人佈置需預留 至少 2 小時 的施作時間。"];
+                terms = ["我已確認場地允許進行氣球佈置，並已通知場方。", "我了解空飄氣球漂浮時間約 6～8 小時，會安排在活動前 1-2 小時完成佈置以達最佳效果。", "關於殘膠風險： 我了解工作室使用 3M 不易殘膠布膠，並同意於 36 小時內 拆除。", "若超過 36 小時未拆除導致殘膠或漆面脫落，或因牆面材質特殊造成損損，我同意工作室不負修復或賠償責任。", "關於作業時間：我了解專人佈置需預留 至少 2 小時 的施作時間。", "我已詳細閱讀預約須知與條款"];
             } else if(type === 'delivery') {
-                terms = ["我了解空飄氣球時效約 6～8 小時（隨時間氧化變霧），已確認送達時間符合活動需求。", "關於交貨地點： 我了解外送僅配送至 一樓或管理室，司機不上樓，我（或收件人）會前往一樓取貨。", "關於商品驗收： 商品送達後，我（或收件人）會立即確認氣球完整性。", "若送達當下有疑慮，我會立即向司機或 LINE 客服反映。", "若商品送達後無立即反應，後續破損或消氣會自行負責。"];
+                terms = ["我了解空飄氣球時效約 6～8 小時（隨時間氧化變霧），已確認送達時間符合活動需求。", "關於交貨地點： 我了解外送僅配送至 一樓或管理室，司機不上樓，我（或收件人）會前往一樓取貨。", "關於商品驗收： 商品送達後，我（或收件人）會立即確認氣球完整性。", "若送達當下有疑慮，我會立即向司機或 LINE 客服反映。", "若商品送達後無立即反應，後續破損或消氣會自行負責。", "我已詳細閱讀預約須知與條款"];
             } else if(type === 'pickup') {
-                terms = ["關於交通工具： 氣球怕風吹且體積大，我會安排**「汽車」**取貨（❌強烈不建議騎機車）。", "關於司機代取： 若委託司機（如 Uber/Lalamove）代取，我理解工作室僅負責交貨時的完整性（會拍照留存），運送途中的破損風險由我自行承擔。", "關於商品驗收： 我（或代取人）會在**「取貨當下」**確認商品完整性，如有疑慮會立即反映。", "離店後免責： 商品交付離店後，因運送過程、環境溫度或人為擠壓造成的消氣或破損，工作室恕不負責。", "關於時效： 我了解空飄氣球時效約 6～8 小時（依環境而異），會隨時間氧化變霧 或 消氣。"];
+                terms = ["關於交通工具： 氣球怕風吹且體積大，我會安排**「汽車」**取貨（❌強烈不建議騎機車）。", "關於司機代取： 若委託司機（如 Uber/Lalamove）代取，我理解工作室僅負責交貨時的完整性（會拍照留存），運送途中的破損風險由我自行承擔。", "關於商品驗收： 我（或代取人）會在**「取貨當下」**確認商品完整性，如有疑慮會立即反映。", "離店後免責： 商品交付離店後，因運送過程、環境溫度或人為擠壓造成的消氣或破損，工作室恕不負責。", "關於時效： 我了解空飄氣球時效約 6～8 小時（依環境而異），會隨時間氧化變霧 或 消氣。", "我已詳細閱讀預約須知與條款"];
             } else if(type === 'trunk') {
-                terms = ["關於作業時間： 我了解後車廂佈置需預留 至少 1 小時 的施作時間，我會準時抵達。", "關於時效： 如有訂購空飄氣球我了解空飄氣球時效約 6～8 小時（依環境而異），建議於活動前 1～2 小時內完成佈置以達最佳效果。", "關於空間： 我會提前清空後車廂雜物，以便現場人員直接進行佈置。", "離場後免責： 佈置完成驗收離場後，因行駛過程晃動、溫度變化或人為因素導致的破損或位移，工作室恕不負責。"];
+                terms = ["關於作業時間： 我了解後車廂佈置需預留 至少 1 小時 的施作時間，我會準時抵達。", "關於時效： 如有訂購空飄氣球我了解空飄氣球時效約 6～8 小時（依環境而異），建議於活動前 1～2 小時內完成佈置以達最佳效果。", "關於空間： 我會提前清空後車廂雜物，以便現場人員直接進行佈置。", "離場後免責： 佈置完成驗收離場後，因行駛過程晃動、溫度變化或人為因素導致的破損或位移，工作室恕不負責。", "我已詳細閱讀預約須知與條款"];
             }
             
             terms.forEach(t => createHiddenInput(form, 'entry.' + configEntry.TERMS_ID, t));
