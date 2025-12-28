@@ -340,7 +340,7 @@
 
         const configMap = {
             '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
-            '工作室取貨': { time: '取貨時間', location: '取貨門市', icon: '🛍️' },
+            '工作室取貨': { time: '取貨時間', location: '取貨門市', icon: '🛒' },
             '後車廂佈置': { time: '抵達時間', location: '施作地點', icon: '🚗' },
             '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
         };
@@ -729,7 +729,7 @@
                                 else if (actionType === 'COMPLETE') statusText = '🏁 已完成'; 
                                 else if (actionType === 'CANCEL') statusText = '❌ 已取消';
                                 else if (actionType === 'REFUND') statusText = '💸 已退款';
-                                else if (actionType === 'RESTORE') statusText = '❌ 未付款';
+                                else if (actionType === 'RESTORE') statusText = '⚠️ 未付款';
 
                                 const price = parseInt(order.rawPrice) || 0;
                                 const received = parseInt(order.receivedPrice) || 0;
@@ -810,7 +810,7 @@
                     let statusText = '';
                     if (order.status === 'CONFIRMED') statusText = '✅ 已付款';
                     else if (order.status === 'WAITING_PAYMENT') statusText = '⏳ 等待匯款';
-                    else if (order.status === 'UNPAID') statusText = '❌ 未付款';
+                    else if (order.status === 'UNPAID') statusText = '⚠️ 未付款';
                     else if (order.status === 'COMPLETED') statusText = '🏁 已完成';
 
                     const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
