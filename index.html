@@ -509,7 +509,6 @@
             }
         }
 
-        // ... bindFormInputs, switchTab 保持不變 ...
         function bindFormInputs() {
             const decoForm = document.getElementById('form-deco');
             decoForm.action = config.DECO.ACTION;
@@ -558,7 +557,7 @@
                 } else {
                     btn.classList.remove('tab-active'); 
                 }
-                if (form) { // Check if form exists
+                if (form) { 
                     if (t === type) form.classList.remove('hidden');
                     else form.classList.add('hidden');
                 }
@@ -569,6 +568,36 @@
             event.preventDefault(); 
             const configEntry = config[type.toUpperCase()];
             form.action = configEntry.ACTION;
+
+            // ==========================================
+            // [新增/修改] 處理電話號碼，強制加上 ' 號以解決 Google Sheets 0 消失問題
+            // ==========================================
+            const phoneInputId = type + '-phone';
+            const phoneInput = document.getElementById(phoneInputId);
+            
+            if (phoneInput && phoneInput.value) {
+                // 如果 input 還有 name 屬性 (第一次送出)，先存起來並移除，避免原生 form 送出不帶單引號的值
+                if (phoneInput.hasAttribute('name')) {
+                    phoneInput.setAttribute('data-entry-name', phoneInput.name);
+                    phoneInput.removeAttribute('name');
+                }
+                
+                const entryName = phoneInput.getAttribute('data-entry-name');
+                
+                // 移除舊的 hidden input (如果使用者重試提交)
+                const oldHidden = form.querySelector(`input[name="${entryName}"][type="hidden"]`);
+                if (oldHidden) oldHidden.remove();
+
+                // 檢查是否已經有 ' 號 (避免重複添加)，並建立隱藏欄位送出
+                let finalPhone = phoneInput.value;
+                if (!finalPhone.startsWith("'")) {
+                    finalPhone = "'" + finalPhone;
+                }
+                createHiddenInput(form, entryName, finalPhone);
+            }
+            // ==========================================
+            // [結束] 電話號碼處理
+            // ==========================================
 
             // ⚠️ 關鍵：組合地址 (縣市+區域+詳細)
             if (type === 'deco' || type === 'delivery') {
