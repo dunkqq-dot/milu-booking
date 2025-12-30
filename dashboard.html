@@ -449,50 +449,52 @@
                     return s;
                 };
 
-                // 🛠️ 終極修復版：強制校正歷史時差 (LMT Correction)
-                // 針對 Google Sheets 1899年日期轉換到現代時區時產生的 +38 分鐘誤差進行數學修正
+                // 🛠️ 終極修復版 4.0：全面時差校正 (Force LMT Correction)
+                // 針對所有帶有 1899/1900 年份標記的日期，一律扣除 38 分鐘
+                // 這樣能同時解決整點 (+38) 與非整點 (+38) 的所有誤差
                 const formatGASTime = (val) => {
                     if (!val) return '';
                     let s = String(val).trim();
 
-                    // 1. 偵測是否為 Google Sheets 的 1899 年預設日期格式
-                    if (s.includes('1899-12-30') && s.includes('T')) {
-                        // 使用 Regex 抓取 UTC 時間成分
+                    // 1. 保護區間時段 (如: "13:00 - 14:00")
+                    if (s.includes(' - ') || s.includes('~')) return s;
+
+                    // 2. 處理 1899/1900 年預設日期格式 (Google Sheets Time Column)
+                    // 這種格式通常帶有 LMT 歷史時差 (+38m)
+                    if (s.includes('T') && (s.includes('1899') || s.includes('1900'))) {
                         const match = s.match(/T(\d{2}):(\d{2})/);
                         if (match) {
-                            let h = parseInt(match[1]); // UTC 時
-                            let m = parseInt(match[2]); // UTC 分
+                            let h = parseInt(match[1]); // UTC Hour
+                            let m = parseInt(match[2]); // UTC Minute
                             
-                            // 轉換為台灣標準時間 (UTC+8)
-                            let localH = h + 8;
-                            let localM = m;
+                            // 轉為分鐘計算
+                            let totalMinutes = h * 60 + m;
                             
-                            // ⚠️ 關鍵修正：扣除歷史時差 (LMT Artifact)
-                            // 17:00 (Sheet) -> 09:38 UTC (GAS) -> 17:38 (Web)
-                            // 誤差為 +38 分鐘，因此這裡強制扣除 38 分鐘
-                            localM -= 38;
+                            // 加上台灣時區 (+8小時 = +480分鐘)
+                            totalMinutes += 480;
                             
-                            // 處理分鐘借位
-                            while (localM < 0) {
-                                localM += 60;
-                                localH -= 1;
-                            }
+                            // 🔥 強制扣除 38 分鐘 (修正 Google Sheets 1899年 LMT 誤差)
+                            // 無論是否為整點，只要是 1899 年的時間物件，通通扣除
+                            totalMinutes -= 38;
+
+                            // 處理跨日與負數
+                            while (totalMinutes < 0) totalMinutes += 1440; // 1440 mins in a day
+                            while (totalMinutes >= 1440) totalMinutes -= 1440;
                             
-                            // 處理小時進位/退位
-                            while (localH >= 24) localH -= 24;
-                            while (localH < 0) localH += 24;
+                            // 轉回 HH:mm
+                            h = Math.floor(totalMinutes / 60);
+                            m = totalMinutes % 60;
                             
-                            return `${String(localH).padStart(2, '0')}:${String(localM).padStart(2, '0')}`;
+                            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
                         }
                     }
 
-                    // 2. 如果不是 1899 年，或格式單純，則嘗試直接抓取 HH:mm
+                    // 3. 一般格式處理
                     const simpleTimeRegex = /^(\d{1,2}):(\d{2})(:(\d{2}))?$/;
                     const match = s.match(simpleTimeRegex);
                     if (match) return `${match[1].padStart(2, '0')}:${match[2]}`;
                     
-                    // 3. 還是失敗就回傳原字串前5碼
-                    return s.substring(0, 5);
+                    return s;
                 };
 
                 const fetchData = async () => {
@@ -919,4 +921,3 @@
     </script>
 </body>
 </html>
-
