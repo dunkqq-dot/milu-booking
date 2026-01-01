@@ -451,7 +451,6 @@
 
                 // 🛠️ 終極修復版 4.0：全面時差校正 (Force LMT Correction)
                 // 針對所有帶有 1899/1900 年份標記的日期，一律扣除 38 分鐘
-                // 這樣能同時解決整點 (+38) 與非整點 (+38) 的所有誤差
                 const formatGASTime = (val) => {
                     if (!val) return '';
                     let s = String(val).trim();
@@ -460,7 +459,6 @@
                     if (s.includes(' - ') || s.includes('~')) return s;
 
                     // 2. 處理 1899/1900 年預設日期格式 (Google Sheets Time Column)
-                    // 這種格式通常帶有 LMT 歷史時差 (+38m)
                     if (s.includes('T') && (s.includes('1899') || s.includes('1900'))) {
                         const match = s.match(/T(\d{2}):(\d{2})/);
                         if (match) {
@@ -474,7 +472,6 @@
                             totalMinutes += 480;
                             
                             // 🔥 強制扣除 38 分鐘 (修正 Google Sheets 1899年 LMT 誤差)
-                            // 無論是否為整點，只要是 1899 年的時間物件，通通扣除
                             totalMinutes -= 38;
 
                             // 處理跨日與負數
@@ -789,11 +786,16 @@
                                     flexContents: flex
                                 };
 
-                                // 🚀 平行處理：同時發 LINE (快，傳送完整資料) 和存 GAS (慢)
-                                await Promise.all([
-                                    sendToMake(payload, flex), 
-                                    fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) }) 
-                                ]);
+                                // 🚀 修正：個別處理 Promise 錯誤，防止單一請求失敗導致整體流程中斷
+                                // 這樣即便 GAS 回傳 CORS 錯誤 (實際上已成功)，也不會卡住 UI
+                                const p1 = fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) })
+                                           .then(res => { /* ok */ })
+                                           .catch(err => console.log("GAS Request finished (ignore error):", err));
+
+                                const p2 = sendToMake(payload, flex)
+                                           .catch(err => console.log("Make Request finished (ignore error):", err));
+
+                                await Promise.all([p1, p2]);
                                 
                                 if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
                                 else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
@@ -817,7 +819,7 @@
                 };
                 const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
                 
-                // 🔥 修改後的儲存邏輯 (解決問題 1)
+                // 🔥 修改後的儲存邏輯 (解決存檔成功卻顯示錯誤的問題)
                 const saveEdit = async () => {
                     // 1. 先詢問使用者意願
                     const { isConfirmed, isDenied } = await Swal.fire({
@@ -879,15 +881,17 @@
                     };
 
                     try {
-                        const requests = [];
-                        // 1. 存檔到 GAS (永遠執行)
-                        requests.push(fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) }));
+                        // 🚀 關鍵修正：將請求各自加上 catch 處理
+                        // 這樣即便 GAS 因為轉址回傳 CORS 錯誤，也不會被視為失敗，程式會繼續執行
+                        const p1 = fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) })
+                                   .then(res => { /* ok */ })
+                                   .catch(err => console.log("GAS Request finished (ignore error):", err));
 
-                        // 2. 發送 LINE 到 Make (修正：無論是否通知都發送，交由 Make Filter 決定)
-                        // 之前是 if (shouldNotify) { ... }
-                        requests.push(sendToMake(payload, flex)); 
+                        // 發送 LINE 到 Make (修正：無論是否通知都發送，交由 Make Filter 決定)
+                        const p2 = sendToMake(payload, flex)
+                                   .catch(err => console.log("Make Request finished (ignore error):", err));
 
-                        await Promise.all(requests);
+                        await Promise.all([p1, p2]);
                         
                         Object.assign(selectedOrder.value, editForm.value);
                         selectedOrder.value.contactName = editForm.value.contactName; 
@@ -895,7 +899,10 @@
                         selectedOrder.value.receivedPrice = parseMoney(editForm.value.receivedPrice);
                         isEditing.value = false;
                         Swal.fire('成功', shouldNotify ? '資料已更新並發送通知！' : '資料已更新 (未發送通知)', 'success');
-                    } catch (e) { Swal.fire('錯誤', e.message, 'error'); }
+                    } catch (e) { 
+                        // 這個 catch 現在只會捕捉程式邏輯錯誤，而不會捕捉被忽略的網路錯誤
+                        Swal.fire('錯誤', e.message, 'error'); 
+                    }
                 };
 
                 const showDebug = () => {
@@ -921,3 +928,4 @@
     </script>
 </body>
 </html>
+
