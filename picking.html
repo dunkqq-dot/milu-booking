@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh-TW">
   <head>
-    <base target="_top">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎈 撿貨小幫手</title>
     <!-- 引入 Bootstrap 讓按鈕變漂亮 -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -26,7 +28,7 @@
     <!-- 頁面 1: 訂單列表 -->
     <div id="view-list">
       <div class="navbar justify-content-center">
-        🎈 撿貨工單
+        🎈 撿貨工單 (GitHub版)
       </div>
       
       <div class="container mt-3">
@@ -80,23 +82,44 @@
     </div>
 
     <script>
+      // ==========================================
+      // ⚠️ 這裡填入您的 GAS 後端網址
+      // ==========================================
+      const API_URL = "https://script.google.com/macros/s/AKfycbzYOxTAcrUDrTfkCH3K4voyHOWu-uk-AVFfAu60nuIHu0kI6D4Q_k-RlMdJhhUG1dZb/exec";
+
       let currentOrders = [];
       let currentRowIndex = -1;
 
       // 初始化：預設今天日期
       window.onload = function() {
-        const today = new Date().toISOString().split('T')[0];
-        document.getElementById('datePicker').value = today;
+        // 設定時區為本地時間，避免抓到昨天的日期
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        document.getElementById('datePicker').value = `${yyyy}-${mm}-${dd}`;
+        
         loadOrders();
       };
 
-      // 載入訂單列表
+      // 載入訂單列表 (使用 fetch)
       function loadOrders() {
         const date = document.getElementById('datePicker').value;
         document.getElementById('loader-list').style.display = 'block';
         document.getElementById('orderListContainer').innerHTML = '';
 
-        google.script.run.withSuccessHandler(renderOrders).getOrdersByDate(date);
+        // 改用 fetch 呼叫 API
+        fetch(`${API_URL}?action=getOrders&date=${date}`)
+          .then(response => response.json())
+          .then(data => {
+            // 後端回傳格式預計是 { orders: [...] }
+            renderOrders(data.orders || []);
+          })
+          .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('loader-list').style.display = 'none';
+            document.getElementById('orderListContainer').innerHTML = '<div class="alert alert-danger text-center">連線失敗，請檢查網路或後端網址</div>';
+          });
       }
 
       function renderOrders(orders) {
@@ -104,7 +127,7 @@
         document.getElementById('loader-list').style.display = 'none';
         const container = document.getElementById('orderListContainer');
 
-        if (orders.length === 0) {
+        if (!orders || orders.length === 0) {
           container.innerHTML = '<div class="alert alert-warning text-center">今天沒有訂單或是日期選錯囉！</div>';
           return;
         }
@@ -144,10 +167,21 @@
         document.getElementById('materialList').innerHTML = '';
         document.getElementById('sheetName').innerText = "讀取中...";
 
-        // 呼叫後端讀取連結
+        // 呼叫後端讀取連結 (使用 fetch)
         if(order.link) {
           document.getElementById('loader-detail').style.display = 'block';
-          google.script.run.withSuccessHandler(renderMaterials).getMaterialList(order.link);
+          
+          fetch(`${API_URL}?action=getMaterials&url=${encodeURIComponent(order.link)}`)
+            .then(response => response.json())
+            .then(data => {
+              renderMaterials(data);
+            })
+            .catch(error => {
+              console.error('Error:', error);
+              document.getElementById('loader-detail').style.display = 'none';
+              document.getElementById('materialList').innerHTML = '<div class="p-3 text-danger">讀取報價單失敗，請稍後再試</div>';
+            });
+
         } else {
           document.getElementById('materialList').innerHTML = '<div class="p-4 text-center text-danger">⚠️ 總表上沒有貼報價單連結！<br>請行政人員補上網址。</div>';
         }
@@ -164,41 +198,76 @@
         document.getElementById('sheetName').innerText = result.sheetName || "報價單";
 
         let html = '';
-        result.items.forEach((item, idx) => {
-          html += `
-            <div class="item-row" onclick="toggleCheck(${idx})">
-              <input type="checkbox" class="item-checkbox" id="check-${idx}">
-              <label for="check-${idx}">
-                ${item.name} <br>
-                <span class="badge bg-secondary">${item.qty}</span>
-              </label>
-            </div>
-          `;
-        });
+        // 確保 result.items 存在
+        const items = result.items || [];
+        
+        if (items.length === 0) {
+            html = '<div class="p-3 text-center text-muted">這張單好像沒有材料內容喔</div>';
+        } else {
+            items.forEach((item, idx) => {
+              html += `
+                <div class="item-row" onclick="toggleCheck(${idx})">
+                  <input type="checkbox" class="item-checkbox" id="check-${idx}">
+                  <label for="check-${idx}">
+                    ${item.name} <br>
+                    <span class="badge bg-secondary">${item.qty}</span>
+                  </label>
+                </div>
+              `;
+            });
+        }
         document.getElementById('materialList').innerHTML = html;
       }
 
       // 點擊整行都能打勾
       function toggleCheck(idx) {
-        // 避免點擊 checkbox 本身時觸發兩次
-        // 這裡單純依靠 label 的 for 屬性即可，或是手動切換
+        // 這裡不需要額外邏輯，依靠 label for 屬性即可
       }
 
       // 返回列表
       function goBack() {
         document.getElementById('view-list').style.display = 'block';
         document.getElementById('view-detail').style.display = 'none';
-        loadOrders(); // 重新整理狀態
+        // 選擇性：返回時是否重新整理列表？如果要更新狀態建議重載
+        loadOrders(); 
       }
 
-      // 完成撿貨
+      // 完成撿貨 (使用 fetch POST)
       function finishOrder() {
         if(!confirm("確定都撿好貨了嗎？")) return;
         
-        google.script.run.withSuccessHandler(function() {
-          alert("🎉 更新成功！");
-          goBack();
-        }).markOrderAsDone(currentRowIndex);
+        // 顯示 loading 避免重複點擊
+        const btn = document.querySelector('#footerAction button');
+        const originalText = btn.innerText;
+        btn.disabled = true;
+        btn.innerText = "更新中...";
+
+        // 使用 fetch POST 送出資料 (JSON 字串)
+        // 這裡使用 text/plain 以避免 GAS 的 CORS 預檢問題，後端需做對應解析
+        fetch(API_URL, {
+            method: "POST",
+            body: JSON.stringify({
+                action: "markAsDone",
+                rowIndex: currentRowIndex
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert("🎉 更新成功！");
+                goBack();
+            } else {
+                alert("更新失敗：" + (data.error || "未知錯誤"));
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert("網路錯誤，無法更新");
+        })
+        .finally(() => {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        });
       }
     </script>
   </body>
