@@ -110,15 +110,28 @@
 
         // 改用 fetch 呼叫 API
         fetch(`${API_URL}?action=getOrders&date=${date}`)
-          .then(response => response.json())
+          .then(response => {
+             // 🔍 偵錯重點：檢查回傳的是不是 JSON 資料
+             const contentType = response.headers.get("content-type");
+             if (!contentType || !contentType.includes("application/json")) {
+               // 如果回傳的是 HTML (例如 Google 登入頁或錯誤頁)，這裡會抓到
+               throw new Error("⚠️ 讀取失敗！系統回傳了網頁而非資料。<br>可能原因：<br>1. GAS 程式碼沒有更新成 API 版本<br>2. 部署權限沒設為「任何人」");
+             }
+             return response.json();
+          })
           .then(data => {
             // 後端回傳格式預計是 { orders: [...] }
+            // 如果 data.error 存在，代表後端邏輯錯誤
+            if (data.error) {
+                throw new Error(data.error);
+            }
             renderOrders(data.orders || []);
           })
           .catch(error => {
             console.error('Error:', error);
             document.getElementById('loader-list').style.display = 'none';
-            document.getElementById('orderListContainer').innerHTML = '<div class="alert alert-danger text-center">連線失敗，請檢查網路或後端網址</div>';
+            // 將錯誤訊息顯示在畫面上，方便排查
+            document.getElementById('orderListContainer').innerHTML = `<div class="alert alert-danger text-center">${error.message}</div>`;
           });
       }
 
@@ -128,7 +141,7 @@
         const container = document.getElementById('orderListContainer');
 
         if (!orders || orders.length === 0) {
-          container.innerHTML = '<div class="alert alert-warning text-center">今天沒有訂單或是日期選錯囉！</div>';
+          container.innerHTML = '<div class="alert alert-warning text-center">今天沒有訂單或是日期選錯囉！<br><small>請確認試算表有該日期的資料</small></div>';
           return;
         }
 
