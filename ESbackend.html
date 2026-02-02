@@ -3,139 +3,355 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>East Store 系統 - 專業全屏版</title>
+    <title>Official website calendar Admin Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f1f5f9; height: 100vh; overflow: hidden; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .active-card { border-left: 5px solid #3b82f6 !important; background-color: #eff6ff; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .btn-active:active { transform: scale(0.95); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .selected-order { border-left: 6px solid #3b82f6 !important; background-color: #f8fafc; }
     </style>
 </head>
-<body class="flex flex-col">
+<body class="h-screen flex flex-col overflow-hidden text-slate-900">
 
-    <header class="bg-[#0f172a] text-white p-4 shadow-xl flex justify-between items-center z-50">
+    <header class="h-16 bg-[#0f172a] text-white flex items-center justify-between px-6 shadow-lg z-50">
         <div class="flex items-center gap-3">
-            <div class="bg-blue-600 p-2 rounded-xl">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 2H7c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM12 18h.01"/></svg>
+            <div class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="3"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             </div>
-            <div>
-                <h1 class="text-base md:text-xl font-black tracking-tighter uppercase italic leading-none">East Store <span class="text-blue-400">Admin</span></h1>
-                <p id="sync-status" class="text-[9px] font-bold text-slate-500 uppercase tracking-[0.3em] mt-1">Ready</p>
-            </div>
+            <span class="font-black tracking-tighter uppercase italic">Official website <span class="text-blue-400">Calendar Admin</span></span>
         </div>
-        <button id="refresh-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold border border-slate-700">
-            <svg id="refresh-icon" class="inline mr-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
-            Sync
+        <button id="syncBtn" onclick="refreshData()" class="p-2.5 bg-slate-800 rounded-xl hover:bg-slate-700 transition-all border border-slate-700">
+            <svg id="syncIcon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
         </button>
     </header>
 
-    <div class="flex flex-1 overflow-hidden relative">
-        <aside class="w-full md:w-[320px] border-r border-slate-200 bg-white flex flex-col h-full z-10">
-            <div class="p-5 border-b">
-                <input id="search-input" type="text" placeholder="搜尋..." class="w-full px-4 py-3 bg-slate-50 rounded-2xl text-sm outline-none focus:ring-2 ring-blue-100 font-bold">
+    <div class="flex-1 flex overflow-hidden relative">
+        <aside id="listContainer" class="w-full md:w-80 border-r bg-white flex flex-col z-30 transition-all">
+            <div class="p-4 border-b">
+                <input id="searchInput" type="text" placeholder="搜尋編號或姓名..." class="w-full px-4 py-2.5 bg-slate-100 rounded-xl outline-none focus:ring-2 ring-blue-500/20 text-sm font-bold">
             </div>
-            <div id="sidebar-list" class="flex-1 overflow-y-auto no-scrollbar"></div>
+            <div id="orderList" class="flex-1 overflow-y-auto no-scrollbar">
+                <div class="p-10 text-center text-slate-300 font-bold animate-pulse text-xs uppercase">Connecting...</div>
+            </div>
         </aside>
 
-        <main id="main-content" class="absolute inset-0 md:relative md:flex-1 bg-slate-50 overflow-y-auto z-40 translate-x-full md:translate-x-0 transition-transform duration-300">
-            <div id="empty-state" class="flex h-full flex-col items-center justify-center text-slate-300">
-                <div id="loading-spinner" class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full spin mb-4"></div>
-                <p id="empty-text" class="font-black text-sm tracking-widest uppercase">Select an order</p>
+        <main id="detailContainer" class="absolute inset-0 md:relative md:flex-1 bg-slate-50 flex flex-col z-40 translate-x-full md:translate-x-0 transition-transform duration-300">
+            <div class="md:hidden flex items-center gap-3 p-4 bg-white border-b sticky top-0">
+                <button onclick="closeDetail()" class="p-2 bg-slate-100 rounded-lg"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="m15 18-6-6 6-6"/></svg></button>
+                <span id="mobileTitle" class="font-black text-sm uppercase">Order Detail</span>
             </div>
-            <div id="detail-content" class="hidden p-6 md:p-10 pb-32"></div>
+            <div id="detailView" class="flex-1 overflow-y-auto p-6 md:p-10 space-y-8 hidden"></div>
+            <div id="emptyView" class="flex-1 flex flex-col items-center justify-center text-slate-300">
+                <p class="font-black tracking-widest uppercase text-[10px]">Select an order</p>
+            </div>
         </main>
     </div>
 
-    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-[100] font-black text-xs uppercase bg-[#0f172a] text-white transition-all opacity-0 pointer-events-none translate-y-10">Success</div>
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-4 bg-slate-900 text-white rounded-2xl shadow-2xl z-[100] text-[10px] font-black opacity-0 transition-all pointer-events-none transform translate-y-4 tracking-widest">SUCCESS</div>
 
     <script>
-        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec";
-        let allOrders = [];
-        let selectedId = null;
-
-        const FIELD_MAPS = {
-            id: ["訂單編號", "編號", "OrderID"],
-            name: ["收件人姓名", "姓名", "名字"],
-            date: ["送貨日期", "日期"],
-            address: ["詳細地址", "地址"]
+        const API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec";
+        
+        let state = {
+            allOrders: [],
+            selectedOrder: null,
+            isEditing: false,
+            headerMap: {}, 
+            editCache: {}  
         };
 
-        function getVal(order, type) {
-            if (!order) return "";
-            const keys = Object.keys(order);
-            const targets = FIELD_MAPS[type];
-            const realKey = keys.find(k => targets.some(t => k.includes(t)));
-            return realKey ? String(order[realKey] || "").trim() : "";
-        }
+        const FIELD_DEFINITIONS = {
+            id: ["訂單編號", "編號", "OrderID"],
+            name: ["姓名", "名字", "客戶姓名"],
+            phone: ["電話", "聯絡電話", "手機"],
+            address: ["配送地址", "送貨地址", "地址"],
+            date: ["取貨/送貨日期", "取貨日期", "送貨日期", "配送日期"],
+            time: ["時間", "配送時間", "送貨時間"],
+            period: ["時段", "配送時段"],
+            uid: ["LINE UID", "UID"],
+            status: ["同步狀態"],
+            note: ["備註", "訂單備註"]
+        };
 
-        async function fetchOrders() {
-            const icon = document.getElementById('refresh-icon');
-            const spinner = document.getElementById('loading-spinner');
-            icon.classList.add('spin');
+        const PERIOD_TAGS = ["不指定", "13:00 前", "14:00-18:00"];
+        
+        // 門市與地址關鍵字對應
+        const STUDIO_PICKUP = {
+            "板橋工作室": "板橋工作室自取",
+            "台中工作室": "台中工作室自取"
+        };
+
+        async function refreshData() {
+            document.getElementById('syncIcon').classList.add('spin');
             try {
-                const res = await fetch(`${GAS_API_URL}?action=getOrders`);
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    allOrders = data;
-                    renderSidebar();
-                    document.getElementById('empty-text').innerText = "Select an order";
-                    spinner.classList.add('hidden');
+                const res = await fetch(`${API_URL}?action=getOrders&t=${Date.now()}`);
+                state.allOrders = await res.json();
+                renderList();
+                if (state.selectedOrder) {
+                    const currentId = getCleanVal(state.selectedOrder, 'id');
+                    const updated = state.allOrders.find(o => getCleanVal(o, 'id') === currentId);
+                    if (updated) { state.selectedOrder = updated; if(!state.isEditing) renderDetail(); }
                 }
-            } catch (e) { 
-                document.getElementById('empty-text').innerText = "Sync Error"; 
-            } finally { 
-                icon.classList.remove('spin'); 
-            }
+            } catch (e) { notify("連線超時"); }
+            finally { setTimeout(() => document.getElementById('syncIcon').classList.remove('spin'), 500); }
         }
 
-        function renderSidebar() {
-            const list = document.getElementById('sidebar-list');
-            const search = document.getElementById('search-input').value.toLowerCase();
-            const filtered = allOrders.filter(o => getVal(o, 'id').toLowerCase().includes(search) || getVal(o, 'name').toLowerCase().includes(search));
+        function getRealKey(order, field) {
+            if (!order) return null;
+            const keys = Object.keys(order);
+            const targets = FIELD_DEFINITIONS[field];
+            return keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
+        }
+
+        function getCleanVal(order, field) {
+            if (!order) return "";
+            const key = getRealKey(order, field);
+            let val = order[key] || "";
+            if (field === 'date' && val) {
+                const d = new Date(val);
+                if (isNaN(d.getTime())) return String(val).trim();
+                if (String(val).includes('T')) d.setHours(d.getHours() + 8);
+                return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+            }
+            if (field === 'time' || field === 'period') {
+                const tKey = getRealKey(order, 'time');
+                const pKey = getRealKey(order, 'period');
+                let tVal = String(order[tKey] || "").trim();
+                let pVal = String(order[pKey] || "").trim();
+                if (tVal.includes("1899")) {
+                    const d = new Date(tVal);
+                    tVal = `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                }
+                const isP = ["前", "後", "上午", "下午", "-", "~"].some(k => tVal.includes(k));
+                if (isP && !pVal) return field === 'period' ? tVal : "";
+                return field === 'time' ? tVal : pVal;
+            }
+            return String(val).trim();
+        }
+
+        function renderList() {
+            const container = document.getElementById('orderList');
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = state.allOrders.filter(o => {
+                const id = getCleanVal(o, 'id').toLowerCase();
+                const name = getCleanVal(o, 'name').toLowerCase();
+                return !search || id.includes(search) || name.includes(search);
+            });
+            filtered.sort((a,b) => String(getCleanVal(a,'id')).localeCompare(String(getCleanVal(b,'id')), undefined, {numeric: true}));
             
-            list.innerHTML = filtered.map(o => {
-                const id = getVal(o, 'id');
-                return `<div onclick="selectOrder('${id}')" class="p-5 border-b cursor-pointer hover:bg-slate-50 ${selectedId === id ? 'selected-order' : ''}">
-                    <div class="text-[10px] font-black text-blue-600 mb-1">#${id}</div>
-                    <div class="text-sm font-bold text-slate-800">${getVal(o, 'name')}</div>
-                </div>`;
+            container.innerHTML = filtered.map(o => {
+                const id = getCleanVal(o, 'id');
+                const isSelected = state.selectedOrder && getCleanVal(state.selectedOrder, 'id') === id;
+                const hasUid = getCleanVal(o, 'uid');
+                
+                return `
+                    <div onclick="selectOrder('${id}')" class="p-5 border-b cursor-pointer hover:bg-slate-50 transition-all ${isSelected ? 'active-card' : 'bg-white'}">
+                        <div class="flex justify-between mb-1 font-mono text-[10px] font-black ${isSelected ? 'text-blue-600' : 'text-slate-300'}">
+                            <div class="flex items-center gap-1.5">
+                                <span>${id}</span>
+                                ${hasUid ? '<span class="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>' : ''}
+                            </div>
+                            <span>${getCleanVal(o, 'date')}</span>
+                        </div>
+                        <div class="text-sm font-bold text-slate-800">${getCleanVal(o, 'name')}</div>
+                    </div>
+                `;
             }).join('');
         }
 
         function selectOrder(id) {
-            selectedId = id;
-            const order = allOrders.find(o => getVal(o, 'id') === id);
-            if (!order) return;
-            
-            renderSidebar();
-            const content = document.getElementById('detail-content');
-            const empty = document.getElementById('empty-state');
-            empty.classList.add('hidden');
-            content.classList.remove('hidden');
-            document.getElementById('main-content').classList.remove('translate-x-full');
+            const order = state.allOrders.find(o => getCleanVal(o, 'id') === id);
+            if (order) {
+                state.selectedOrder = order;
+                state.isEditing = false;
+                state.headerMap = {};
+                Object.keys(FIELD_DEFINITIONS).forEach(f => { state.headerMap[f] = getRealKey(order, f); });
+                renderDetail();
+                renderList();
+                document.getElementById('detailContainer').classList.remove('translate-x-full');
+                document.getElementById('emptyView').classList.add('hidden');
+                document.getElementById('detailView').classList.remove('hidden');
+            }
+        }
 
-            content.innerHTML = `
-                <h2 class="text-4xl font-black text-[#0f172a] mb-8 italic uppercase tracking-tighter">#${id}</h2>
-                <div class="grid gap-6">
-                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                        <div class="text-[10px] font-black text-slate-300 uppercase mb-2">Name</div>
-                        <div class="font-bold text-slate-800">${getVal(order, 'name')}</div>
+        function closeDetail() { document.getElementById('detailContainer').classList.add('translate-x-full'); state.selectedOrder = null; renderList(); }
+
+        function renderDetail() {
+            const container = document.getElementById('detailView');
+            const o = state.selectedOrder;
+            if (!o) return;
+            const uid = getCleanVal(o, 'uid');
+            const addr = getCleanVal(o, 'address');
+            
+            // 判斷當前門市顯示
+            let storeDisplay = "一般配送";
+            for (let key in STUDIO_PICKUP) {
+                if (addr.includes(key)) storeDisplay = key + " 自取";
+            }
+
+            container.innerHTML = `
+                <div class="flex flex-col lg:flex-row justify-between gap-6 pb-6 border-b">
+                    <div>
+                        <h2 class="text-5xl font-black tracking-tighter italic text-[#0f172a]">${getCleanVal(o, 'id')}</h2>
+                        <p class="text-[10px] font-black text-slate-400 mt-2 uppercase tracking-widest italic">${storeDisplay}</p>
                     </div>
-                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                        <div class="text-[10px] font-black text-slate-300 uppercase mb-2">Address</div>
-                        <div class="font-bold text-slate-800">${getVal(order, 'address')}</div>
+                    <div class="flex gap-3">
+                        ${state.isEditing ? `
+                            <button onclick="saveEdit()" id="saveBtn" class="flex-1 lg:flex-none px-10 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] tracking-widest shadow-xl">CONFIRM SAVE</button>
+                            <button onclick="state.isEditing=false; renderDetail();" class="px-6 py-3 bg-white border rounded-2xl font-black text-[10px] text-slate-400">CANCEL</button>
+                        ` : `
+                            <button onclick="enterEditMode()" class="flex-1 lg:flex-none px-10 py-3 bg-[#0f172a] text-white rounded-2xl font-black text-[10px] tracking-widest shadow-2xl">EDIT ORDER</button>
+                        `}
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    <div class="space-y-8">
+                        <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 space-y-8 shadow-sm">
+                            <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Contact</h3>
+                            ${drawField("姓名", "name", "text")}${drawField("電話", "phone", "text")}
+                        </div>
+                        <div class="p-8 rounded-[2.5rem] border ${uid ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'}">
+                            <h3 class="text-[10px] font-black ${uid ? 'text-emerald-400' : 'text-slate-400'} uppercase tracking-widest mb-4">LINE Notification</h3>
+                            ${uid ? `
+                                <button onclick="sendNotify()" class="w-full py-4 bg-emerald-500 text-white rounded-xl font-black text-[10px] tracking-widest shadow-lg active:scale-95 transition-all">發送通知小卡</button>
+                            ` : `<p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">尚未連動 LINE</p>`}
+                        </div>
+                    </div>
+                    <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 flex flex-col shadow-sm gap-8">
+                        <div>
+                            <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-6">Delivery Address</h3>
+                            ${drawField("配送地址", "address", "address_smart")}
+                        </div>
+                    </div>
+                    <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 space-y-8 shadow-sm">
+                        <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Schedule</h3>
+                        ${drawField("日期", "date", "date")}${drawField("時間", "time", "time")}${drawField("時段", "period", "period")}
+                    </div>
+                    <div class="md:col-span-2 lg:col-span-3 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
+                        <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-4">Note</h3>
+                        ${drawField("備註", "note", "textarea")}
                     </div>
                 </div>
             `;
         }
 
-        window.onload = fetchOrders;
-        document.getElementById('refresh-btn').onclick = fetchOrders;
-        document.getElementById('search-input').oninput = renderSidebar;
+        function drawField(label, field, type) {
+            const isEditing = state.isEditing;
+            let val = isEditing ? (state.editCache[field] || "") : getCleanVal(state.selectedOrder, field);
+            
+            if (isEditing) {
+                // 特殊：智慧地址 (含門市按鈕連動)
+                if (type === 'address_smart') {
+                    return `
+                        <div class="space-y-4">
+                            <div class="flex flex-wrap gap-2 mb-2">
+                                ${Object.keys(STUDIO_PICKUP).map(studio => {
+                                    const studioAddr = STUDIO_PICKUP[studio];
+                                    const isActive = val === studioAddr;
+                                    return `<button onclick="updateCache('address', '${studioAddr}', true)" class="px-3 py-2 rounded-lg text-[10px] font-black border transition-all ${isActive ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-100'}">${studio}</button>`;
+                                }).join('')}
+                                <button onclick="updateCache('address', '', true)" class="px-3 py-2 rounded-lg text-[10px] font-black border bg-slate-50 text-slate-400 border-slate-100">清除地址</button>
+                            </div>
+                            <textarea oninput="updateCache('address', this.value)" class="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 transition-all shadow-inner min-h-[100px]">${val}</textarea>
+                        </div>
+                    `;
+                }
+
+                if (field === 'period') {
+                    return `
+                        <div class="space-y-3">
+                            <span class="text-[10px] font-black text-slate-400 uppercase">${label}</span>
+                            <div class="flex flex-wrap gap-2">
+                                ${PERIOD_TAGS.map(tag => `<button onclick="updateCache('period', '${tag}', true)" class="px-3 py-1.5 rounded-lg text-[9px] font-black border transition-all ${val === tag ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white text-slate-400 border-slate-100'}">${tag}</button>`).join('')}
+                            </div>
+                            <input type="text" value="${val}" oninput="updateCache('period', this.value)" class="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 transition-all shadow-inner">
+                        </div>
+                    `;
+                }
+                if (type === 'date' && val) val = val.replace(/\//g, '-');
+                const tag = type === 'textarea' ? `<textarea oninput="updateCache('${field}', this.value)" class="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 transition-all shadow-inner min-h-[100px]">${val}</textarea>` : `<input type="${type}" value="${val}" oninput="updateCache('${field}', this.value)" class="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 transition-all shadow-inner">`;
+                return `<div class="space-y-2"><span class="text-[10px] font-black text-slate-400 uppercase">${label}</span>${tag}</div>`;
+            }
+            return `<div class="flex flex-col text-left"><span class="text-[10px] font-black text-slate-300 uppercase mb-1">${label}</span><span class="text-base font-bold text-slate-800 leading-tight">${val || "---"}</span></div>`;
+        }
+
+        function enterEditMode() {
+            state.editCache = { 
+                name: getCleanVal(state.selectedOrder, 'name'), 
+                phone: getCleanVal(state.selectedOrder, 'phone'), 
+                address: getCleanVal(state.selectedOrder, 'address'), 
+                date: getCleanVal(state.selectedOrder, 'date'), 
+                time: getCleanVal(state.selectedOrder, 'time'), 
+                period: getCleanVal(state.selectedOrder, 'period'), 
+                note: getCleanVal(state.selectedOrder, 'note') 
+            };
+            state.isEditing = true;
+            renderDetail();
+        }
+
+        function updateCache(field, val, refresh = false) { state.editCache[field] = val; if (refresh) renderDetail(); }
+
+        async function saveEdit() {
+            const btn = document.getElementById('saveBtn');
+            if (btn) { btn.disabled = true; btn.innerText = "SAVING..."; }
+            notify("SAVING TO CLOUD...");
+
+            const payload = {};
+            Object.keys(state.editCache).forEach(f => {
+                const header = state.headerMap[f];
+                if (header) {
+                    let v = state.editCache[f];
+                    if (f === 'date' && v) v = v.replace(/-/g, '/');
+                    if (f === 'phone' && v) v = "'" + v.replace(/^'/, "");
+                    payload[header] = v;
+                }
+            });
+
+            const syncHeader = state.headerMap['status'];
+            if (syncHeader) payload[syncHeader] = "等待同步";
+            
+            if (!state.headerMap['period'] && state.editCache['period'] && !state.editCache['time']) {
+                payload[state.headerMap['time']] = state.editCache['period'];
+            }
+
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: 'updateOrder', data: { ID_KEY: getCleanVal(state.selectedOrder, 'id').replace('#', ''), payload: payload } })
+                });
+                notify("SAVED SUCCESSFULLY");
+                state.isEditing = false;
+                setTimeout(refreshData, 1200);
+            } catch (e) {
+                notify("SAVE ERROR");
+                if (btn) { btn.disabled = false; btn.innerText = "CONFIRM SAVE"; }
+            }
+        }
+
+        async function sendNotify() {
+            const orderId = getCleanVal(state.selectedOrder, 'id');
+            notify("發送 LINE 通知中...");
+            try {
+                await fetch(API_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    body: JSON.stringify({ action: 'sendNotification', orderId: orderId })
+                });
+                notify("通知已發送");
+            } catch (e) { notify("發送失敗"); }
+        }
+
+        function notify(msg) {
+            const t = document.getElementById('toast');
+            if (t) { t.innerText = msg; t.style.opacity = '1'; t.style.transform = 'translate(-50%, 0)'; setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translate(-50%, 1rem)'; }, 3000); }
+        }
+
+        window.onload = refreshData;
+        document.getElementById('searchInput').oninput = renderList;
     </script>
 </body>
 </html>
