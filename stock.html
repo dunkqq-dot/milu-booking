@@ -27,6 +27,9 @@
 
         /**
          * 🎈 麋鹿氣球：備貨管理系統 (GitHub Pages 部署版)
+         * 修正紀錄：
+         * 1. 修正日期抓取：移除模糊的「日期」關鍵字，改為鎖定「取貨/送貨日期」。
+         * 2. 修正時間顯示：處理 Google Sheets 傳回的 1899 ISO 時間格式。
          */
         const API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec"; 
 
@@ -45,13 +48,13 @@
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [toast, setToast] = useState(null);
 
-            // 模糊匹配欄位偵測邏輯
+            // 模糊匹配欄位偵測邏輯 - 修正：從 date 中移除 "日期"，防止抓到下單日
             const FIELD_MAPS = {
                 id: ["訂單編號", "OrderID"],
                 name: ["收件人姓名", "收件人", "姓名"],
                 address: ["詳細地址", "地址", "送貨地址"],
-                date: ["送貨日期", "取貨日期", "日期"],
-                time: ["送貨時段", "配送時段", "時間"],
+                date: ["送貨日期", "取貨/送貨日期", "取貨日期", "配送日期", "預定日期"],
+                time: ["送貨時段", "配送時段", "時間", "取貨時間"],
                 itemType: ["品項類型", "品項"],
                 stockStatus: ["備貨狀態", "狀態"],
                 remark: ["備註欄", "備註"]
@@ -61,6 +64,7 @@
                 if (!order) return "";
                 const keys = Object.keys(order);
                 const targets = FIELD_MAPS[type] || [];
+                // 優先精確匹配，再進行包含匹配
                 const realKey = keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
                 
                 if (!realKey) return "";
@@ -78,9 +82,14 @@
                     }
                 }
 
-                // 處理日期格式簡化
-                if (type === 'date' && String(val).includes("T") && !String(val).includes("1899")) {
-                    return String(val).split('T')[0].replace(/-/g, '/');
+                // 處理日期格式簡化與時區修正
+                if (type === 'date' && val) {
+                    const d = new Date(val);
+                    if (isNaN(d.getTime())) return String(val).trim();
+                    if (String(val).includes("T") && !String(val).includes("1899")) {
+                        d.setHours(d.getHours() + 8);
+                    }
+                    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
                 }
 
                 return String(val || "").trim();
@@ -140,7 +149,9 @@
             const filteredOrders = useMemo(() => {
                 return orders.filter(o => {
                     let d = getVal(o, 'date');
-                    return d.replace(/\//g, '-').includes(selectedDate);
+                    // 統一轉為 YYYY-MM-DD 格式進行比對
+                    const cleanDate = d.replace(/\//g, '-');
+                    return cleanDate.includes(selectedDate);
                 }).sort((a, b) => getVal(a, 'time').localeCompare(getVal(b, 'time')));
             }, [orders, selectedDate]);
 
@@ -236,7 +247,7 @@
                                                     <span className="font-bold text-[#967E67]">{getVal(o, 'time')}</span>
                                                 </div>
                                                 <div className="flex items-start gap-2 leading-snug">
-                                                    <LucideIcon name="map-pin" size={16} className="text-slate-300 shrink-0 mt-0.5"/> 
+                                                    <LucideIcon name="map-pin" size={16} className="text-stone-300 shrink-0 mt-0.5"/> 
                                                     <span className="text-slate-600">{getVal(o, 'address')}</span>
                                                 </div>
                                                 {getVal(o, 'remark') && getVal(o, 'remark') !== "-" && (
