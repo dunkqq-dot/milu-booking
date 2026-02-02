@@ -30,12 +30,14 @@
         // API 設定
         const API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec";
 
+        // 修正：將 "日期" 從 date 移除，確保不抓到下單日期
         const FIELD_DEFINITIONS = {
             id: ["訂單編號", "編號", "OrderID"],
             name: ["收件人姓名", "姓名", "名字", "客戶姓名"],
             phone: ["電話", "聯絡電話", "手機"],
             address: ["詳細地址", "配送地址", "送貨地址", "地址"],
-            date: ["送貨日期", "取貨/送貨日期", "取貨日期", "配送日期", "日期"],
+            date: ["送貨日期", "取貨/送貨日期", "取貨日期", "配送日期", "預定日期"],
+            orderDate: ["下單日期", "訂購日期", "日期"], 
             time: ["送貨時段", "時間", "配送時間", "送貨時間"],
             period: ["時段", "配送時段"],
             uid: ["LINE UID", "UID"],
@@ -79,7 +81,8 @@
             const getRealKey = (order, field) => {
                 if (!order) return null;
                 const keys = Object.keys(order);
-                const targets = FIELD_DEFINITIONS[field];
+                const targets = FIELD_DEFINITIONS[field] || [];
+                // 優先精確匹配，再進行包含匹配
                 return keys.find(k => targets.some(t => k.trim() === t)) || 
                        keys.find(k => targets.some(t => k.includes(t)));
             };
@@ -89,13 +92,19 @@
                 const key = getRealKey(order, field);
                 let val = order[key] || "";
                 
-                if (field === 'date' && val) {
+                // 處理日期格式
+                if (field === 'date' || field === 'orderDate') {
+                    if (!val) return "";
                     const d = new Date(val);
                     if (isNaN(d.getTime())) return String(val).trim();
-                    if (String(val).includes('T')) d.setHours(d.getHours() + 8);
+                    // 修正 GAS ISO 時區問題
+                    if (String(val).includes('T') && !String(val).includes("1899")) {
+                        d.setHours(d.getHours() + 8);
+                    }
                     return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
                 }
 
+                // 處理時間 (含 1899 修正)
                 if (field === 'time' || field === 'period') {
                     const tKey = getRealKey(order, 'time');
                     const pKey = getRealKey(order, 'period');
@@ -150,7 +159,8 @@
                 Object.keys(FIELD_DEFINITIONS).forEach(f => {
                     const realKey = state.headerMap[f];
                     let rawVal = realKey ? state.selectedOrder[realKey] : "";
-                    if (f === 'date' && rawVal) {
+                    
+                    if ((f === 'date' || f === 'orderDate') && rawVal) {
                         const d = new Date(rawVal);
                         if (!isNaN(d.getTime())) {
                             if (String(rawVal).includes('T')) d.setHours(d.getHours() + 8);
@@ -178,7 +188,7 @@
                     const header = state.headerMap[f];
                     if (header) {
                         let v = state.editCache[f];
-                        if (f === 'date' && v) v = v.replace(/-/g, '/');
+                        if ((f === 'date' || f === 'orderDate') && v) v = v.replace(/-/g, '/');
                         if (f === 'phone' && v) v = "'" + String(v).replace(/^'/, "");
                         payloadData[header] = v;
                     }
@@ -201,7 +211,6 @@
                 }
             };
 
-            // 日曆計算邏輯
             const { firstDay, daysCount } = useMemo(() => {
                 const year = currentMonth.getFullYear();
                 const month = currentMonth.getMonth();
@@ -216,23 +225,22 @@
                 return (day > 0 && day <= daysCount) ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toISOString().split('T')[0] : null;
             });
 
-            // 綜合篩選邏輯
+            // 綜合篩選：使用 getDisplayVal(o, 'date') 確保根據配送日期篩選
             const filteredOrders = useMemo(() => {
                 return state.allOrders.filter(o => {
                     const id = getDisplayVal(o, 'id').toLowerCase();
                     const name = getDisplayVal(o, 'name').toLowerCase();
-                    const date = getDisplayVal(o, 'date').replace(/\//g, '-');
+                    const deliveryDate = getDisplayVal(o, 'date').replace(/\//g, '-');
                     
                     if (searchTerm) {
                         return id.includes(searchTerm.toLowerCase()) || name.includes(searchTerm.toLowerCase());
                     }
-                    return date.includes(selectedDate);
+                    return deliveryDate.includes(selectedDate);
                 }).sort((a, b) => String(getDisplayVal(a, 'id')).localeCompare(String(getDisplayVal(b, 'id')), undefined, { numeric: true }));
             }, [state.allOrders, searchTerm, selectedDate]);
 
             return (
                 <div className="h-screen flex flex-col overflow-hidden font-sans bg-slate-50">
-                    {/* Header */}
                     <header className="h-16 bg-[#0f172a] text-white flex items-center justify-between px-6 shadow-lg shrink-0 z-50">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center font-bold text-white italic">M</div>
@@ -244,14 +252,11 @@
                     </header>
 
                     <div className="flex-1 flex overflow-hidden relative">
-                        {/* 左側整合欄位 */}
                         <aside className={`w-full md:w-[340px] border-r bg-white flex flex-col z-30 transition-all ${state.selectedOrder ? 'hidden md:flex' : 'flex'}`}>
-                            {/* 搜尋 */}
                             <div className="p-4 border-b">
                                 <input type="text" placeholder="搜尋編號或姓名..." className="w-full px-4 py-2.5 bg-slate-100 rounded-xl outline-none focus:ring-2 ring-blue-500/20 text-sm font-bold" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                             </div>
 
-                            {/* 日曆切換器 (搜尋時半透明) */}
                             <div className={`p-4 border-b transition-opacity ${searchTerm ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-bold text-sm text-slate-500">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</h3>
@@ -267,6 +272,7 @@
                                     {daysArray.map((dateStr, i) => {
                                         const dayNum = dateStr ? parseInt(dateStr.split('-')[2]) : null;
                                         const isSelected = dateStr === selectedDate;
+                                        // 日曆紅點依據配送日期判斷
                                         const dayOrders = dateStr ? state.allOrders.filter(o => getDisplayVal(o, 'date').replace(/\//g,'-').includes(dateStr)) : [];
                                         const hasSpecial = dayOrders.some(o => getDisplayVal(o, 'itemType') === "性別" || getDisplayVal(o, 'itemType') === "空飄");
                                         
@@ -289,12 +295,10 @@
                                 </div>
                             </div>
 
-                            {/* 列表標題 */}
                             <div className="px-4 py-2 bg-slate-50 border-b text-[10px] font-black text-slate-400 uppercase tracking-widest">
                                 {searchTerm ? `搜尋結果 (${filteredOrders.length})` : `${selectedDate} 訂單 (${filteredOrders.length})`}
                             </div>
 
-                            {/* 列表內容 */}
                             <div className="flex-1 overflow-y-auto">
                                 {filteredOrders.map(o => {
                                     const id = getDisplayVal(o, 'id');
@@ -310,7 +314,6 @@
                             </div>
                         </aside>
 
-                        {/* 右側詳情區 */}
                         <main className={`flex-1 flex flex-col overflow-y-auto z-40 bg-slate-50 ${state.selectedOrder ? 'flex' : 'hidden md:flex'}`}>
                             {state.selectedOrder ? (
                                 <div className="p-6 md:p-10 space-y-8 max-w-5xl w-full mx-auto">
