@@ -92,7 +92,7 @@
                 
                 // 處理日期
                 if (field === 'date' || field === 'orderDate') {
-                    if (!val) return "";
+                    if (!val || String(val) === "undefined") return "";
                     const d = new Date(val);
                     if (isNaN(d.getTime())) return String(val).trim();
                     if (String(val).includes('T') && !String(val).includes("1899")) {
@@ -116,15 +116,14 @@
                     }
 
                     const looksLikePeriod = ["前", "後", "上午", "下午", "-", "~"].some(k => tVal.includes(k));
-                    if (field === 'period') return pVal || (looksLikePeriod ? tVal : "");
+                    if (field === 'period') return pVal === "undefined" ? "" : (pVal || (looksLikePeriod ? tVal : ""));
                     if (field === 'time') return looksLikePeriod && !pVal ? "" : tVal;
                 }
 
-                // 處理單號，避免 ##3987
-                if (field === 'id' && String(val).startsWith('#')) {
-                    return String(val);
-                } else if (field === 'id') {
-                    return '#' + String(val);
+                // 處理單號，確保不重複顯示 #
+                if (field === 'id') {
+                    const cleanId = String(val).replace(/^#+/, '');
+                    return cleanId ? '#' + cleanId : "";
                 }
 
                 return String(val).trim();
@@ -271,7 +270,7 @@
                                         <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-1 hover:bg-slate-100 rounded-lg"><Icon name="chevron-right" /></button>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-300 mb-2">
+                                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-300 mb-2 uppercase">
                                     {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d}>{d}</div>)}
                                 </div>
                                 <div className="grid grid-cols-7 gap-1">
