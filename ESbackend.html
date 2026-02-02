@@ -9,12 +9,15 @@
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .animate-spin { animation: spin 0.8s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .active-card { border-left: 4px solid #3b82f6 !important; background-color: #eff6ff; }
+        .calendar-selected { background-color: #3b82f6 !important; color: white !important; }
     </style>
 </head>
 <body class="h-screen flex flex-col overflow-hidden text-slate-900">
@@ -24,7 +27,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // API 設定 - 請確保這是最新部署的「網頁應用程式」網址
+        // API 設定
         const API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec";
 
         const FIELD_DEFINITIONS = {
@@ -37,7 +40,8 @@
             period: ["時段", "配送時段"],
             uid: ["LINE UID", "UID"],
             status: ["同步狀態"],
-            note: ["備註欄", "備註", "訂單備註"]
+            note: ["備註欄", "備註", "訂單備註"],
+            itemType: ["品項類型", "品項"]
         };
 
         const PERIOD_TAGS = ["不指定", "13:00 前", "14:00-18:00"];
@@ -45,6 +49,12 @@
         const STUDIO_PICKUP = {
             "板橋工作室": "板橋工作室自取",
             "台中工作室": "台中工作室自取"
+        };
+
+        // Lucide 圖示元件相容層
+        const Icon = ({ name, size = 16, className = "" }) => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
         const App = () => {
@@ -57,6 +67,8 @@
             });
             const [loading, setLoading] = useState(false);
             const [searchTerm, setSearchTerm] = useState('');
+            const [currentMonth, setCurrentMonth] = useState(new Date());
+            const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [toast, setToast] = useState(null);
 
             const notify = (msg) => {
@@ -177,6 +189,7 @@
                 try {
                     await fetch(API_URL, {
                         method: 'POST',
+                        mode: 'no-cors',
                         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                         body: JSON.stringify({ action: 'updateOrder', data: { ID_KEY: rawId, payload: payloadData } })
                     });
@@ -188,16 +201,38 @@
                 }
             };
 
+            // 日曆計算邏輯
+            const { firstDay, daysCount } = useMemo(() => {
+                const year = currentMonth.getFullYear();
+                const month = currentMonth.getMonth();
+                return {
+                    firstDay: new Date(year, month, 1).getDay(),
+                    daysCount: new Date(year, month + 1, 0).getDate()
+                };
+            }, [currentMonth]);
+
+            const daysArray = Array.from({ length: 42 }, (_, i) => {
+                const day = i - firstDay + 1;
+                return (day > 0 && day <= daysCount) ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toISOString().split('T')[0] : null;
+            });
+
+            // 綜合篩選邏輯
             const filteredOrders = useMemo(() => {
                 return state.allOrders.filter(o => {
                     const id = getDisplayVal(o, 'id').toLowerCase();
                     const name = getDisplayVal(o, 'name').toLowerCase();
-                    return id.includes(searchTerm.toLowerCase()) || name.includes(searchTerm.toLowerCase());
+                    const date = getDisplayVal(o, 'date').replace(/\//g, '-');
+                    
+                    if (searchTerm) {
+                        return id.includes(searchTerm.toLowerCase()) || name.includes(searchTerm.toLowerCase());
+                    }
+                    return date.includes(selectedDate);
                 }).sort((a, b) => String(getDisplayVal(a, 'id')).localeCompare(String(getDisplayVal(b, 'id')), undefined, { numeric: true }));
-            }, [state.allOrders, searchTerm]);
+            }, [state.allOrders, searchTerm, selectedDate]);
 
             return (
-                <div className="h-screen flex flex-col overflow-hidden font-sans text-slate-900 bg-slate-50">
+                <div className="h-screen flex flex-col overflow-hidden font-sans bg-slate-50">
+                    {/* Header */}
                     <header className="h-16 bg-[#0f172a] text-white flex items-center justify-between px-6 shadow-lg shrink-0 z-50">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center font-bold text-white italic">M</div>
@@ -207,32 +242,83 @@
                             <svg className={loading ? 'animate-spin' : ''} width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
                         </button>
                     </header>
+
                     <div className="flex-1 flex overflow-hidden relative">
-                        <aside className={`w-full md:w-80 border-r bg-white flex flex-col z-30 transition-all ${state.selectedOrder ? 'hidden md:flex' : 'flex'}`}>
+                        {/* 左側整合欄位 */}
+                        <aside className={`w-full md:w-[340px] border-r bg-white flex flex-col z-30 transition-all ${state.selectedOrder ? 'hidden md:flex' : 'flex'}`}>
+                            {/* 搜尋 */}
                             <div className="p-4 border-b">
                                 <input type="text" placeholder="搜尋編號或姓名..." className="w-full px-4 py-2.5 bg-slate-100 rounded-xl outline-none focus:ring-2 ring-blue-500/20 text-sm font-bold" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                             </div>
+
+                            {/* 日曆切換器 (搜尋時半透明) */}
+                            <div className={`p-4 border-b transition-opacity ${searchTerm ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+                                <div className="flex justify-between items-center mb-4">
+                                    <h3 className="font-bold text-sm text-slate-500">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</h3>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-1 hover:bg-slate-100 rounded-lg"><Icon name="chevron-left" /></button>
+                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-1 hover:bg-slate-100 rounded-lg"><Icon name="chevron-right" /></button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-7 gap-1 text-center text-[10px] font-black text-slate-300 mb-2">
+                                    {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d}>{d}</div>)}
+                                </div>
+                                <div className="grid grid-cols-7 gap-1">
+                                    {daysArray.map((dateStr, i) => {
+                                        const dayNum = dateStr ? parseInt(dateStr.split('-')[2]) : null;
+                                        const isSelected = dateStr === selectedDate;
+                                        const dayOrders = dateStr ? state.allOrders.filter(o => getDisplayVal(o, 'date').replace(/\//g,'-').includes(dateStr)) : [];
+                                        const hasSpecial = dayOrders.some(o => getDisplayVal(o, 'itemType') === "性別" || getDisplayVal(o, 'itemType') === "空飄");
+                                        
+                                        return (
+                                            <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
+                                                className={`h-9 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all relative ${
+                                                    !dateStr ? '' : isSelected ? 'calendar-selected shadow-md' : 'hover:bg-slate-50 text-slate-700'
+                                                }`}
+                                            >
+                                                <span className="text-[11px] font-bold">{dayNum}</span>
+                                                {dayOrders.length > 0 && (
+                                                    <div className="flex gap-0.5 mt-0.5">
+                                                        <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-blue-400'}`}></div>
+                                                        {hasSpecial && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500 animate-pulse'}`}></div>}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            {/* 列表標題 */}
+                            <div className="px-4 py-2 bg-slate-50 border-b text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                {searchTerm ? `搜尋結果 (${filteredOrders.length})` : `${selectedDate} 訂單 (${filteredOrders.length})`}
+                            </div>
+
+                            {/* 列表內容 */}
                             <div className="flex-1 overflow-y-auto">
                                 {filteredOrders.map(o => {
                                     const id = getDisplayVal(o, 'id');
                                     const isSelected = state.selectedOrder && getDisplayVal(state.selectedOrder, 'id') === id;
                                     return (
-                                        <div key={id} onClick={() => selectOrder(id)} className={`p-5 border-b cursor-pointer hover:bg-slate-50 transition-all ${isSelected ? 'border-l-4 border-l-blue-500 bg-blue-50' : 'bg-white'}`}>
-                                            <div className="flex justify-between mb-1 font-mono font-bold text-slate-400 text-xs"><span>{id}</span><span>{getDisplayVal(o, 'date')}</span></div>
+                                        <div key={id} onClick={() => selectOrder(id)} className={`p-5 border-b cursor-pointer hover:bg-slate-50 transition-all ${isSelected ? 'active-card bg-blue-50' : 'bg-white'}`}>
+                                            <div className="flex justify-between mb-1 font-mono font-bold text-slate-400 text-xs"><span>#{id}</span><span>{getDisplayVal(o, 'date')}</span></div>
                                             <div className="text-sm font-bold text-slate-800">{getDisplayVal(o, 'name')}</div>
                                         </div>
                                     );
                                 })}
+                                {filteredOrders.length === 0 && <div className="p-10 text-center text-slate-300 font-bold text-xs">沒有訂單</div>}
                             </div>
                         </aside>
+
+                        {/* 右側詳情區 */}
                         <main className={`flex-1 flex flex-col overflow-y-auto z-40 bg-slate-50 ${state.selectedOrder ? 'flex' : 'hidden md:flex'}`}>
                             {state.selectedOrder ? (
                                 <div className="p-6 md:p-10 space-y-8 max-w-5xl w-full mx-auto">
                                     <div className="flex flex-col lg:flex-row justify-between gap-6 pb-6 border-b border-slate-200">
                                         <div className="flex items-start gap-4">
-                                            <button onClick={() => setState(prev => ({...prev, selectedOrder: null}))} className="md:hidden p-2 bg-white border rounded-xl shadow-sm"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m15 18-6-6 6-6"/></svg></button>
+                                            <button onClick={() => setState(prev => ({...prev, selectedOrder: null}))} className="md:hidden p-2 bg-white border rounded-xl shadow-sm"><Icon name="chevron-left" size={20}/></button>
                                             <div>
-                                                <h2 className="text-5xl font-black tracking-tighter italic text-[#0f172a]">{getDisplayVal(state.selectedOrder, 'id')}</h2>
+                                                <h2 className="text-5xl font-black tracking-tighter italic text-[#0f172a]">#{getDisplayVal(state.selectedOrder, 'id')}</h2>
                                                 <p className="text-[10px] font-black text-slate-400 mt-2 uppercase tracking-widest italic">{getDisplayVal(state.selectedOrder, 'address').includes('自取') ? '🏬 工作室自取' : '🚚 一般配送'}</p>
                                             </div>
                                         </div>
@@ -273,12 +359,11 @@
                                             <div className="space-y-3">
                                                 <label className="text-[10px] font-black text-slate-400 block uppercase">日期</label>
                                                 {state.isEditing ? <input type="date" className="w-full p-3 bg-slate-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-blue-500" value={state.editCache.date} onChange={e => updateCache('date', e.target.value)} /> : <p className="font-bold text-slate-800">{getDisplayVal(state.selectedOrder, 'date')}</p>}
-                                                <label className="text-[10px] font-black text-slate-400 block uppercase">時段標籤 / 詳細時間</label>
+                                                <label className="text-[10px] font-black text-slate-400 block uppercase">時段 / 具體時間</label>
                                                 {state.isEditing ? (
                                                     <div className="space-y-2">
                                                         <div className="flex flex-wrap gap-1">{PERIOD_TAGS.map(t => <button key={t} onClick={() => updateCache('period', t)} className={`px-2 py-1 rounded-lg text-[9px] font-black border ${state.editCache.period === t ? 'bg-blue-600 text-white' : 'bg-white text-slate-400 border-slate-100'}`}>{t}</button>)}</div>
                                                         <input className="w-full p-3 bg-slate-50 rounded-xl font-bold border-2 border-transparent focus:border-blue-500 text-xs" value={state.editCache.period} onChange={e => updateCache('period', e.target.value)} />
-                                                        <label className="text-[10px] font-black text-slate-400 block uppercase mt-2">具體時間</label>
                                                         <input className="w-full p-3 bg-slate-50 rounded-xl font-bold border-2 border-transparent focus:border-blue-500 text-sm" value={state.editCache.time} onChange={e => updateCache('time', e.target.value)} />
                                                     </div>
                                                 ) : <p className="font-bold text-slate-800">{getDisplayVal(state.selectedOrder, 'period') || "未指定"} | {getDisplayVal(state.selectedOrder, 'time') || "無時間"}</p>}
@@ -292,7 +377,7 @@
                                 </div>
                             ) : (
                                 <div className="flex-1 flex flex-col items-center justify-center text-slate-300 p-6">
-                                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="mb-4 opacity-20"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                    <Icon name="clipboard-list" size={64} className="mb-4 opacity-10" />
                                     <p className="font-black tracking-widest uppercase text-xs">選擇訂單開始編輯</p>
                                 </div>
                             )}
