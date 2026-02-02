@@ -60,9 +60,30 @@
             const getVal = (order, type) => {
                 if (!order) return "";
                 const keys = Object.keys(order);
-                const targets = FIELD_MAPS[type];
+                const targets = FIELD_MAPS[type] || [];
                 const realKey = keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
-                return realKey ? String(order[realKey]).trim() : "";
+                
+                if (!realKey) return "";
+                let val = order[realKey];
+
+                // 處理時間顯示問題 (修正 1899-12-30 ISO 字串)
+                if (type === 'time' && String(val).includes("1899")) {
+                    try {
+                        const d = new Date(val);
+                        const hours = String(d.getHours()).padStart(2, '0');
+                        const minutes = String(d.getMinutes()).padStart(2, '0');
+                        return `${hours}:${minutes}`;
+                    } catch (e) {
+                        return String(val);
+                    }
+                }
+
+                // 處理日期格式簡化
+                if (type === 'date' && String(val).includes("T") && !String(val).includes("1899")) {
+                    return String(val).split('T')[0].replace(/-/g, '/');
+                }
+
+                return String(val || "").trim();
             };
 
             const fetchOrders = async () => {
@@ -116,11 +137,12 @@
                 return (day > 0 && day <= daysCount) ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toISOString().split('T')[0] : null;
             });
 
-            const filteredOrders = orders.filter(o => {
-                let d = getVal(o, 'date');
-                if (d.includes('T')) d = d.split('T')[0];
-                return d.replace(/\//g, '-').includes(selectedDate);
-            }).sort((a, b) => getVal(a, 'time').localeCompare(getVal(b, 'time')));
+            const filteredOrders = useMemo(() => {
+                return orders.filter(o => {
+                    let d = getVal(o, 'date');
+                    return d.replace(/\//g, '-').includes(selectedDate);
+                }).sort((a, b) => getVal(a, 'time').localeCompare(getVal(b, 'time')));
+            }, [orders, selectedDate]);
 
             return (
                 <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-10">
@@ -165,8 +187,8 @@
                                                 <span className="text-sm font-bold">{dayNum}</span>
                                                 {dayOrders.length > 0 && (
                                                     <div className="flex gap-1 mt-1">
-                                                        <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-[#967E67]'}`}></div>
-                                                        {hasSpecial && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500 animate-pulse'}`}></div>}
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[#967E67]'}`}></div>
+                                                        {hasSpecial && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500 animate-pulse'}`}></div>}
                                                     </div>
                                                 )}
                                             </div>
@@ -210,7 +232,7 @@
                                             
                                             <div className="text-sm text-slate-500 space-y-3 mb-6">
                                                 <div className="flex items-center gap-2 font-medium">
-                                                    <LucideIcon name="clock" size={16} className="text-slate-300"/> 
+                                                    <LucideIcon name="clock" size={16} className="text-stone-300"/> 
                                                     <span className="font-bold text-[#967E67]">{getVal(o, 'time')}</span>
                                                 </div>
                                                 <div className="flex items-start gap-2 leading-snug">
