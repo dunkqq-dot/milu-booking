@@ -3,279 +3,139 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>麋鹿氣球 - 備貨行事曆系統</title>
-    <!-- 載入外部套件 -->
+    <title>Easy Store 系統 - 專業全屏版</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f1f5f9; height: 100vh; overflow: hidden; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        /* 針對行動端優化點擊效果 */
         .btn-active:active { transform: scale(0.95); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .selected-order { border-left: 6px solid #3b82f6 !important; background-color: #f8fafc; }
     </style>
 </head>
-<body class="min-h-screen">
+<body class="flex flex-col">
 
-    <div id="root"></div>
+    <header class="bg-[#0f172a] text-white p-4 shadow-xl flex justify-between items-center z-50">
+        <div class="flex items-center gap-3">
+            <div class="bg-blue-600 p-2 rounded-xl">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 2H7c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h10c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM12 18h.01"/></svg>
+            </div>
+            <div>
+                <h1 class="text-base md:text-xl font-black tracking-tighter uppercase italic leading-none">East Store <span class="text-blue-400">Admin</span></h1>
+                <p id="sync-status" class="text-[9px] font-bold text-slate-500 uppercase tracking-[0.3em] mt-1">Ready</p>
+            </div>
+        </div>
+        <button id="refresh-btn" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold border border-slate-700">
+            <svg id="refresh-icon" class="inline mr-1" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+            Sync
+        </button>
+    </header>
 
-    <script type="text/javascript">
-        const { useState, useEffect, useMemo } = React;
+    <div class="flex flex-1 overflow-hidden relative">
+        <aside class="w-full md:w-[320px] border-r border-slate-200 bg-white flex flex-col h-full z-10">
+            <div class="p-5 border-b">
+                <input id="search-input" type="text" placeholder="搜尋..." class="w-full px-4 py-3 bg-slate-50 rounded-2xl text-sm outline-none focus:ring-2 ring-blue-100 font-bold">
+            </div>
+            <div id="sidebar-list" class="flex-1 overflow-y-auto no-scrollbar"></div>
+        </aside>
 
-        // --- 核心設定 ---
-        const API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec";
+        <main id="main-content" class="absolute inset-0 md:relative md:flex-1 bg-slate-50 overflow-y-auto z-40 translate-x-full md:translate-x-0 transition-transform duration-300">
+            <div id="empty-state" class="flex h-full flex-col items-center justify-center text-slate-300">
+                <div id="loading-spinner" class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full spin mb-4"></div>
+                <p id="empty-text" class="font-black text-sm tracking-widest uppercase">Select an order</p>
+            </div>
+            <div id="detail-content" class="hidden p-6 md:p-10 pb-32"></div>
+        </main>
+    </div>
 
-        // 模糊匹配欄位偵測邏輯（解決試算表標頭不一致問題）
+    <div id="toast" class="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-[100] font-black text-xs uppercase bg-[#0f172a] text-white transition-all opacity-0 pointer-events-none translate-y-10">Success</div>
+
+    <script>
+        const GAS_API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec";
+        let allOrders = [];
+        let selectedId = null;
+
         const FIELD_MAPS = {
             id: ["訂單編號", "編號", "OrderID"],
-            name: ["收件人姓名", "收件人", "姓名"],
-            address: ["詳細地址", "地址", "送貨地址"],
-            date: ["送貨日期", "取貨日期", "日期", "取貨/送貨日期"],
-            time: ["送貨時段", "配送時段", "時間", "配送時間"],
-            itemType: ["品項類型", "品項", "類型"],
-            stockStatus: ["備貨狀態", "狀態"],
-            remark: ["備註欄", "備註", "內部備註"]
+            name: ["收件人姓名", "姓名", "名字"],
+            date: ["送貨日期", "日期"],
+            address: ["詳細地址", "地址"]
         };
 
-        // Lucide 圖示元件（模擬 lucide-react）
-        const Icon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => { lucide.createIcons(); }, [name]);
-            return React.createElement('i', { 'data-lucide': name, style: { width: size, height: size }, className: className });
-        };
+        function getVal(order, type) {
+            if (!order) return "";
+            const keys = Object.keys(order);
+            const targets = FIELD_MAPS[type];
+            const realKey = keys.find(k => targets.some(t => k.includes(t)));
+            return realKey ? String(order[realKey] || "").trim() : "";
+        }
 
-        const App = () => {
-            const [orders, setOrders] = useState([]);
-            const [loading, setLoading] = useState(false);
-            const [currentMonth, setCurrentMonth] = useState(new Date());
-            const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-            const [toast, setToast] = useState(null);
-
-            const getVal = (order, type) => {
-                if (!order) return "";
-                const keys = Object.keys(order);
-                const targets = FIELD_MAPS[type];
-                const realKey = keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
-                return realKey ? String(order[realKey]).trim() : "";
-            };
-
-            const fetchOrders = async () => {
-                setLoading(true);
-                try {
-                    const response = await fetch(`${API_URL}?action=getOrders&t=${Date.now()}`);
-                    const data = await response.json();
-                    setOrders(Array.isArray(data) ? data : []);
-                } catch (err) {
-                    showToast("資料讀取失敗，請確認 GAS API 權限設定。", "error");
-                } finally {
-                    setLoading(false);
+        async function fetchOrders() {
+            const icon = document.getElementById('refresh-icon');
+            const spinner = document.getElementById('loading-spinner');
+            icon.classList.add('spin');
+            try {
+                const res = await fetch(`${GAS_API_URL}?action=getOrders`);
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    allOrders = data;
+                    renderSidebar();
+                    document.getElementById('empty-text').innerText = "Select an order";
+                    spinner.classList.add('hidden');
                 }
-            };
+            } catch (e) { 
+                document.getElementById('empty-text').innerText = "Sync Error"; 
+            } finally { 
+                icon.classList.remove('spin'); 
+            }
+        }
 
-            useEffect(() => { fetchOrders(); }, []);
+        function renderSidebar() {
+            const list = document.getElementById('sidebar-list');
+            const search = document.getElementById('search-input').value.toLowerCase();
+            const filtered = allOrders.filter(o => getVal(o, 'id').toLowerCase().includes(search) || getVal(o, 'name').toLowerCase().includes(search));
+            
+            list.innerHTML = filtered.map(o => {
+                const id = getVal(o, 'id');
+                return `<div onclick="selectOrder('${id}')" class="p-5 border-b cursor-pointer hover:bg-slate-50 ${selectedId === id ? 'selected-order' : ''}">
+                    <div class="text-[10px] font-black text-blue-600 mb-1">#${id}</div>
+                    <div class="text-sm font-bold text-slate-800">${getVal(o, 'name')}</div>
+                </div>`;
+            }).join('');
+        }
 
-            const showToast = (text, type = "success") => {
-                setToast({ text, type });
-                setTimeout(() => setToast(null), 3000);
-            };
+        function selectOrder(id) {
+            selectedId = id;
+            const order = allOrders.find(o => getVal(o, 'id') === id);
+            if (!order) return;
+            
+            renderSidebar();
+            const content = document.getElementById('detail-content');
+            const empty = document.getElementById('empty-state');
+            empty.classList.add('hidden');
+            content.classList.remove('hidden');
+            document.getElementById('main-content').classList.remove('translate-x-full');
 
-            const updateStatus = async (row, newStatus) => {
-                setLoading(true);
-                try {
-                    await fetch(API_URL, {
-                        method: "POST",
-                        body: JSON.stringify({ action: "updateStatus", row: row, status: newStatus })
-                    });
-                    showToast(`狀態已更新為：${newStatus}`);
-                    fetchOrders(); 
-                } catch (err) {
-                    showToast("更新失敗，請檢查網路或 GAS 部署。", "error");
-                } finally {
-                    setLoading(false);
-                }
-            };
-
-            // 日曆邏輯
-            const { firstDay, daysCount } = useMemo(() => {
-                const year = currentMonth.getFullYear();
-                const month = currentMonth.getMonth();
-                return {
-                    firstDay: new Date(year, month, 1).getDay(),
-                    daysCount: new Date(year, month + 1, 0).getDate()
-                };
-            }, [currentMonth]);
-
-            const daysArray = Array.from({ length: 42 }, (_, i) => {
-                const day = i - firstDay + 1;
-                return (day > 0 && day <= daysCount) ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toISOString().split('T')[0] : null;
-            });
-
-            const filteredOrders = useMemo(() => {
-                return orders.filter(o => {
-                    let d = getVal(o, 'date');
-                    if (d.includes('T')) d = d.split('T')[0];
-                    return d.replace(/\//g, '-').includes(selectedDate);
-                }).sort((a, b) => getVal(a, 'time').localeCompare(getVal(b, 'time')));
-            }, [orders, selectedDate]);
-
-            const getStatusStyle = (status) => {
-                if (status === "檢查完畢") return "bg-green-100 text-green-700 border-green-200";
-                if (status === "已備貨") return "bg-amber-100 text-amber-700 border-amber-200";
-                return "bg-red-50 text-red-600 border-red-100";
-            };
-
-            return (
-                <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-10">
-                    {/* Header */}
-                    <header className="bg-[#967E67] text-white p-4 shadow-md sticky top-0 z-20 flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                            <div className="bg-white/20 p-1.5 rounded-lg border border-white/30"><Icon name="package" size={20} /></div>
-                            <h1 className="text-lg font-bold">麋鹿氣球 · 備貨管理</h1>
-                        </div>
-                        <button onClick={fetchOrders} className="p-2 hover:bg-white/20 rounded-full transition-colors btn-active">
-                            <Icon name="refresh-cw" size={20} className={loading ? "spin" : ""} />
-                        </button>
-                    </header>
-
-                    <main className="max-w-6xl mx-auto p-4 md:flex gap-8">
-                        {/* 左側日曆 */}
-                        <div className="md:w-[350px] shrink-0 mb-6">
-                            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 sticky top-20">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="font-bold text-lg text-slate-700">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</h2>
-                                    <div className="flex gap-1">
-                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 hover:bg-slate-100 rounded-xl transition-colors"><Icon name="chevron-left" /></button>
-                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 hover:bg-slate-100 rounded-xl transition-colors"><Icon name="chevron-right" /></button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-7 gap-1 text-center">
-                                    {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-bold text-slate-300 py-2">{d}</div>)}
-                                    {daysArray.map((dateStr, i) => {
-                                        const dayNum = dateStr ? parseInt(dateStr.split('-')[2]) : null;
-                                        const isSelected = dateStr === selectedDate;
-                                        const isToday = dateStr === new Date().toISOString().split('T')[0];
-                                        const dayOrders = dateStr ? orders.filter(o => getVal(o, 'date').replace(/\//g,'-').includes(dateStr)) : [];
-                                        const hasSpecial = dayOrders.some(o => getVal(o, 'itemType') === "性別" || getVal(o, 'itemType') === "空飄");
-                                        
-                                        return (
-                                            <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
-                                                className={`h-12 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all relative ${
-                                                    !dateStr ? '' : 
-                                                    isSelected ? 'bg-[#967E67] text-white shadow-lg z-10' : 
-                                                    isToday ? 'bg-stone-100 border border-stone-300' : 'bg-white hover:bg-slate-50 border border-slate-100'
-                                                }`}
-                                            >
-                                                <span className="text-sm font-bold">{dayNum}</span>
-                                                {dayOrders.length > 0 && (
-                                                    <div className="flex gap-1 mt-1">
-                                                        <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-[#967E67]'}`}></div>
-                                                        {hasSpecial && <div className={`w-1.5 h-1.5 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-amber-500 animate-pulse'}`}></div>}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* 右側清單 */}
-                        <div className="flex-1">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-bold text-lg text-slate-600 flex items-center gap-2"><Icon name="calendar" size={18}/> {selectedDate} 待辦清單</h3>
-                                <span className="text-xs font-bold bg-slate-200 text-slate-500 px-3 py-1 rounded-full">{filteredOrders.length} 筆</span>
-                            </div>
-
-                            <div className="space-y-4">
-                                {filteredOrders.length === 0 ? (
-                                    <div className="py-24 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200 text-slate-300 font-bold">
-                                        當日目前無訂單
-                                    </div>
-                                ) : (
-                                    filteredOrders.map((o) => (
-                                        <div key={o["__row__"]} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                            <div className="flex justify-between mb-4 items-start">
-                                                <div>
-                                                    <div className="flex gap-2 mb-2">
-                                                        <span className="text-[10px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded tracking-widest uppercase">{getVal(o, 'id')}</span>
-                                                        {getVal(o, 'itemType') && <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded tracking-wide">✨ {getVal(o, 'itemType')}</span>}
-                                                    </div>
-                                                    <h4 className="font-bold text-xl text-slate-800">{getVal(o, 'name')}</h4>
-                                                </div>
-                                                <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${getStatusStyle(getVal(o, 'stockStatus'))}`}>
-                                                    {getVal(o, 'stockStatus') || "未撿取"}
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="text-sm text-slate-500 space-y-3 mb-6">
-                                                <div className="flex items-center gap-2 font-medium">
-                                                    <Icon name="clock" size={16} className="text-stone-300" /> 
-                                                    <span className="font-bold text-[#967E67]">{getVal(o, 'time')}</span>
-                                                </div>
-                                                <div className="flex items-start gap-2 leading-snug">
-                                                    <Icon name="map-pin" size={16} className="text-stone-300 shrink-0 mt-0.5" /> 
-                                                    <span className="text-slate-600">{getVal(o, 'address')}</span>
-                                                </div>
-                                                {getVal(o, 'remark') && getVal(o, 'remark') !== "-" && (
-                                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex gap-2">
-                                                        <Icon name="message-circle" size={16} className="text-stone-300 shrink-0 mt-0.5" />
-                                                        <p className="text-xs text-stone-500 italic leading-relaxed">{getVal(o, 'remark')}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {["未撿取", "已備貨", "檢查完畢"].map((st) => (
-                                                    <button
-                                                        key={st}
-                                                        disabled={loading}
-                                                        onClick={() => updateStatus(o["__row__"], st)}
-                                                        className={`py-3.5 rounded-2xl text-[11px] font-black transition-all btn-active ${
-                                                            getVal(o, 'stockStatus') === st || (!getVal(o, 'stockStatus') && st === "未撿取")
-                                                            ? (st === "未撿取" ? "bg-red-500 text-white shadow-lg" : 
-                                                               st === "已備貨" ? "bg-amber-500 text-white shadow-lg" : 
-                                                               "bg-green-600 text-white shadow-lg")
-                                                            : "bg-slate-50 text-slate-400 hover:bg-slate-100 border border-slate-200/50"
-                                                        }`}
-                                                    >
-                                                        {st}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    </main>
-
-                    {/* Toast 訊息 */}
-                    {toast && (
-                        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-50 text-sm font-bold border transition-all ${
-                            toast.type === 'error' ? 'bg-red-600 text-white border-red-400' : 'bg-[#0f172a] text-white border-slate-700'
-                        }`}>
-                            {toast.text}
-                        </div>
-                    )}
-
-                    {/* Loading 遮罩 */}
-                    {loading && (
-                        <div className="fixed inset-0 bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center z-[100]">
-                            <div className="bg-white p-5 rounded-3xl shadow-xl flex items-center gap-3 border border-slate-100">
-                                <div className="w-5 h-5 border-3 border-[#967E67] border-t-transparent rounded-full animate-spin"></div>
-                                <span className="font-bold text-slate-600 text-sm uppercase tracking-widest">Processing...</span>
-                            </div>
-                        </div>
-                    )}
+            content.innerHTML = `
+                <h2 class="text-4xl font-black text-[#0f172a] mb-8 italic uppercase tracking-tighter">#${id}</h2>
+                <div class="grid gap-6">
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <div class="text-[10px] font-black text-slate-300 uppercase mb-2">Name</div>
+                        <div class="font-bold text-slate-800">${getVal(order, 'name')}</div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
+                        <div class="text-[10px] font-black text-slate-300 uppercase mb-2">Address</div>
+                        <div class="font-bold text-slate-800">${getVal(order, 'address')}</div>
+                    </div>
                 </div>
-            );
-        };
+            `;
+        }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(App));
+        window.onload = fetchOrders;
+        document.getElementById('refresh-btn').onclick = fetchOrders;
+        document.getElementById('search-input').oninput = renderSidebar;
     </script>
 </body>
 </html>
