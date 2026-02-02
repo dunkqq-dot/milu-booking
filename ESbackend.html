@@ -50,7 +50,7 @@
         </main>
     </div>
 
-    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-4 bg-slate-900 text-white rounded-2xl shadow-2xl z-[100] text-[10px] font-black opacity-0 transition-all pointer-events-none transform translate-y-4 tracking-widest">SUCCESS</div>
+    <div id="toast" class="fixed bottom-8 left-1/2 -translate-x-1/2 px-8 py-4 bg-slate-900 text-white rounded-2xl shadow-2xl z-[100] text-[10px] font-black opacity-0 transition-all pointer-events-none transform translate-y-4 tracking-widest uppercase">Success</div>
 
     <script>
         const API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec";
@@ -65,20 +65,19 @@
 
         const FIELD_DEFINITIONS = {
             id: ["訂單編號", "編號", "OrderID"],
-            name: ["姓名", "名字", "客戶姓名"],
+            name: ["收件人姓名", "姓名", "名字", "客戶姓名"],
             phone: ["電話", "聯絡電話", "手機"],
-            address: ["配送地址", "送貨地址", "地址"],
-            date: ["取貨/送貨日期", "取貨日期", "送貨日期", "配送日期"],
-            time: ["時間", "配送時間", "送貨時間"],
+            address: ["詳細地址", "配送地址", "送貨地址", "地址"],
+            date: ["送貨日期", "取貨/送貨日期", "取貨日期", "配送日期", "日期"],
+            time: ["送貨時段", "時間", "配送時間", "送貨時間"],
             period: ["時段", "配送時段"],
             uid: ["LINE UID", "UID"],
             status: ["同步狀態"],
-            note: ["備註", "訂單備註"]
+            note: ["備註欄", "備註", "訂單備註"]
         };
 
         const PERIOD_TAGS = ["不指定", "13:00 前", "14:00-18:00"];
         
-        // 門市與地址關鍵字對應
         const STUDIO_PICKUP = {
             "板橋工作室": "板橋工作室自取",
             "台中工作室": "台中工作室自取"
@@ -93,7 +92,10 @@
                 if (state.selectedOrder) {
                     const currentId = getCleanVal(state.selectedOrder, 'id');
                     const updated = state.allOrders.find(o => getCleanVal(o, 'id') === currentId);
-                    if (updated) { state.selectedOrder = updated; if(!state.isEditing) renderDetail(); }
+                    if (updated) { 
+                        state.selectedOrder = updated; 
+                        if(!state.isEditing) renderDetail(); 
+                    }
                 }
             } catch (e) { notify("連線超時"); }
             finally { setTimeout(() => document.getElementById('syncIcon').classList.remove('spin'), 500); }
@@ -113,6 +115,7 @@
             if (field === 'date' && val) {
                 const d = new Date(val);
                 if (isNaN(d.getTime())) return String(val).trim();
+                // 處理 Google Apps Script 傳回的 ISO 格式
                 if (String(val).includes('T')) d.setHours(d.getHours() + 8);
                 return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
             }
@@ -177,7 +180,11 @@
             }
         }
 
-        function closeDetail() { document.getElementById('detailContainer').classList.add('translate-x-full'); state.selectedOrder = null; renderList(); }
+        function closeDetail() { 
+            document.getElementById('detailContainer').classList.add('translate-x-full'); 
+            state.selectedOrder = null; 
+            renderList(); 
+        }
 
         function renderDetail() {
             const container = document.getElementById('detailView');
@@ -186,7 +193,6 @@
             const uid = getCleanVal(o, 'uid');
             const addr = getCleanVal(o, 'address');
             
-            // 判斷當前門市顯示
             let storeDisplay = "一般配送";
             for (let key in STUDIO_PICKUP) {
                 if (addr.includes(key)) storeDisplay = key + " 自取";
@@ -200,10 +206,10 @@
                     </div>
                     <div class="flex gap-3">
                         ${state.isEditing ? `
-                            <button onclick="saveEdit()" id="saveBtn" class="flex-1 lg:flex-none px-10 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] tracking-widest shadow-xl">CONFIRM SAVE</button>
-                            <button onclick="state.isEditing=false; renderDetail();" class="px-6 py-3 bg-white border rounded-2xl font-black text-[10px] text-slate-400">CANCEL</button>
+                            <button onclick="saveEdit()" id="saveBtn" class="flex-1 lg:flex-none px-10 py-3 bg-blue-600 text-white rounded-2xl font-black text-[10px] tracking-widest shadow-xl active:scale-95 transition-all">CONFIRM SAVE</button>
+                            <button onclick="state.isEditing=false; renderDetail();" class="px-6 py-3 bg-white border rounded-2xl font-black text-[10px] text-slate-400 active:scale-95 transition-all">CANCEL</button>
                         ` : `
-                            <button onclick="enterEditMode()" class="flex-1 lg:flex-none px-10 py-3 bg-[#0f172a] text-white rounded-2xl font-black text-[10px] tracking-widest shadow-2xl">EDIT ORDER</button>
+                            <button onclick="enterEditMode()" class="flex-1 lg:flex-none px-10 py-3 bg-[#0f172a] text-white rounded-2xl font-black text-[10px] tracking-widest shadow-2xl active:scale-95 transition-all">EDIT ORDER</button>
                         `}
                     </div>
                 </div>
@@ -211,7 +217,8 @@
                     <div class="space-y-8">
                         <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 space-y-8 shadow-sm">
                             <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Contact</h3>
-                            ${drawField("姓名", "name", "text")}${drawField("電話", "phone", "text")}
+                            ${drawField("姓名", "name", "text")}
+                            ${drawField("電話", "phone", "text")}
                         </div>
                         <div class="p-8 rounded-[2.5rem] border ${uid ? 'bg-emerald-50 border-emerald-100' : 'bg-slate-100 border-slate-200'}">
                             <h3 class="text-[10px] font-black ${uid ? 'text-emerald-400' : 'text-slate-400'} uppercase tracking-widest mb-4">LINE Notification</h3>
@@ -228,7 +235,9 @@
                     </div>
                     <div class="bg-white p-8 rounded-[2.5rem] border border-slate-100 space-y-8 shadow-sm">
                         <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-widest">Schedule</h3>
-                        ${drawField("日期", "date", "date")}${drawField("時間", "time", "time")}${drawField("時段", "period", "period")}
+                        ${drawField("日期", "date", "date")}
+                        ${drawField("時間", "time", "text")}
+                        ${drawField("時段", "period", "period")}
                     </div>
                     <div class="md:col-span-2 lg:col-span-3 bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm">
                         <h3 class="text-[10px] font-black text-slate-300 uppercase tracking-widest mb-4">Note</h3>
@@ -243,7 +252,6 @@
             let val = isEditing ? (state.editCache[field] || "") : getCleanVal(state.selectedOrder, field);
             
             if (isEditing) {
-                // 特殊：智慧地址 (含門市按鈕連動)
                 if (type === 'address_smart') {
                     return `
                         <div class="space-y-4">
@@ -271,11 +279,12 @@
                         </div>
                     `;
                 }
+                
                 if (type === 'date' && val) val = val.replace(/\//g, '-');
                 const tag = type === 'textarea' ? `<textarea oninput="updateCache('${field}', this.value)" class="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 transition-all shadow-inner min-h-[100px]">${val}</textarea>` : `<input type="${type}" value="${val}" oninput="updateCache('${field}', this.value)" class="w-full p-4 bg-slate-50 rounded-2xl text-sm font-bold outline-none border-2 border-transparent focus:border-blue-500 transition-all shadow-inner">`;
                 return `<div class="space-y-2"><span class="text-[10px] font-black text-slate-400 uppercase">${label}</span>${tag}</div>`;
             }
-            return `<div class="flex flex-col text-left"><span class="text-[10px] font-black text-slate-300 uppercase mb-1">${label}</span><span class="text-base font-bold text-slate-800 leading-tight">${val || "---"}</span></div>`;
+            return `<div class="flex flex-col text-left"><span class="text-[10px] font-black text-slate-300 uppercase mb-1">${label}</span><span class="text-base font-bold text-slate-800 leading-tight whitespace-pre-wrap">${val || "---"}</span></div>`;
         }
 
         function enterEditMode() {
@@ -292,42 +301,58 @@
             renderDetail();
         }
 
-        function updateCache(field, val, refresh = false) { state.editCache[field] = val; if (refresh) renderDetail(); }
+        function updateCache(field, val, refresh = false) { 
+            state.editCache[field] = val; 
+            if (refresh) renderDetail(); 
+        }
 
         async function saveEdit() {
             const btn = document.getElementById('saveBtn');
             if (btn) { btn.disabled = true; btn.innerText = "SAVING..."; }
-            notify("SAVING TO CLOUD...");
+            notify("上傳資料中...");
 
             const payload = {};
+            // 轉換 Cache 回對應試算表標頭
             Object.keys(state.editCache).forEach(f => {
                 const header = state.headerMap[f];
                 if (header) {
                     let v = state.editCache[f];
-                    if (f === 'date' && v) v = v.replace(/-/g, '/');
-                    if (f === 'phone' && v) v = "'" + v.replace(/^'/, "");
+                    if (f === 'date' && v) v = v.replace(/-/g, '/'); // 轉回 YYYY/MM/DD
+                    if (f === 'phone' && v) v = "'" + String(v).replace(/^'/, ""); // 強制純文字
                     payload[header] = v;
                 }
             });
 
-            const syncHeader = state.headerMap['status'];
-            if (syncHeader) payload[syncHeader] = "等待同步";
+            // 強制設定同步狀態為等待同步
+            const syncHeader = state.headerMap['status'] || "同步狀態";
+            payload[syncHeader] = "等待同步";
             
+            // 智慧對應：如果沒時段欄位則將時段填入時間欄位
             if (!state.headerMap['period'] && state.editCache['period'] && !state.editCache['time']) {
-                payload[state.headerMap['time']] = state.editCache['period'];
+                const timeHeader = state.headerMap['time'];
+                if(timeHeader) payload[timeHeader] = state.editCache['period'];
             }
 
             try {
-                await fetch(API_URL, {
+                const orderId = getCleanVal(state.selectedOrder, 'id').replace('#', '').trim();
+                const response = await fetch(API_URL, {
                     method: 'POST',
-                    mode: 'no-cors',
-                    body: JSON.stringify({ action: 'updateOrder', data: { ID_KEY: getCleanVal(state.selectedOrder, 'id').replace('#', ''), payload: payload } })
+                    mode: 'no-cors', // 配合 GAS 的轉導
+                    body: JSON.stringify({ 
+                        action: 'updateOrder', 
+                        data: { 
+                            ID_KEY: orderId, 
+                            payload: payload 
+                        } 
+                    })
                 });
-                notify("SAVED SUCCESSFULLY");
+                
+                notify("資料已成功更新");
                 state.isEditing = false;
-                setTimeout(refreshData, 1200);
+                // 1.5 秒後重新整理，確保試算表寫入完成
+                setTimeout(refreshData, 1500);
             } catch (e) {
-                notify("SAVE ERROR");
+                notify("儲存發生錯誤");
                 if (btn) { btn.disabled = false; btn.innerText = "CONFIRM SAVE"; }
             }
         }
@@ -341,13 +366,21 @@
                     mode: 'no-cors',
                     body: JSON.stringify({ action: 'sendNotification', orderId: orderId })
                 });
-                notify("通知已發送");
+                notify("通知已成功發送");
             } catch (e) { notify("發送失敗"); }
         }
 
         function notify(msg) {
             const t = document.getElementById('toast');
-            if (t) { t.innerText = msg; t.style.opacity = '1'; t.style.transform = 'translate(-50%, 0)'; setTimeout(() => { t.style.opacity = '0'; t.style.transform = 'translate(-50%, 1rem)'; }, 3000); }
+            if (t) { 
+                t.innerText = msg; 
+                t.style.opacity = '1'; 
+                t.style.transform = 'translate(-50%, 0)'; 
+                setTimeout(() => { 
+                    t.style.opacity = '0'; 
+                    t.style.transform = 'translate(-50%, 1rem)'; 
+                }, 3000); 
+            }
         }
 
         window.onload = refreshData;
