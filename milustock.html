@@ -30,14 +30,14 @@
 
         const CATEGORIES = ["全部", "專人佈置", "氣球外送", "工作室取貨", "後車箱佈置"];
 
-        // 欄位匹配定義
+        // 欄位匹配定義 - 修正：優先匹配「撿貨狀態」
         const FIELD_MAPS = {
             id: ["訂單編號", "編號", "OrderID", "ID"],
             name: ["收件人姓名", "收件人", "客戶名稱", "LINE名稱", "姓名"],
             address: ["送貨地址", "詳細地址", "地址", "地點", "location"],
             date: ["送貨日期", "預約日期", "日期", "date"],
             time: ["送貨時段", "預約時間", "時間", "time"],
-            status: ["狀態", "付款狀態", "備貨狀態", "status"],
+            status: ["撿貨狀態", "狀態", "備貨狀態", "status"], // 移除「付款狀態」，避免衝突
             remark: ["備註", "備註欄", "注意事項", "remark"]
         };
 
@@ -125,8 +125,10 @@
             const orderIndexByDate = useMemo(() => {
                 const index = {};
                 orders.forEach(o => {
-                    const s = o._status;
-                    if (s.includes("未付款") || s.toUpperCase().includes("UNPAID")) return;
+                    // 這裡的邏輯依然需要檢查試算表中的「付款狀態」來過濾
+                    // 但顯示與修改則是以「撿貨狀態」為主
+                    const pStatus = findVal(o, ["付款狀態", "付款"]);
+                    if (pStatus.includes("未付款") || pStatus.toUpperCase().includes("UNPAID")) return;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return;
                     const dateKey = o._date.replace(/\//g, '-');
                     index[dateKey] = (index[dateKey] || 0) + 1;
@@ -136,8 +138,8 @@
 
             const filteredOrders = useMemo(() => {
                 return orders.filter(o => {
-                    const statusVal = o._status;
-                    if (statusVal.includes("未付款") || statusVal.toUpperCase().includes("UNPAID")) return false;
+                    const pStatus = findVal(o, ["付款狀態", "付款"]);
+                    if (pStatus.includes("未付款") || pStatus.toUpperCase().includes("UNPAID")) return false;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
                     const orderDate = o._date.replace(/\//g, '-');
                     return orderDate.includes(selectedDate);
@@ -180,7 +182,6 @@
                         </button>
                     </header>
 
-                    {/* 更新分類標籤顏色 */}
                     <div className="bg-slate-100 p-2 sticky top-[64px] z-20 overflow-x-auto no-scrollbar border-b border-slate-200">
                         <div className="flex gap-2 max-w-6xl mx-auto px-2">
                             {CATEGORIES.map(cat => (
