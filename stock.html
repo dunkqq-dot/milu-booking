@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>麋鹿氣球 - 雙系統備貨管理系統</title>
+    <title>麋鹿氣球 - 備貨管理系統</title>
     <!-- 載入套件 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -16,8 +16,6 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .source-tag { font-size: 9px; padding: 2px 6px; border-radius: 4px; font-weight: 900; }
-        .btn-active:active { transform: scale(0.95); }
     </style>
 </head>
 <body class="min-h-screen">
@@ -28,26 +26,18 @@
         const { useState, useEffect, useMemo } = React;
 
         /**
-         * 🎈 麋鹿氣球：雙系統備貨管理 (精準修正版)
+         * 🎈 麋鹿氣球：備貨管理系統
+         * 修正紀錄：
+         * 1. 過濾邏輯：排除「付款狀態」為「未付款」的訂單。
+         * 2. 日曆顯示：未付款訂單不會觸發日曆小圓點。
          */
-        const API_URL_OFFICIAL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec"; 
-        const API_URL_MANUAL = "https://script.google.com/macros/s/AKfycbya7e4XKsmBp1c885BTSLj386yvtt6_k7QGSXH8d1-7HrdzPfFWccgGAy3Dvd_nWFDTSw/exec"; 
+        const API_URL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec"; 
 
-        // 智慧欄位對應表
-        const FIELD_MAPS = {
-            id: ["訂單編號", "OrderID", "編號", "ID"],
-            name: ["收件人姓名", "現場收件人姓名", "現場聯絡人姓名", "客戶姓名", "姓名"],
-            phone: ["電話", "收件人電話", "現場聯絡電話", "聯絡電話"],
-            address: ["詳細地址", "外送詳細地點", "送貨地址", "地址"],
-            date: ["送貨日期", "外送日期", "預約日期", "取貨日期", "取貨/送貨日期", "預定日期"],
-            time: ["送貨時段", "外送抵達區間", "進場佈置」時間", "時間", "取貨時間"],
-            itemType: ["品項類型", "服務項目", "標籤"],
-            stockStatus: ["備貨狀態", "撿貨狀態", "狀態"],
-            remark: ["備註欄", "房型／場地名稱", "外送須知與商品確認", "備註"]
-        };
-
+        // Lucide 圖示元件
         const LucideIcon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
@@ -58,36 +48,28 @@
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [toast, setToast] = useState(null);
 
-            // 強化型欄位抓取函式
+            // 欄位匹配邏輯
+            const FIELD_MAPS = {
+                id: ["訂單編號", "OrderID"],
+                name: ["收件人姓名", "收件人", "姓名"],
+                address: ["詳細地址", "地址", "送貨地址"],
+                date: ["送貨日期", "取貨/送貨日期", "取貨日期", "配送日期", "預定日期"],
+                time: ["送貨時段", "配送時段", "時間", "取貨時間"],
+                itemType: ["品項類型", "品項"],
+                stockStatus: ["備貨狀態", "備貨"],
+                remark: ["備註欄", "備註"],
+                paymentStatus: ["付款狀態", "付款", "支付狀態"] // 新增付款狀態匹配
+            };
+
             const getVal = (order, type) => {
                 if (!order) return "";
                 const keys = Object.keys(order);
                 const targets = FIELD_MAPS[type] || [];
-                
-                // 優先尋找：移除 Emoji 與空格後的部分匹配
-                const realKey = keys.find(k => {
-                    const cleanKey = k.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, "").trim();
-                    return targets.some(t => {
-                        const cleanTarget = t.replace(/[^\u4e00-\u9fa5a-zA-Z0-9]/g, "").trim();
-                        return cleanKey === cleanTarget || cleanKey.includes(cleanTarget);
-                    });
-                });
+                const realKey = keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
                 
                 if (!realKey) return "";
                 let val = order[realKey];
 
-                // 處理日期格式 (預防時區偏移)
-                if (type === 'date' && val) {
-                    const d = new Date(val);
-                    if (isNaN(d.getTime())) return String(val).trim();
-                    const y = d.getFullYear();
-                    const m = String(d.getMonth() + 1).padStart(2, '0');
-                    const day = String(d.getDate()).padStart(2, '0');
-                    if (y < 2000) return String(val).trim(); // 處理 1899 問題
-                    return `${y}/${m}/${day}`;
-                }
-
-                // 處理時間 (含 1899 修正)
                 if (type === 'time' && String(val).includes("1899")) {
                     try {
                         const d = new Date(val);
@@ -95,38 +77,26 @@
                     } catch (e) { return String(val); }
                 }
 
+                if (type === 'date' && val) {
+                    const d = new Date(val);
+                    if (isNaN(d.getTime())) return String(val).trim();
+                    if (String(val).includes("T") && !String(val).includes("1899")) {
+                        d.setHours(d.getHours() + 8);
+                    }
+                    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+                }
+
                 return String(val || "").trim();
             };
 
             const fetchOrders = async () => {
                 setLoading(true);
-                const configs = [
-                    { url: API_URL_OFFICIAL, label: "官網", color: "bg-blue-600", statusKey: "備貨狀態" },
-                    { url: API_URL_MANUAL, label: "預約總表", color: "bg-purple-600", statusKey: "撿貨狀態" }
-                ];
-
                 try {
-                    const results = await Promise.all(configs.map(async (cfg) => {
-                        if (!cfg.url) return [];
-                        try {
-                            const res = await fetch(`${cfg.url}?action=getOrders&t=${Date.now()}`);
-                            const data = await res.json();
-                            if (!Array.isArray(data)) return [];
-                            
-                            // 過濾完全空白的行
-                            return data.filter(o => getVal(o, 'name') !== "" || getVal(o, 'id') !== "")
-                                .map(o => ({ 
-                                    ...o, 
-                                    _srcLabel: cfg.label, 
-                                    _srcColor: cfg.color, 
-                                    _srcUrl: cfg.url,
-                                    _statusHeader: cfg.statusKey
-                                }));
-                        } catch (e) { return []; }
-                    }));
-                    setOrders(results.flat());
+                    const response = await fetch(`${API_URL}?action=getOrders&t=${Date.now()}`);
+                    const data = await response.json();
+                    setOrders(Array.isArray(data) ? data : []);
                 } catch (err) {
-                    showToast("同步失敗", "error");
+                    showToast("資料讀取失敗", "error");
                 } finally {
                     setLoading(false);
                 }
@@ -139,30 +109,30 @@
                 setTimeout(() => setToast(null), 3000);
             };
 
-            const updateStatus = async (order, newStatus) => {
+            const updateStatus = async (row, newStatus) => {
                 setLoading(true);
                 try {
-                    await fetch(order._srcUrl, {
+                    await fetch(API_URL, {
                         method: "POST",
-                        body: JSON.stringify({ 
-                            action: "updateStatus", 
-                            row: order.__row__, 
-                            status: newStatus,
-                            header: order._statusHeader 
-                        })
+                        body: JSON.stringify({ action: "updateStatus", row: row, status: newStatus })
                     });
-                    showToast(`[${order._srcLabel}] 更新成功`);
+                    showToast(`狀態已更新：${newStatus}`);
                     fetchOrders(); 
                 } catch (err) {
                     showToast("更新失敗", "error");
+                } finally {
                     setLoading(false);
                 }
             };
 
+            // 日曆邏輯
             const { firstDay, daysCount } = useMemo(() => {
                 const year = currentMonth.getFullYear();
                 const month = currentMonth.getMonth();
-                return { firstDay: new Date(year, month, 1).getDay(), daysCount: new Date(year, month + 1, 0).getDate() };
+                return {
+                    firstDay: new Date(year, month, 1).getDay(),
+                    daysCount: new Date(year, month + 1, 0).getDate()
+                };
             }, [currentMonth]);
 
             const daysArray = Array.from({ length: 42 }, (_, i) => {
@@ -170,54 +140,60 @@
                 return (day > 0 && day <= daysCount) ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toISOString().split('T')[0] : null;
             });
 
+            // 列表過濾：排除未付款
             const filteredOrders = useMemo(() => {
                 return orders.filter(o => {
-                    let d = getVal(o, 'date').replace(/\//g, '-');
-                    return d === selectedDate || d.includes(selectedDate);
+                    if (getVal(o, 'paymentStatus') === "未付款") return false; // 排除未付款
+                    let d = getVal(o, 'date');
+                    const cleanDate = d.replace(/\//g, '-');
+                    return cleanDate.includes(selectedDate);
                 }).sort((a, b) => getVal(a, 'time').localeCompare(getVal(b, 'time')));
             }, [orders, selectedDate]);
 
             return (
-                <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-10 text-xs">
+                <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-10">
                     <header className="bg-[#967E67] text-white p-4 shadow-md sticky top-0 z-20 flex justify-between items-center">
                         <div className="flex items-center gap-2">
                             <div className="bg-white/20 p-1.5 rounded-lg border border-white/30"><LucideIcon name="package" size={20} /></div>
-                            <h1 className="text-lg font-bold tracking-tight">麋鹿氣球 · 雙系統備貨</h1>
+                            <h1 className="text-lg font-bold">麋鹿氣球 · 備貨管理</h1>
                         </div>
-                        <button onClick={fetchOrders} className="p-2 hover:bg-white/20 rounded-full active:scale-95 transition-all">
+                        <button onClick={fetchOrders} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                             <LucideIcon name="refresh-cw" size={20} className={loading ? "spin" : ""} />
                         </button>
                     </header>
 
                     <main className="max-w-6xl mx-auto p-4 md:flex gap-8">
-                        {/* 左側日曆 */}
+                        {/* 日曆 */}
                         <div className="md:w-[350px] shrink-0 mb-6">
                             <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 sticky top-20">
-                                <div className="flex justify-between items-center mb-6 px-1">
-                                    <h2 className="font-black text-lg text-slate-700">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</h2>
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="font-bold text-lg text-slate-700">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</h2>
                                     <div className="flex gap-1">
                                         <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 hover:bg-slate-100 rounded-xl"><LucideIcon name="chevron-left" /></button>
                                         <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 hover:bg-slate-100 rounded-xl"><LucideIcon name="chevron-right" /></button>
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-7 gap-1 text-center font-black text-slate-300 mb-2 uppercase">
-                                    {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d}>{d}</div>)}
+                                <div className="grid grid-cols-7 gap-1 text-center">
+                                    {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-bold text-slate-300 py-2">{d}</div>)}
                                     {daysArray.map((dateStr, i) => {
                                         const dayNum = dateStr ? parseInt(dateStr.split('-')[2]) : null;
                                         const isSelected = dateStr === selectedDate;
                                         const isToday = dateStr === new Date().toISOString().split('T')[0];
-                                        const dayOrders = dateStr ? orders.filter(o => getVal(o, 'date').replace(/\//g,'-').includes(dateStr)) : [];
-                                        const hasSpecial = dayOrders.some(o => {
-                                            const type = getVal(o, 'itemType');
-                                            return type.includes("性別") || type.includes("空飄");
-                                        });
+                                        
+                                        // 日曆小點也排除未付款
+                                        const dayOrders = dateStr ? orders.filter(o => {
+                                            if (getVal(o, 'paymentStatus') === "未付款") return false;
+                                            return getVal(o, 'date').replace(/\//g,'-').includes(dateStr);
+                                        }) : [];
+                                        
+                                        const hasSpecial = dayOrders.some(o => getVal(o, 'itemType') === "性別" || getVal(o, 'itemType') === "空飄");
                                         
                                         return (
                                             <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
                                                 className={`h-12 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all relative ${
                                                     !dateStr ? '' : 
                                                     isSelected ? 'bg-[#967E67] text-white shadow-lg z-10' : 
-                                                    isToday ? 'bg-stone-100 border border-slate-300' : 'bg-white hover:bg-slate-50 border border-slate-100'
+                                                    isToday ? 'bg-slate-100 border border-slate-300' : 'bg-white hover:bg-slate-50 border border-slate-100'
                                                 }`}
                                             >
                                                 <span className="text-sm font-bold">{dayNum}</span>
@@ -234,86 +210,83 @@
                             </div>
                         </div>
 
-                        {/* 右側訂單清單 */}
+                        {/* 列表 */}
                         <div className="flex-1">
-                            <h3 className="font-bold text-lg mb-4 text-slate-600 flex items-center gap-2 px-1"><LucideIcon name="calendar" size={18}/> {selectedDate} 待辦清單 ({filteredOrders.length})</h3>
-                            
+                            <div className="flex items-center justify-between mb-4">
+                                <h3 className="font-bold text-lg text-slate-600 flex items-center gap-2"><LucideIcon name="calendar" size={18}/> {selectedDate} 待辦清單</h3>
+                                <span className="text-xs font-bold bg-slate-200 text-slate-500 px-3 py-1 rounded-full">{filteredOrders.length} 筆</span>
+                            </div>
+
                             <div className="space-y-4">
                                 {filteredOrders.length === 0 ? (
-                                    <div className="py-24 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200 text-slate-300 font-bold uppercase tracking-widest">
-                                        當日無預訂訂單
+                                    <div className="py-24 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200 text-slate-300 font-bold">
+                                        當日無預訂 (或均為未付款)
                                     </div>
                                 ) : (
-                                    filteredOrders.map((o) => {
-                                        const status = getVal(o, 'stockStatus');
-                                        return (
-                                            <div key={o._srcLabel + o.__row__} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                                <div className="flex justify-between mb-4 items-start">
-                                                    <div>
-                                                        <div className="flex gap-2 mb-2 items-center">
-                                                            <span className={`source-tag text-white ${o._srcColor}`}>{o._srcLabel}</span>
-                                                            <span className="font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded tracking-widest uppercase">{getVal(o, 'id') || "#手單"}</span>
-                                                            {getVal(o, 'itemType') && <span className="font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded">✨ {getVal(o, 'itemType')}</span>}
-                                                        </div>
-                                                        <h4 className="font-bold text-xl text-slate-800 leading-tight">{getVal(o, 'name')}</h4>
+                                    filteredOrders.map((o) => (
+                                        <div key={o["__row__"]} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow">
+                                            <div className="flex justify-between mb-4 items-start">
+                                                <div>
+                                                    <div className="flex gap-2 mb-2">
+                                                        <span className="text-[10px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded tracking-widest uppercase">{getVal(o, 'id')}</span>
+                                                        {getVal(o, 'itemType') && <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded tracking-wide">✨ {getVal(o, 'itemType')}</span>}
                                                     </div>
-                                                    <div className={`font-bold px-3 py-1 rounded-full border ${
-                                                        status.includes("檢查") ? "bg-green-100 text-green-700 border-green-200" : 
-                                                        status.includes("已備貨") ? "bg-amber-100 text-amber-700 border-amber-200" : 
-                                                        "bg-red-50 text-red-600 border-red-100"
-                                                    }`}>
-                                                        {status || "未撿取"}
-                                                    </div>
+                                                    <h4 className="font-bold text-xl text-slate-800">{getVal(o, 'name')}</h4>
                                                 </div>
-                                                
-                                                <div className="text-slate-500 space-y-3 mb-6">
-                                                    <div className="flex items-center gap-2 font-bold text-stone-700">
-                                                        <LucideIcon name="clock" size={16} className="text-stone-300"/> 
-                                                        <span className="text-[#967E67] font-black">{getVal(o, 'time')}</span>
-                                                    </div>
-                                                    <div className="flex items-start gap-2 leading-snug">
-                                                        <LucideIcon name="map-pin" size={16} className="text-stone-300 shrink-0 mt-0.5"/> 
-                                                        <span className="text-slate-600">{getVal(o, 'address')}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <LucideIcon name="phone" size={16} className="text-stone-300"/>
-                                                        <span className="text-slate-600">{getVal(o, 'phone')}</span>
-                                                    </div>
-                                                    {getVal(o, 'remark') && getVal(o, 'remark') !== "-" && (
-                                                        <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 flex gap-2">
-                                                            <LucideIcon name="message-circle" size={16} className="text-stone-300 shrink-0 mt-0.5"/>
-                                                            <p className="text-stone-500 italic leading-relaxed whitespace-pre-wrap">{getVal(o, 'remark')}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <div className="grid grid-cols-3 gap-2">
-                                                    {["未撿取", "已備貨", "檢查完畢"].map((st) => (
-                                                        <button
-                                                            key={st}
-                                                            disabled={loading}
-                                                            onClick={() => updateStatus(o, st)}
-                                                            className={`py-3.5 rounded-2xl font-black transition-all active:scale-95 btn-active ${
-                                                                status.includes(st) || (!status && st === "未撿取")
-                                                                ? (st === "未撿取" ? "bg-red-500 text-white shadow-lg shadow-red-100" : st === "已備貨" ? "bg-amber-500 text-white shadow-lg shadow-amber-100" : "bg-green-600 text-white shadow-lg shadow-green-100")
-                                                                : "bg-slate-50 text-slate-400 hover:bg-slate-100 border border-slate-200/50"
-                                                            }`}
-                                                        >
-                                                            {st}
-                                                        </button>
-                                                    ))}
+                                                <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${
+                                                    getVal(o, 'stockStatus') === "檢查完畢" ? "bg-green-100 text-green-700 border-green-200" : 
+                                                    getVal(o, 'stockStatus') === "已備貨" ? "bg-amber-100 text-amber-700 border-amber-200" : 
+                                                    "bg-red-50 text-red-600 border-red-100"
+                                                }`}>
+                                                    {getVal(o, 'stockStatus') || "未撿取"}
                                                 </div>
                                             </div>
-                                        );
-                                    })
+                                            
+                                            <div className="text-sm text-slate-500 space-y-3 mb-6">
+                                                <div className="flex items-center gap-2 font-medium">
+                                                    <LucideIcon name="clock" size={16} className="text-stone-300"/> 
+                                                    <span className="font-bold text-[#967E67]">{getVal(o, 'time')}</span>
+                                                </div>
+                                                <div className="flex items-start gap-2 leading-snug">
+                                                    <LucideIcon name="map-pin" size={16} className="text-stone-300 shrink-0 mt-0.5"/> 
+                                                    <span className="text-slate-600">{getVal(o, 'address')}</span>
+                                                </div>
+                                                {getVal(o, 'remark') && getVal(o, 'remark') !== "-" && (
+                                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex gap-2">
+                                                        <LucideIcon name="message-circle" size={16} className="text-slate-300 shrink-0 mt-0.5"/>
+                                                        <p className="text-xs text-slate-500 italic leading-relaxed">{getVal(o, 'remark')}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {["未撿取", "已備貨", "檢查完畢"].map((st) => (
+                                                    <button
+                                                        key={st}
+                                                        disabled={loading}
+                                                        onClick={() => updateStatus(o["__row__"], st)}
+                                                        className={`py-3.5 rounded-2xl text-[11px] font-black transition-all ${
+                                                            getVal(o, 'stockStatus') === st || (!getVal(o, 'stockStatus') && st === "未撿取")
+                                                            ? (st === "未撿取" ? "bg-red-500 text-white shadow-lg" : 
+                                                               st === "已備貨" ? "bg-amber-500 text-white shadow-lg" : 
+                                                               "bg-green-600 text-white shadow-lg")
+                                                            : "bg-slate-50 text-slate-400 border border-slate-200/50"
+                                                        }`}
+                                                    >
+                                                        {st}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))
                                 )}
                             </div>
                         </div>
                     </main>
 
                     {toast && (
-                        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-50 text-sm font-bold border transition-all animate-in slide-in-from-bottom-4 ${
-                            toast.type === 'error' ? 'bg-red-600 text-white border-red-400' : 'bg-[#0f172a] text-white border-slate-700'
+                        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-50 text-sm font-bold border transition-all ${
+                            toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-[#0f172a] text-white'
                         }`}>
                             {toast.text}
                         </div>
@@ -321,9 +294,9 @@
 
                     {loading && (
                         <div className="fixed inset-0 bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center z-[100]">
-                            <div className="bg-white p-5 rounded-3xl shadow-xl flex items-center gap-3 border border-slate-100">
+                            <div className="bg-white p-5 rounded-3xl shadow-xl flex items-center gap-3">
                                 <div className="w-5 h-5 border-3 border-[#967E67] border-t-transparent rounded-full animate-spin"></div>
-                                <span className="font-bold text-slate-600 text-xs uppercase tracking-widest tracking-tighter">同步雙系統中...</span>
+                                <span className="font-bold text-slate-600 text-sm tracking-widest">LOADING...</span>
                             </div>
                         </div>
                     )}
