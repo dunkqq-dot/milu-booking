@@ -29,61 +29,72 @@
 
         const CATEGORIES = ["全部", "專人佈置", "氣球外送", "工作室取貨", "後車箱佈置"];
 
+        // 欄位匹配定義
+        const FIELD_MAPS = {
+            id: ["訂單編號", "編號", "OrderID", "ID"],
+            name: ["收件人姓名", "收件人", "客戶名稱", "LINE名稱", "姓名"],
+            address: ["送貨地址", "詳細地址", "地址", "地點", "location"],
+            date: ["送貨日期", "預約日期", "日期", "date"],
+            time: ["送貨時段", "預約時間", "時間", "time"],
+            status: ["狀態", "付款狀態", "備貨狀態", "status"],
+            remark: ["備註", "備註欄", "注意事項", "remark"]
+        };
+
         const LucideIcon = ({ name, size = 18, className = "" }) => {
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
         const App = () => {
-            const [orders, setOrders] = useState([]);
+            const [rawOrders, setRawOrders] = useState([]);
             const [loading, setLoading] = useState(false);
             const [currentCategory, setCurrentCategory] = useState("全部");
             const [currentMonth, setCurrentMonth] = useState(new Date());
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [toast, setToast] = useState(null);
 
-            // 強化匹配邏輯：增加更多試算表可能出現的中文欄位名
-            const FIELD_MAPS = {
-                id: ["訂單編號", "編號", "OrderID", "ID"],
-                name: ["收件人姓名", "收件人", "客戶名稱", "LINE名稱", "姓名"],
-                address: ["送貨地址", "詳細地址", "地址", "地點", "location"],
-                date: ["送貨日期", "預約日期", "日期", "date"],
-                time: ["送貨時段", "預約時間", "時間", "time"],
-                status: ["狀態", "付款狀態", "備貨狀態", "status"],
-                remark: ["備註", "備註欄", "注意事項", "remark"]
-            };
-
-            const getVal = (order, type) => {
-                if (!order) return "";
+            // 工具函式：抓取值
+            const findVal = (order, targets) => {
                 const keys = Object.keys(order);
-                const targets = FIELD_MAPS[type] || [];
-                const realKey = keys.find(k => targets.some(t => k === t.trim())) || keys.find(k => targets.some(t => k.includes(t)));
-                
-                if (!realKey) return "";
-                let val = order[realKey];
-
-                if (type === 'time' && String(val).includes("1899")) {
-                    try {
-                        const d = new Date(val);
-                        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-                    } catch (e) { return String(val); }
-                }
-
-                if (type === 'date' && val) {
-                    const d = new Date(val);
-                    if (isNaN(d.getTime())) return String(val).trim();
-                    if (String(val).includes("T") && !String(val).includes("1899")) d.setHours(d.getHours() + 8);
-                    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
-                }
-                return String(val || "").trim();
+                const realKey = keys.find(k => targets.some(t => k === t.trim() || k.includes(t)));
+                return realKey ? order[realKey] : "";
             };
+
+            // 優化點 1：抓到資料後立刻「正規化」，避免渲染時重複進行 key 搜尋
+            const orders = useMemo(() => {
+                return rawOrders.map(o => {
+                    let d = findVal(o, FIELD_MAPS.date);
+                    if (d && !isNaN(new Date(d).getTime())) {
+                        const dateObj = new Date(d);
+                        if (String(d).includes("T") && !String(d).includes("1899")) dateObj.setHours(dateObj.getHours() + 8);
+                        d = `${dateObj.getFullYear()}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${String(dateObj.getDate()).padStart(2, '0')}`;
+                    }
+
+                    let t = findVal(o, FIELD_MAPS.time);
+                    if (t && String(t).includes("1899")) {
+                        const timeObj = new Date(t);
+                        t = `${String(timeObj.getHours()).padStart(2, '0')}:${String(timeObj.getMinutes()).padStart(2, '0')}`;
+                    }
+
+                    return {
+                        ...o,
+                        _id: findVal(o, FIELD_MAPS.id),
+                        _name: findVal(o, FIELD_MAPS.name),
+                        _address: findVal(o, FIELD_MAPS.address),
+                        _date: String(d).trim(),
+                        _time: String(t).trim(),
+                        _status: findVal(o, FIELD_MAPS.status),
+                        _remark: findVal(o, FIELD_MAPS.remark)
+                    };
+                });
+            }, [rawOrders]);
 
             const fetchOrders = async () => {
                 setLoading(true);
                 try {
                     const response = await fetch(`${API_URL}?action=getOrders&t=${Date.now()}`);
                     const data = await response.json();
-                    setOrders(Array.isArray(data) ? data : []);
+                    setRawOrders(Array.isArray(data) ? data : []);
                 } catch (err) {
                     showToast("同步失敗", "error");
                 } finally {
@@ -114,19 +125,27 @@
                 finally { setLoading(false); }
             };
 
+            // 優化點 2：預先計算當月每日訂單量索引，提升日曆渲染速度
+            const orderIndexByDate = useMemo(() => {
+                const index = {};
+                orders.forEach(o => {
+                    const s = o._status;
+                    if (s.includes("未付款") || s.toUpperCase().includes("UNPAID")) return;
+                    if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return;
+                    const dateKey = o._date.replace(/\//g, '-');
+                    index[dateKey] = (index[dateKey] || 0) + 1;
+                });
+                return index;
+            }, [orders, currentCategory]);
+
             const filteredOrders = useMemo(() => {
                 return orders.filter(o => {
-                    // 1. 排除未付款 (後端已過濾，前端做雙重保險)
-                    const statusVal = getVal(o, 'status');
+                    const statusVal = o._status;
                     if (statusVal.includes("未付款") || statusVal.toUpperCase().includes("UNPAID")) return false;
-                    
-                    // 2. 分類過濾
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
-
-                    // 3. 日期過濾
-                    const orderDate = getVal(o, 'date').replace(/\//g, '-');
+                    const orderDate = o._date.replace(/\//g, '-');
                     return orderDate.includes(selectedDate);
-                }).sort((a, b) => getVal(a, 'time').localeCompare(getVal(b, 'time')));
+                }).sort((a, b) => a._time.localeCompare(b._time));
             }, [orders, selectedDate, currentCategory]);
 
             const daysArray = useMemo(() => {
@@ -164,7 +183,6 @@
                     </div>
 
                     <main className="max-w-6xl mx-auto p-4 lg:flex gap-8">
-                        {/* 日曆 */}
                         <div className="lg:w-[320px] shrink-0 mb-6">
                             <div className="bg-white rounded-3xl shadow-sm border p-5 sticky top-36">
                                 <div className="flex justify-between items-center mb-6">
@@ -178,12 +196,8 @@
                                     {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-bold text-slate-300 py-2">{d}</div>)}
                                     {daysArray.map((dateStr, i) => {
                                         const isSelected = dateStr === selectedDate;
-                                        const dayOrdersCount = dateStr ? orders.filter(o => {
-                                            const s = getVal(o, 'status');
-                                            if (s.includes("未付款") || s.toUpperCase().includes("UNPAID")) return false;
-                                            if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
-                                            return getVal(o, 'date').replace(/\//g,'-').includes(dateStr);
-                                        }).length : 0;
+                                        // 直接從索引 Map 中取值，大幅加快渲染
+                                        const dayOrdersCount = orderIndexByDate[dateStr] || 0;
                                         return (
                                             <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
                                                 className={`h-10 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all ${!dateStr ? '' : isSelected ? 'bg-slate-800 text-white shadow-lg' : 'hover:bg-slate-50 border border-transparent'}`}>
@@ -196,7 +210,6 @@
                             </div>
                         </div>
 
-                        {/* 清單 */}
                         <div className="flex-1">
                             <div className="flex items-center justify-between mb-4">
                                 <h3 className="font-bold text-slate-600 flex items-center gap-2"><LucideIcon name="calendar-check" size={20} /> {selectedDate} · {currentCategory}</h3>
@@ -211,21 +224,25 @@
                                             <div className="flex justify-between mb-4 items-start">
                                                 <div>
                                                     <span className="text-[10px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded uppercase">{o["__sheet__"]}</span>
-                                                    <h4 className="font-bold text-xl text-slate-800 mt-1">{getVal(o, 'name')}</h4>
+                                                    <h4 className="font-bold text-xl text-slate-800 mt-1">{o._name}</h4>
                                                 </div>
-                                                <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${getVal(o, 'status').includes("檢查完畢") ? "bg-green-100 text-green-700 border-green-200" : getVal(o, 'status').includes("已備貨") ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-600 border-blue-100"}`}>
-                                                    {getVal(o, 'status')}
+                                                <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${o._status.includes("檢查完畢") ? "bg-green-100 text-green-700 border-green-200" : o._status.includes("已備貨") ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-600 border-blue-100"}`}>
+                                                    {o._status}
                                                 </div>
                                             </div>
                                             <div className="text-sm text-slate-500 space-y-3 mb-6">
-                                                <div className="flex items-center gap-2 font-medium text-slate-700"><LucideIcon name="clock" size={16} />{getVal(o, 'time')}</div>
-                                                <div className="flex items-start gap-2 leading-snug"><LucideIcon name="map-pin" size={16} className="shrink-0 mt-0.5"/>{getVal(o, 'address')}</div>
+                                                <div className="flex items-center gap-2 font-medium text-slate-700"><LucideIcon name="clock" size={16} />{o._time}</div>
+                                                <div className="flex items-start gap-2 leading-snug"><LucideIcon name="map-pin" size={16} className="shrink-0 mt-0.5"/>{o._address}</div>
+                                                {o._remark && o._remark !== "-" && (
+                                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex gap-2">
+                                                        <LucideIcon name="info" size={16} className="shrink-0 mt-0.5"/><p className="text-xs text-slate-500">{o._remark}</p>
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="grid grid-cols-3 gap-2">
-                                                {/* 選項修正：將「已付款」改為「未備貨」 */}
                                                 {["未備貨", "已備貨", "檢查完畢"].map((st) => (
                                                     <button key={st} onClick={() => updateStatus(o, st)}
-                                                        className={`py-3.5 rounded-2xl text-[11px] font-black transition-all ${getVal(o, 'status').includes(st) ? "bg-slate-800 text-white shadow-lg" : "bg-slate-50 text-slate-400 border border-slate-200/50"}`}>
+                                                        className={`py-3.5 rounded-2xl text-[11px] font-black transition-all ${o._status.includes(st) ? "bg-slate-800 text-white shadow-lg" : "bg-slate-50 text-slate-400 border border-slate-200/50"}`}>
                                                         {st}
                                                     </button>
                                                 ))}
