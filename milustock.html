@@ -125,14 +125,23 @@
                 finally { setLoading(false); }
             };
 
+            // 優化日曆索引：同時儲存該日期訂單總數與是否含有未撿取訂單
             const orderIndexByDate = useMemo(() => {
                 const index = {};
                 orders.forEach(o => {
                     const pStatus = o._payStatus;
                     if (pStatus.includes("未付款") || pStatus.toUpperCase().includes("UNPAID")) return;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return;
+                    
                     const dateKey = o._date.replace(/\//g, '-');
-                    index[dateKey] = (index[dateKey] || 0) + 1;
+                    if (!index[dateKey]) index[dateKey] = { count: 0, hasUnpicked: false };
+                    
+                    index[dateKey].count++;
+                    
+                    // 偵測是否為未撿取 (空值也視為未撿取)
+                    if (!o._status || o._status.includes("未撿取")) {
+                        index[dateKey].hasUnpicked = true;
+                    }
                 });
                 return index;
             }, [orders, currentCategory]);
@@ -207,15 +216,30 @@
                                     {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-bold text-slate-300 py-2">{d}</div>)}
                                     {daysArray.map((dateStr, i) => {
                                         const isSelected = dateStr === selectedDate;
-                                        const dayOrdersCount = orderIndexByDate[dateStr] || 0;
+                                        const dayData = orderIndexByDate[dateStr];
+                                        const hasData = dayData && dayData.count > 0;
+                                        const isWarning = dayData && dayData.hasUnpicked;
+
                                         return (
                                             <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
                                                 className={`h-10 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all ${!dateStr ? '' : isSelected ? 'bg-emerald-800 text-white shadow-lg' : 'hover:bg-slate-50 border border-transparent'}`}>
                                                 <span className="text-sm font-bold">{dateStr ? parseInt(dateStr.split('-')[2]) : ""}</span>
-                                                {dayOrdersCount > 0 && <div className={`mt-0.5 h-1 w-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-400'}`}></div>}
+                                                {hasData && (
+                                                    <div className={`mt-0.5 h-1.5 w-1.5 rounded-full ${
+                                                        isSelected ? 'bg-white' : (isWarning ? 'bg-rose-500 animate-pulse' : 'bg-emerald-400')
+                                                    }`}></div>
+                                                )}
                                             </div>
                                         );
                                     })}
+                                </div>
+                                <div className="mt-4 pt-4 border-t border-slate-100 flex gap-4 justify-center items-center">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400"></div> 已處理
+                                    </div>
+                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div> 待撿取
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -253,7 +277,6 @@
                                                 )}
                                             </div>
                                             <div className="grid grid-cols-3 gap-2">
-                                                {/* 選項更新：將「未備貨」改為「未撿取」 */}
                                                 {["未撿取", "已備貨", "檢查完畢"].map((st) => {
                                                     const isActive = o._status.includes(st) || (o._status === "" && st === "未撿取");
                                                     return (
