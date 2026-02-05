@@ -15,8 +15,8 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        /* 清新綠色漸層 */
         .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
     </style>
 </head>
 <body class="min-h-screen">
@@ -39,12 +39,131 @@
             time: ["送貨時段", "預約時間", "時間"],
             pickingStatus: ["撿貨狀態", "備貨狀態"], 
             paymentStatus: ["付款狀態", "狀態", "付款"],
-            remark: ["備註", "備註欄", "注意事項"]
+            remark: ["備註", "備註欄", "注意事項"],
+            quoteUrl: ["報價單連結", "報價單", "報價單網址"] // 新增報價單連結匹配
         };
 
         const LucideIcon = ({ name, size = 18, className = "" }) => {
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        };
+
+        // 報價單 Modal 元件
+        const QuoteModal = ({ isOpen, onClose, quoteUrl, orderName }) => {
+            const [data, setData] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [checkedItems, setCheckedItems] = useState({});
+
+            useEffect(() => {
+                if (isOpen && quoteUrl) {
+                    fetchQuoteData();
+                }
+            }, [isOpen, quoteUrl]);
+
+            const fetchQuoteData = async () => {
+                setLoading(true);
+                try {
+                    const res = await fetch(`${API_URL}?action=getQuoteData&url=${encodeURIComponent(quoteUrl)}`);
+                    const json = await res.json();
+                    if (json.error) throw new Error(json.error);
+                    
+                    // 假設報價單第一列是標題，過濾掉標題並找出 材料、數量、備註 欄位
+                    const headers = json[0];
+                    const rows = json.slice(1);
+                    
+                    const mIdx = headers.findIndex(h => h.includes("材料"));
+                    const qIdx = headers.findIndex(h => h.includes("數量"));
+                    const rIdx = headers.findIndex(h => h.includes("備註"));
+
+                    const formatted = rows.map((row, i) => ({
+                        id: i,
+                        item: row[mIdx] || "",
+                        qty: row[qIdx] || "",
+                        note: row[rIdx] || ""
+                    })).filter(r => r.item !== ""); // 移除空列
+
+                    setData(formatted);
+                } catch (e) {
+                    console.error("讀取報價單失敗", e);
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const toggleCheck = (id) => {
+                setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
+            };
+
+            if (!isOpen) return null;
+
+            return (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 modal-overlay" onClick={onClose}>
+                    <div className="bg-white w-full max-w-2xl max-h-[80vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                        <header className="p-6 border-b flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
+                                    <LucideIcon name="file-spreadsheet" className="text-emerald-600" /> 報價單明細
+                                </h3>
+                                <p className="text-xs text-slate-400 font-bold mt-1">對象：{orderName}</p>
+                            </div>
+                            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+                                <LucideIcon name="x" size={24} />
+                            </button>
+                        </header>
+                        
+                        <div className="flex-1 overflow-y-auto p-6">
+                            {loading ? (
+                                <div className="py-20 text-center flex flex-col items-center gap-3">
+                                    <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+                                    <span className="text-slate-400 font-bold text-sm">正在載入報價單...</span>
+                                </div>
+                            ) : data.length === 0 ? (
+                                <div className="py-20 text-center text-slate-300 font-bold">無法讀取報價單資料，請確認連結與權限。</div>
+                            ) : (
+                                <div className="space-y-2">
+                                    <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b">
+                                        <div className="col-span-1">撿</div>
+                                        <div className="col-span-6">材料內容</div>
+                                        <div className="col-span-2 text-center">數量</div>
+                                        <div className="col-span-3">備註</div>
+                                    </div>
+                                    {data.map((row) => (
+                                        <div key={row.id} 
+                                             onClick={() => toggleCheck(row.id)}
+                                             className={`grid grid-cols-12 gap-2 px-4 py-4 rounded-2xl cursor-pointer transition-all border ${
+                                                 checkedItems[row.id] ? 'bg-slate-50 border-transparent opacity-60' : 'bg-white border-slate-100 hover:border-emerald-200 hover:shadow-sm'
+                                             }`}>
+                                            <div className="col-span-1 flex items-center">
+                                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                                                    checkedItems[row.id] ? 'bg-emerald-500 border-emerald-500' : 'border-slate-200 bg-white'
+                                                }`}>
+                                                    {checkedItems[row.id] && <LucideIcon name="check" size={14} className="text-white" />}
+                                                </div>
+                                            </div>
+                                            <div className={`col-span-6 flex items-center font-bold text-slate-700 ${checkedItems[row.id] ? 'line-through text-slate-400' : ''}`}>
+                                                {row.item}
+                                            </div>
+                                            <div className={`col-span-2 flex items-center justify-center font-black text-emerald-600 ${checkedItems[row.id] ? 'line-through text-slate-300' : ''}`}>
+                                                {row.qty}
+                                            </div>
+                                            <div className={`col-span-3 flex items-center text-xs text-slate-500 italic ${checkedItems[row.id] ? 'line-through text-slate-300' : ''}`}>
+                                                {row.note}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <footer className="p-6 border-t bg-slate-50 flex justify-between items-center">
+                            <span className="text-[10px] font-bold text-slate-400">※ 勾選狀態僅供本次備貨參考，不影響原始試算表。</span>
+                            <button onClick={onClose} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm shadow-md hover:bg-slate-700 transition-all">
+                                關閉
+                            </button>
+                        </footer>
+                    </div>
+                </div>
+            );
         };
 
         const App = () => {
@@ -54,6 +173,9 @@
             const [currentMonth, setCurrentMonth] = useState(new Date());
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [toast, setToast] = useState(null);
+            
+            // 報價單 Modal 狀態
+            const [quoteModal, setQuoteModal] = useState({ isOpen: false, url: "", name: "" });
 
             const findVal = (order, targets) => {
                 const keys = Object.keys(order);
@@ -83,7 +205,8 @@
                         _time: String(t).trim(),
                         _status: findVal(o, FIELD_MAPS.pickingStatus) || o["撿貨狀態"] || "", 
                         _payStatus: String(findVal(o, FIELD_MAPS.paymentStatus) || "").toUpperCase(),
-                        _remark: findVal(o, FIELD_MAPS.remark)
+                        _remark: findVal(o, FIELD_MAPS.remark),
+                        _quoteUrl: findVal(o, FIELD_MAPS.quoteUrl)
                     };
                 });
             }, [rawOrders]);
@@ -125,42 +248,28 @@
                 finally { setLoading(false); }
             };
 
-            // 判斷是否為無效訂單的輔助函式
             const isExcludedOrder = (payStatus) => {
                 const excludeKeywords = ["未付款", "UNPAID", "已取消", "CANCELED", "CANCELLED", "已退款", "REFUNDED"];
                 return excludeKeywords.some(keyword => payStatus.includes(keyword));
             };
 
-            // 優化日曆索引：同步排除未付款、已取消、已退款
             const orderIndexByDate = useMemo(() => {
                 const index = {};
                 orders.forEach(o => {
-                    // 過濾無效訂單
                     if (isExcludedOrder(o._payStatus)) return;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return;
-                    
                     const dateKey = o._date.replace(/\//g, '-');
                     if (!index[dateKey]) index[dateKey] = { count: 0, hasUnpicked: false };
-                    
                     index[dateKey].count++;
-                    
-                    // 偵測是否為未撿取
-                    if (!o._status || o._status.includes("未撿取")) {
-                        index[dateKey].hasUnpicked = true;
-                    }
+                    if (!o._status || o._status.includes("未撿取")) index[dateKey].hasUnpicked = true;
                 });
                 return index;
             }, [orders, currentCategory]);
 
             const filteredOrders = useMemo(() => {
                 return orders.filter(o => {
-                    // 1. 排除無效訂單
                     if (isExcludedOrder(o._payStatus)) return false;
-                    
-                    // 2. 分類過濾
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
-                    
-                    // 3. 日期過濾
                     const orderDate = o._date.replace(/\//g, '-');
                     return orderDate.includes(selectedDate);
                 }).sort((a, b) => a._time.localeCompare(b._time));
@@ -273,8 +382,17 @@
                                                     </div>
                                                     <h4 className="font-bold text-xl text-slate-800 mt-1">{o._name}</h4>
                                                 </div>
-                                                <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${getStatusStyles(o._status)}`}>
-                                                    {o._status || "未撿取"}
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${getStatusStyles(o._status)}`}>
+                                                        {o._status || "未撿取"}
+                                                    </div>
+                                                    {o._quoteUrl && (
+                                                        <button 
+                                                            onClick={() => setQuoteModal({ isOpen: true, url: o._quoteUrl, name: o._name })}
+                                                            className="flex items-center gap-1.5 text-[10px] font-black bg-emerald-600 text-white px-3 py-1 rounded-full shadow-sm hover:bg-emerald-700 transition-all active:scale-95">
+                                                            <LucideIcon name="clipboard-list" size={12} /> 查看報價單
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                             <div className="text-sm text-slate-500 space-y-3 mb-6">
@@ -306,9 +424,17 @@
                         </div>
                     </main>
 
-                    {toast && <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-50 text-sm font-bold bg-slate-900 text-white">{toast.text}</div>}
+                    {/* 報價單 Modal */}
+                    <QuoteModal 
+                        isOpen={quoteModal.isOpen} 
+                        onClose={() => setQuoteModal({ ...quoteModal, isOpen: false })} 
+                        quoteUrl={quoteModal.url}
+                        orderName={quoteModal.name}
+                    />
+
+                    {toast && <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-[300] text-sm font-bold bg-slate-900 text-white">{toast.text}</div>}
                     {loading && (
-                        <div className="fixed inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-[100]">
+                        <div className="fixed inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-[500]">
                              <div className="bg-white p-6 rounded-3xl shadow-xl flex flex-col items-center gap-4 border border-emerald-100">
                                 <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
                                 <span className="font-black text-emerald-600 text-xs tracking-widest">SYNCING...</span>
