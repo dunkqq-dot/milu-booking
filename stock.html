@@ -27,29 +27,26 @@
         const { useState, useEffect, useMemo } = React;
 
         /**
-         * 🎈 麋鹿氣球：雙系統備貨管理系統
+         * 🎈 麋鹿氣球：雙系統備貨管理系統 (修正版)
          */
         const API_URL_OFFICIAL = "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec"; 
         const API_URL_MANUAL = "https://script.google.com/macros/s/AKfycbya7e4XKsmBp1c885BTSLj386yvtt6_k7QGSXH8d1-7HrdzPfFWccgGAy3Dvd_nWFDTSw/exec"; 
 
-        // 欄位定義 - 整合兩個試算表的所有標頭名稱
+        // 欄位定義 - 增加對預約總表特殊標題的支援
         const FIELD_MAPS = {
             id: ["訂單編號", "OrderID", "編號", "ID"],
             name: ["收件人姓名", "👤 現場收件人姓名", "現場聯絡人姓名", "客戶姓名", "姓名"],
             phone: ["電話", "📞 收件人電話", "現場聯絡電話", "收件人電話"],
             address: ["詳細地址", "📍 外送詳細地點", "送貨地址", "地址"],
-            date: ["送貨日期", "📅 外送日期", "預約日期", "取貨日期", "取貨/送貨日期"],
+            date: ["送貨日期", "📅 外送日期", "預約日期", "取貨日期", "取貨/送貨日期", "日期"],
             time: ["送貨時段", "🕐 請選擇外送抵達區間", "預計「進場佈置」時間", "時間", "取貨時間"],
             itemType: ["品項類型", "服務項目", "標籤"],
             stockStatus: ["備貨狀態", "撿貨狀態", "狀態"],
             remark: ["備註欄", "房型／場地名稱", "外送須知與商品確認", "備註"]
         };
 
-        // Lucide 圖示元件
         const LucideIcon = ({ name, size = 18, className = "" }) => {
-            useEffect(() => {
-                if (window.lucide) window.lucide.createIcons();
-            }, [name]);
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
@@ -64,7 +61,10 @@
                 if (!order) return "";
                 const keys = Object.keys(order);
                 const targets = FIELD_MAPS[type] || [];
-                const realKey = keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
+                
+                // 優先尋找完全匹配或包含關鍵字的標頭
+                const realKey = keys.find(k => targets.some(t => k.trim() === t)) || 
+                               keys.find(k => targets.some(t => k.includes(t)));
                 
                 if (!realKey) return "";
                 let val = order[realKey];
@@ -77,12 +77,20 @@
                     } catch (e) { return String(val); }
                 }
 
-                // 處理日期與時區
+                // 處理日期與時區修正 (防止日期偏移一天)
                 if (type === 'date' && val) {
                     const d = new Date(val);
                     if (isNaN(d.getTime())) return String(val).trim();
-                    if (String(val).includes("T") && !String(val).includes("1899")) d.setHours(d.getHours() + 8);
-                    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+                    
+                    // 為了避免時區偏移，我們手動提取 Date 物件中的年月日
+                    const year = d.getFullYear();
+                    const month = d.getMonth() + 1;
+                    const day = d.getDate();
+                    
+                    // 如果年份太小 (例如 1899)，則視為無效日期
+                    if (year < 2000) return String(val).trim();
+                    
+                    return `${year}/${String(month).padStart(2, '0')}/${String(day).padStart(2, '0')}`;
                 }
 
                 return String(val || "").trim();
@@ -93,25 +101,33 @@
                 const configs = [
                     { url: API_URL_OFFICIAL, label: "官網", color: "bg-blue-600", statusKey: "備貨狀態" },
                     { url: API_URL_MANUAL, label: "預約總表", color: "bg-purple-600", statusKey: "撿貨狀態" }
-                ];
+                ].filter(c => c.url !== "");
 
                 try {
                     const results = await Promise.all(configs.map(async (cfg) => {
                         try {
                             const res = await fetch(`${cfg.url}?action=getOrders&t=${Date.now()}`);
                             const data = await res.json();
-                            return Array.isArray(data) ? data.map(o => ({ 
-                                ...o, 
-                                _srcLabel: cfg.label, 
-                                _srcColor: cfg.color, 
-                                _srcUrl: cfg.url,
-                                _statusHeader: cfg.statusKey
-                            })) : [];
-                        } catch (e) { return []; }
+                            if (!Array.isArray(data)) return [];
+                            
+                            // 過濾掉空行，並注入來源資訊
+                            return data
+                                .filter(o => getVal(o, 'name') !== "") 
+                                .map(o => ({ 
+                                    ...o, 
+                                    _srcLabel: cfg.label, 
+                                    _srcColor: cfg.color, 
+                                    _srcUrl: cfg.url,
+                                    _statusHeader: cfg.statusKey
+                                }));
+                        } catch (e) { 
+                            console.error(`來源 ${cfg.label} 讀取失敗:`, e);
+                            return []; 
+                        }
                     }));
                     setOrders(results.flat());
                 } catch (err) {
-                    showToast("同步系統失敗", "error");
+                    showToast("同步系統失敗，請確認網路連線", "error");
                 } finally {
                     setLoading(false);
                 }
@@ -133,7 +149,7 @@
                             action: "updateStatus", 
                             row: order.__row__, 
                             status: newStatus,
-                            header: order._statusHeader // 讓 GAS 知道要更新哪一欄 (備貨狀態 or 撿貨狀態)
+                            header: order._statusHeader
                         })
                     });
                     showToast(`[${order._srcLabel}] 更新成功：${newStatus}`);
@@ -155,19 +171,26 @@
                 return (day > 0 && day <= daysCount) ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toISOString().split('T')[0] : null;
             });
 
+            // 核心篩選邏輯：統一轉換格式進行比對
             const filteredOrders = useMemo(() => {
                 return orders.filter(o => {
                     let d = getVal(o, 'date');
-                    return d.replace(/\//g, '-').includes(selectedDate);
-                }).sort((a, b) => getVal(a, 'time').localeCompare(getVal(b, 'time')));
+                    if (!d) return false;
+                    const cleanDate = d.replace(/\//g, '-');
+                    return cleanDate === selectedDate || cleanDate.includes(selectedDate);
+                }).sort((a, b) => {
+                    const timeA = getVal(a, 'time') || "99:99";
+                    const timeB = getVal(b, 'time') || "99:99";
+                    return timeA.localeCompare(timeB);
+                });
             }, [orders, selectedDate]);
 
             return (
-                <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-10">
+                <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-10 text-xs">
                     <header className="bg-[#967E67] text-white p-4 shadow-md sticky top-0 z-20 flex justify-between items-center">
                         <div className="flex items-center gap-2">
                             <div className="bg-white/20 p-1.5 rounded-lg border border-white/30"><LucideIcon name="package" size={20} /></div>
-                            <h1 className="text-lg font-bold tracking-tight">麋鹿氣球 · 備貨管理系統</h1>
+                            <h1 className="text-lg font-bold tracking-tight">麋鹿氣球 · 雙系統備貨</h1>
                         </div>
                         <button onClick={fetchOrders} className="p-2 hover:bg-white/20 rounded-full transition-all active:scale-95">
                             <LucideIcon name="refresh-cw" size={20} className={loading ? "spin" : ""} />
@@ -223,7 +246,7 @@
                             <div className="space-y-4">
                                 {filteredOrders.length === 0 ? (
                                     <div className="py-24 text-center bg-white rounded-[2rem] border-2 border-dashed border-slate-200 text-slate-300 font-bold uppercase tracking-widest">
-                                        當日目前無預訂
+                                        No Bookings Today
                                     </div>
                                 ) : (
                                     filteredOrders.map((o) => {
@@ -234,12 +257,12 @@
                                                     <div>
                                                         <div className="flex gap-2 mb-2 items-center">
                                                             <span className={`source-tag text-white ${o._srcColor}`}>{o._srcLabel}</span>
-                                                            <span className="text-[10px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded tracking-widest uppercase">{getVal(o, 'id') || "#手單"}</span>
-                                                            {getVal(o, 'itemType') && <span className="text-[10px] font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded">✨ {getVal(o, 'itemType')}</span>}
+                                                            <span className="font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded tracking-widest uppercase">{getVal(o, 'id') || "#手單"}</span>
+                                                            {getVal(o, 'itemType') && <span className="font-black bg-amber-100 text-amber-600 px-2 py-0.5 rounded">✨ {getVal(o, 'itemType')}</span>}
                                                         </div>
-                                                        <h4 className="font-bold text-xl text-slate-800">{getVal(o, 'name')}</h4>
+                                                        <h4 className="font-bold text-xl text-slate-800 leading-tight">{getVal(o, 'name')}</h4>
                                                     </div>
-                                                    <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${
+                                                    <div className={`font-bold px-3 py-1 rounded-full border ${
                                                         status.includes("檢查") ? "bg-green-100 text-green-700 border-green-200" : 
                                                         status.includes("已備貨") ? "bg-amber-100 text-amber-700 border-amber-200" : 
                                                         "bg-red-50 text-red-600 border-red-100"
@@ -248,10 +271,10 @@
                                                     </div>
                                                 </div>
                                                 
-                                                <div className="text-sm text-slate-500 space-y-3 mb-6">
-                                                    <div className="flex items-center gap-2 font-medium">
+                                                <div className="text-slate-500 space-y-3 mb-6">
+                                                    <div className="flex items-center gap-2 font-bold text-stone-700">
                                                         <LucideIcon name="clock" size={16} className="text-stone-300"/> 
-                                                        <span className="font-bold text-[#967E67]">{getVal(o, 'time')}</span>
+                                                        <span className="text-[#967E67] font-black">{getVal(o, 'time')}</span>
                                                     </div>
                                                     <div className="flex items-start gap-2 leading-snug">
                                                         <LucideIcon name="map-pin" size={16} className="text-stone-300 shrink-0 mt-0.5"/> 
@@ -260,7 +283,7 @@
                                                     {getVal(o, 'remark') && getVal(o, 'remark') !== "-" && (
                                                         <div className="bg-stone-50 p-4 rounded-2xl border border-stone-100 flex gap-2">
                                                             <LucideIcon name="message-circle" size={16} className="text-stone-300 shrink-0 mt-0.5"/>
-                                                            <p className="text-xs text-stone-500 italic leading-relaxed whitespace-pre-wrap">{getVal(o, 'remark')}</p>
+                                                            <p className="text-stone-500 italic leading-relaxed whitespace-pre-wrap">{getVal(o, 'remark')}</p>
                                                         </div>
                                                     )}
                                                 </div>
@@ -271,7 +294,7 @@
                                                             key={st}
                                                             disabled={loading}
                                                             onClick={() => updateStatus(o, st)}
-                                                            className={`py-3.5 rounded-2xl text-[11px] font-black transition-all active:scale-95 ${
+                                                            className={`py-3.5 rounded-2xl font-black transition-all active:scale-95 ${
                                                                 status.includes(st) || (!status && st === "未撿取")
                                                                 ? (st === "未撿取" ? "bg-red-500 text-white shadow-lg shadow-red-100" : st === "已備貨" ? "bg-amber-500 text-white shadow-lg shadow-amber-100" : "bg-green-600 text-white shadow-lg shadow-green-100")
                                                                 : "bg-slate-50 text-slate-400 hover:bg-slate-100 border border-slate-200/50"
@@ -301,7 +324,7 @@
                         <div className="fixed inset-0 bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center z-[100]">
                             <div className="bg-white p-5 rounded-3xl shadow-xl flex items-center gap-3 border border-slate-100">
                                 <div className="w-5 h-5 border-3 border-[#967E67] border-t-transparent rounded-full animate-spin"></div>
-                                <span className="font-bold text-slate-600 text-sm uppercase tracking-widest">同步雙系統中...</span>
+                                <span className="font-bold text-slate-600 text-sm uppercase tracking-widest">同步中...</span>
                             </div>
                         </div>
                     )}
