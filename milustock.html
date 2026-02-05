@@ -82,7 +82,7 @@
                         _date: String(d).trim(),
                         _time: String(t).trim(),
                         _status: findVal(o, FIELD_MAPS.pickingStatus) || o["撿貨狀態"] || "", 
-                        _payStatus: findVal(o, FIELD_MAPS.paymentStatus),
+                        _payStatus: String(findVal(o, FIELD_MAPS.paymentStatus) || "").toUpperCase(),
                         _remark: findVal(o, FIELD_MAPS.remark)
                     };
                 });
@@ -125,12 +125,18 @@
                 finally { setLoading(false); }
             };
 
-            // 優化日曆索引：同時儲存該日期訂單總數與是否含有未撿取訂單
+            // 判斷是否為無效訂單的輔助函式
+            const isExcludedOrder = (payStatus) => {
+                const excludeKeywords = ["未付款", "UNPAID", "已取消", "CANCELED", "CANCELLED", "已退款", "REFUNDED"];
+                return excludeKeywords.some(keyword => payStatus.includes(keyword));
+            };
+
+            // 優化日曆索引：同步排除未付款、已取消、已退款
             const orderIndexByDate = useMemo(() => {
                 const index = {};
                 orders.forEach(o => {
-                    const pStatus = o._payStatus;
-                    if (pStatus.includes("未付款") || pStatus.toUpperCase().includes("UNPAID")) return;
+                    // 過濾無效訂單
+                    if (isExcludedOrder(o._payStatus)) return;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return;
                     
                     const dateKey = o._date.replace(/\//g, '-');
@@ -138,7 +144,7 @@
                     
                     index[dateKey].count++;
                     
-                    // 偵測是否為未撿取 (空值也視為未撿取)
+                    // 偵測是否為未撿取
                     if (!o._status || o._status.includes("未撿取")) {
                         index[dateKey].hasUnpicked = true;
                     }
@@ -148,9 +154,13 @@
 
             const filteredOrders = useMemo(() => {
                 return orders.filter(o => {
-                    const pStatus = o._payStatus;
-                    if (pStatus.includes("未付款") || pStatus.toUpperCase().includes("UNPAID")) return false;
+                    // 1. 排除無效訂單
+                    if (isExcludedOrder(o._payStatus)) return false;
+                    
+                    // 2. 分類過濾
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
+                    
+                    // 3. 日期過濾
                     const orderDate = o._date.replace(/\//g, '-');
                     return orderDate.includes(selectedDate);
                 }).sort((a, b) => a._time.localeCompare(b._time));
@@ -251,7 +261,7 @@
                             </div>
                             <div className="space-y-4">
                                 {filteredOrders.length === 0 ? (
-                                    <div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100 text-slate-300 font-bold">目前無預訂訂單</div>
+                                    <div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100 text-slate-300 font-bold">目前無有效預訂</div>
                                 ) : (
                                     filteredOrders.map((o) => (
                                         <div key={o["__sheet__"] + o["__row__"]} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow">
