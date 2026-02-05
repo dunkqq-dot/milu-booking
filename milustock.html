@@ -38,8 +38,10 @@
             address: ["送貨地址", "詳細地址", "地址", "地點"],
             date: ["送貨日期", "預約日期", "日期"],
             time: ["送貨時段", "預約時間", "時間"],
+            pickingStatus: ["撿貨狀態", "備貨狀態"], 
             paymentStatus: ["付款狀態", "狀態", "付款"],
-            remark: ["備註", "備註欄", "注意事項"]
+            remark: ["備註", "備註欄", "注意事項"],
+            quoteUrl: ["報價單連結", "報價單", "報價單網址"]
         };
 
         const LucideIcon = ({ name, size = 18, className = "" }) => {
@@ -47,7 +49,7 @@
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
-        // 報價單顯示彈窗 (用於讀取外部報價單試算表)
+        // 報價單顯示彈窗
         const QuoteModal = ({ isOpen, onClose, quoteUrl, orderName }) => {
             const [data, setData] = useState([]);
             const [loading, setLoading] = useState(false);
@@ -63,7 +65,7 @@
                     const json = await res.json();
                     if (json.error) throw new Error(json.error);
                     
-                    // 智慧尋找標題列 (掃描前 10 列)
+                    // 智慧尋找標題列 (掃描前 10 列，支援 材料/品項/內容)
                     let headerRowIdx = -1;
                     for (let i = 0; i < Math.min(json.length, 10); i++) {
                         const row = json[i].map(c => String(c));
@@ -72,7 +74,7 @@
                         }
                     }
 
-                    if (headerRowIdx === -1) throw new Error("找不到對應的材料清單標題列（需包含材料或品項）。");
+                    if (headerRowIdx === -1) throw new Error("找不到對應的材料清單標題列（標題需包含材料、品項或內容）。");
 
                     const headers = json[headerRowIdx].map(h => String(h).trim());
                     const mIdx = headers.findIndex(h => h.includes("材料") || h.includes("品項") || h.includes("內容"));
@@ -94,21 +96,23 @@
                     <div className="bg-white w-full max-w-2xl max-h-[80vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
                         <header className="p-6 border-b flex justify-between items-center bg-slate-50">
                             <div>
-                                <h3 className="font-black text-xl text-slate-800 flex items-center gap-2"><LucideIcon name="file-spreadsheet" className="text-emerald-600" /> 外部報價單內容</h3>
-                                <p className="text-xs text-slate-400 font-bold mt-1">{orderName}</p>
+                                <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
+                                    <LucideIcon name="file-spreadsheet" className="text-emerald-600" /> 報價單內容 (唯讀)
+                                </h3>
+                                <p className="text-xs text-slate-400 font-bold mt-1">訂單對象：{orderName}</p>
                             </div>
                             <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><LucideIcon name="x" size={24} /></button>
                         </header>
                         <div className="flex-1 overflow-y-auto p-6">
-                            {loading ? (<div className="py-20 text-center flex flex-col items-center gap-3"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div><span className="text-slate-400 font-bold text-sm">載入中...</span></div>) : 
-                             error ? (<div className="py-20 text-center text-rose-400 font-bold px-10">讀取外部報價單失敗：{error}</div>) : (
+                            {loading ? (<div className="py-20 text-center flex flex-col items-center gap-3"><div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div><span className="text-slate-400 font-bold text-sm">正在讀取報價單明細...</span></div>) : 
+                             error ? (<div className="py-20 text-center px-10"><LucideIcon name="alert-circle" size={40} className="mx-auto text-rose-300 mb-4" /><p className="text-rose-400 font-bold">讀取失敗：{error}</p></div>) : (
                                 <div className="space-y-2">
-                                    <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-black text-slate-400 border-b uppercase">
-                                        <div className="col-span-1 text-center">撿</div><div className="col-span-6">材料內容</div><div className="col-span-2 text-center">數量</div><div className="col-span-3 text-right">備註</div>
+                                    <div className="grid grid-cols-12 gap-2 px-4 py-2 text-[10px] font-black text-slate-400 border-b uppercase tracking-widest">
+                                        <div className="col-span-1 text-center">撿</div><div className="col-span-6">材料項目</div><div className="col-span-2 text-center">數量</div><div className="col-span-3 text-right">備註</div>
                                     </div>
                                     {data.map((row) => (
                                         <div key={row.id} onClick={() => setCheckedItems(p => ({...p, [row.id]: !p[row.id]}))} className={`grid grid-cols-12 gap-2 px-4 py-4 rounded-2xl border cursor-pointer transition-all ${checkedItems[row.id] ? 'bg-slate-50 opacity-60' : 'bg-white border-slate-100 hover:border-emerald-200 shadow-sm'}`}>
-                                            <div className="col-span-1 flex items-center justify-center"><div className={`w-5 h-5 rounded-md border-2 ${checkedItems[row.id] ? 'bg-emerald-500 border-emerald-500' : 'border-slate-200'}`}>{checkedItems[row.id] && <LucideIcon name="check" size={14} className="text-white" />}</div></div>
+                                            <div className="col-span-1 flex items-center justify-center"><div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center ${checkedItems[row.id] ? 'bg-emerald-500 border-emerald-500' : 'border-slate-200'}`}>{checkedItems[row.id] && <LucideIcon name="check" size={14} className="text-white" />}</div></div>
                                             <div className={`col-span-6 flex items-center font-bold ${checkedItems[row.id] ? 'line-through text-slate-400' : 'text-slate-700'}`}>{row.item}</div>
                                             <div className="col-span-2 flex items-center justify-center font-black text-emerald-600">{row.qty}</div>
                                             <div className="col-span-3 flex items-center justify-end text-xs text-slate-500 italic truncate">{row.note}</div>
@@ -117,7 +121,10 @@
                                 </div>
                             )}
                         </div>
-                        <footer className="p-6 border-t bg-slate-50 flex justify-between items-center"><span className="text-[10px] text-slate-400 font-bold">※ 唯讀模式：勾選狀態不會儲存回試算表。</span><button onClick={onClose} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm shadow-md">關閉</button></footer>
+                        <footer className="p-6 border-t bg-slate-50 flex justify-between items-center">
+                            <span className="text-[10px] text-slate-400 font-bold italic">※ 此彈窗僅供撿貨參考，勾選狀態不會儲存回試算表。</span>
+                            <button onClick={onClose} className="px-6 py-2 bg-slate-800 text-white rounded-xl font-bold text-sm shadow-md hover:bg-slate-700 transition-all">關閉</button>
+                        </footer>
                     </div>
                 </div>
             );
@@ -131,7 +138,6 @@
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [toast, setToast] = useState(null);
             
-            // 功能狀態
             const [quoteModal, setQuoteModal] = useState({ isOpen: false, url: "", name: "" });
             const [editingUrl, setEditingUrl] = useState({ id: null, url: "" });
 
@@ -159,48 +165,50 @@
             const fetchOrders = async () => {
                 setLoading(true);
                 try {
-                    const res = await fetch(`${API_URL}?action=getOrders&t=${Date.now()}`);
-                    const data = await res.json();
-                    setRawOrders(data || []);
-                } catch (e) { setToast({ text: "讀取失敗，請檢查網路連線", type: "error" }); } finally { setLoading(false); }
+                    const response = await fetch(`${API_URL}?action=getOrders&t=${Date.now()}`);
+                    const data = await response.json();
+                    setRawOrders(Array.isArray(data) ? data : []);
+                } catch (err) {
+                    setToast({ text: "讀取失敗，請確認 API 連線", type: "error" });
+                } finally {
+                    setLoading(false);
+                }
             };
 
             useEffect(() => { fetchOrders(); }, []);
 
+            const showToast = (text, type = "success") => {
+                setToast({ text, type });
+                setTimeout(() => setToast(null), 3000);
+            };
+
             const updateField = async (order, newValue, colName) => {
                 setLoading(true);
                 try {
-                    await fetch(API_URL, { 
-                        method: "POST", 
-                        body: JSON.stringify({ 
-                            action: 'updateStatus', 
-                            sheet: order["__sheet__"], 
-                            row: order["__row__"], 
-                            status: newValue, 
-                            columnName: colName 
-                        }) 
-                    });
-                    setToast({ text: "更新完成" }); 
-                    setEditingUrl({ id: null, url: "" }); 
+                    const payload = {
+                        action: 'updateStatus',
+                        sheet: order["__sheet__"],
+                        row: order["__row__"],
+                        status: newValue,
+                        columnName: colName 
+                    };
+                    await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
+                    showToast(`更新完成：${newValue}`);
+                    setEditingUrl({ id: null, url: "" });
                     fetchOrders(); 
-                } catch (err) { setToast({ text: "更新失敗", type: "error" }); } finally { setLoading(false); }
+                } catch (err) { showToast("更新失敗", "error"); } 
+                finally { setLoading(false); }
             };
 
-            const isExcluded = (ps) => ["未付款", "UNPAID", "取消", "CANCELED", "CANCELLED", "退款", "REFUNDED"].some(k => ps.includes(k));
-
-            const filteredOrders = useMemo(() => {
-                return orders.filter(o => {
-                    if (isExcluded(o._payStatus)) return false;
-                    if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
-                    const cleanDate = o._date.split(' ')[0].replace(/\//g, '-');
-                    return cleanDate.includes(selectedDate);
-                }).sort((a, b) => a._time.localeCompare(b._time));
-            }, [orders, selectedDate, currentCategory]);
+            const isExcludedOrder = (payStatus) => {
+                const excludeKeywords = ["未付款", "UNPAID", "已取消", "CANCELED", "CANCELLED", "已退款", "REFUNDED"];
+                return excludeKeywords.some(keyword => payStatus.includes(keyword));
+            };
 
             const orderIndexByDate = useMemo(() => {
                 const index = {};
                 orders.forEach(o => {
-                    if (isExcluded(o._payStatus)) return;
+                    if (isExcludedOrder(o._payStatus)) return;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return;
                     const dateKey = o._date.split(' ')[0].replace(/\//g, '-');
                     if (!index[dateKey]) index[dateKey] = { count: 0, hasUnpicked: false };
@@ -209,6 +217,15 @@
                 });
                 return index;
             }, [orders, currentCategory]);
+
+            const filteredOrders = useMemo(() => {
+                return orders.filter(o => {
+                    if (isExcludedOrder(o._payStatus)) return false;
+                    if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
+                    const orderDate = o._date.split(' ')[0].replace(/\//g, '-');
+                    return orderDate.includes(selectedDate);
+                }).sort((a, b) => a._time.localeCompare(b._time));
+            }, [orders, selectedDate, currentCategory]);
 
             const daysArray = useMemo(() => {
                 const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
@@ -278,10 +295,10 @@
                         {/* 右側列表 */}
                         <div className="flex-1 space-y-4">
                             <div className="flex items-center justify-between mb-4 px-2">
-                                <h3 className="font-bold text-slate-600 flex items-center gap-2"><LucideIcon name="calendar-check" size={20} className="text-emerald-600" /> {selectedDate} 排程單</h3>
+                                <h3 className="font-bold text-slate-600 flex items-center gap-2"><LucideIcon name="calendar-check" size={20} className="text-emerald-600" /> {selectedDate} 排程清單</h3>
                                 <span className="text-xs font-bold bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-100">{filteredOrders.length} 筆</span>
                             </div>
-                            {filteredOrders.length === 0 ? (<div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100 text-slate-300 font-bold italic">目前無效預訂訂單</div>) : (
+                            {filteredOrders.length === 0 ? (<div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100 text-slate-300 font-bold italic">目前無有效訂單</div>) : (
                                 filteredOrders.map((o) => (
                                     <div key={o["__sheet__"] + o["__row__"]} className="bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-8 hover:shadow-md transition-shadow">
                                         <div className="flex justify-between mb-6 items-start">
@@ -305,10 +322,10 @@
                                             )}
                                         </div>
 
-                                        {/* 報價單網址管理 (開單人員匯入外部試算表用) */}
+                                        {/* 報價單網址管理區 (開單人員匯入用) */}
                                         <div className="mb-8 p-5 bg-slate-50 rounded-3xl border border-slate-200/50 group">
                                             <div className="flex justify-between items-center mb-3">
-                                                <span className="text-[11px] font-black text-slate-400 flex items-center gap-1.5 uppercase tracking-wider"><LucideIcon name="external-link" size={14} /> 報價單連結管理 (外部試算表)</span>
+                                                <span className="text-[11px] font-black text-slate-400 flex items-center gap-1.5 uppercase tracking-wider"><LucideIcon name="external-link" size={14} /> 報價單連結匯入 (外部試算表)</span>
                                                 {editingUrl.id !== o["__row__"] ? (
                                                     <button onClick={() => setEditingUrl({ id: o["__row__"], url: o._quoteUrl })} className="text-[11px] font-bold text-emerald-600 hover:text-emerald-700 transition-colors">修改網址</button>
                                                 ) : (
@@ -321,7 +338,7 @@
                                             {editingUrl.id === o["__row__"] ? (
                                                 <input autoFocus type="text" value={editingUrl.url} onChange={(e) => setEditingUrl({...editingUrl, url: e.target.value})} className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white" placeholder="請貼上報價單試算表網址 (需具備讀取權限)..." />
                                             ) : (
-                                                <p className="text-[10px] text-slate-400 truncate italic bg-white/50 p-2 rounded-lg border border-slate-100">{o._quoteUrl || "尚未關聯外部報價單"}</p>
+                                                <p className="text-[10px] text-slate-400 truncate italic bg-white/50 p-2 rounded-lg border border-slate-100">{o._quoteUrl || "尚未匯入外部報價單連結"}</p>
                                             )}
                                         </div>
 
