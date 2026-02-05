@@ -15,6 +15,7 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        /* 清新綠色漸層 */
         .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
     </style>
 </head>
@@ -29,15 +30,15 @@
 
         const CATEGORIES = ["全部", "專人佈置", "氣球外送", "工作室取貨", "後車箱佈置"];
 
-        // 欄位匹配定義 - 嚴格區分「撿貨狀態」與「付款狀態」
+        // 欄位匹配定義
         const FIELD_MAPS = {
             id: ["訂單編號", "編號", "OrderID"],
             name: ["收件人姓名", "收件人", "客戶名稱", "LINE名稱", "姓名"],
             address: ["送貨地址", "詳細地址", "地址", "地點"],
             date: ["送貨日期", "預約日期", "日期"],
             time: ["送貨時段", "預約時間", "時間"],
-            pickingStatus: ["撿貨狀態", "備貨狀態"], // 專門對應撿貨資訊
-            paymentStatus: ["付款狀態", "狀態", "付款"], // 專門對應付款資訊（用於過濾）
+            pickingStatus: ["撿貨狀態", "備貨狀態"], 
+            paymentStatus: ["付款狀態", "狀態", "付款"],
             remark: ["備註", "備註欄", "注意事項"]
         };
 
@@ -56,7 +57,6 @@
 
             const findVal = (order, targets) => {
                 const keys = Object.keys(order);
-                // 優先尋找精確匹配，再尋找包含關鍵字的 Key
                 const realKey = keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
                 return realKey ? order[realKey] : "";
             };
@@ -81,7 +81,7 @@
                         _address: findVal(o, FIELD_MAPS.address),
                         _date: String(d).trim(),
                         _time: String(t).trim(),
-                        _status: findVal(o, FIELD_MAPS.pickingStatus) || o["撿貨狀態"] || "", // 確保讀取到撿貨欄位
+                        _status: findVal(o, FIELD_MAPS.pickingStatus) || o["撿貨狀態"] || "", 
                         _payStatus: findVal(o, FIELD_MAPS.paymentStatus),
                         _remark: findVal(o, FIELD_MAPS.remark)
                     };
@@ -116,7 +116,7 @@
                         sheet: order["__sheet__"],
                         row: order["__row__"],
                         status: newStatus,
-                        columnName: "撿貨狀態" // 核心修正：明確指示後端更新「撿貨狀態」這一欄
+                        columnName: "撿貨狀態" 
                     };
                     await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
                     showToast(`狀態更新：${newStatus}`);
@@ -227,7 +227,7 @@
                             </div>
                             <div className="space-y-4">
                                 {filteredOrders.length === 0 ? (
-                                    <div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-300 font-bold">目前無有效預訂</div>
+                                    <div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100 text-slate-300 font-bold">目前無預訂訂單</div>
                                 ) : (
                                     filteredOrders.map((o) => (
                                         <div key={o["__sheet__"] + o["__row__"]} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow">
@@ -240,7 +240,7 @@
                                                     <h4 className="font-bold text-xl text-slate-800 mt-1">{o._name}</h4>
                                                 </div>
                                                 <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${getStatusStyles(o._status)}`}>
-                                                    {o._status || "未備貨"}
+                                                    {o._status || "未撿取"}
                                                 </div>
                                             </div>
                                             <div className="text-sm text-slate-500 space-y-3 mb-6">
@@ -253,8 +253,9 @@
                                                 )}
                                             </div>
                                             <div className="grid grid-cols-3 gap-2">
-                                                {["未備貨", "已備貨", "檢查完畢"].map((st) => {
-                                                    const isActive = o._status.includes(st) || (o._status === "" && st === "未備貨");
+                                                {/* 選項更新：將「未備貨」改為「未撿取」 */}
+                                                {["未撿取", "已備貨", "檢查完畢"].map((st) => {
+                                                    const isActive = o._status.includes(st) || (o._status === "" && st === "未撿取");
                                                     return (
                                                         <button key={st} onClick={() => updateStatus(o, st)}
                                                             className={`py-3.5 rounded-2xl text-[11px] font-black transition-all active:scale-95 ${
