@@ -15,7 +15,8 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        .primary-gradient { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); }
+        /* 更新為清新綠色漸層 */
+        .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
     </style>
 </head>
 <body class="min-h-screen">
@@ -53,14 +54,12 @@
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [toast, setToast] = useState(null);
 
-            // 工具函式：抓取值
             const findVal = (order, targets) => {
                 const keys = Object.keys(order);
                 const realKey = keys.find(k => targets.some(t => k === t.trim() || k.includes(t)));
                 return realKey ? order[realKey] : "";
             };
 
-            // 優化點 1：抓到資料後立刻「正規化」，避免渲染時重複進行 key 搜尋
             const orders = useMemo(() => {
                 return rawOrders.map(o => {
                     let d = findVal(o, FIELD_MAPS.date);
@@ -69,13 +68,11 @@
                         if (String(d).includes("T") && !String(d).includes("1899")) dateObj.setHours(dateObj.getHours() + 8);
                         d = `${dateObj.getFullYear()}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${String(dateObj.getDate()).padStart(2, '0')}`;
                     }
-
                     let t = findVal(o, FIELD_MAPS.time);
                     if (t && String(t).includes("1899")) {
                         const timeObj = new Date(t);
                         t = `${String(timeObj.getHours()).padStart(2, '0')}:${String(timeObj.getMinutes()).padStart(2, '0')}`;
                     }
-
                     return {
                         ...o,
                         _id: findVal(o, FIELD_MAPS.id),
@@ -125,7 +122,6 @@
                 finally { setLoading(false); }
             };
 
-            // 優化點 2：預先計算當月每日訂單量索引，提升日曆渲染速度
             const orderIndexByDate = useMemo(() => {
                 const index = {};
                 orders.forEach(o => {
@@ -159,23 +155,37 @@
                 });
             }, [currentMonth]);
 
+            // 狀態顏色映射邏輯
+            const getStatusStyles = (status) => {
+                if (status.includes("檢查完畢")) return "bg-emerald-100 text-emerald-700 border-emerald-200";
+                if (status.includes("已備貨")) return "bg-amber-100 text-amber-700 border-amber-200";
+                return "bg-rose-100 text-rose-700 border-rose-200"; // 預設或未備貨
+            };
+
+            const getBtnActiveStyles = (st) => {
+                if (st === "檢查完畢") return "bg-emerald-600 text-white shadow-lg shadow-emerald-100";
+                if (st === "已備貨") return "bg-amber-500 text-white shadow-lg shadow-amber-100";
+                return "bg-rose-500 text-white shadow-lg shadow-rose-100"; // 未備貨
+            };
+
             return (
                 <div className="min-h-screen pb-10">
                     <header className="primary-gradient text-white p-4 shadow-md sticky top-0 z-30 flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <LucideIcon name="package" size={24} />
-                            <h1 className="text-lg font-bold">MILU 備貨系統</h1>
+                            <h1 className="text-lg font-bold tracking-tight">MILU 備貨管理</h1>
                         </div>
-                        <button onClick={fetchOrders} className="p-2 hover:bg-white/10 rounded-full">
+                        <button onClick={fetchOrders} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                             <LucideIcon name="refresh-cw" size={20} className={loading ? "spin" : ""} />
                         </button>
                     </header>
 
+                    {/* 更新分類標籤顏色 */}
                     <div className="bg-slate-100 p-2 sticky top-[64px] z-20 overflow-x-auto no-scrollbar border-b border-slate-200">
                         <div className="flex gap-2 max-w-6xl mx-auto px-2">
                             {CATEGORIES.map(cat => (
                                 <button key={cat} onClick={() => setCurrentCategory(cat)}
-                                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${currentCategory === cat ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${currentCategory === cat ? 'bg-emerald-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'}`}>
                                     {cat}
                                 </button>
                             ))}
@@ -185,8 +195,8 @@
                     <main className="max-w-6xl mx-auto p-4 lg:flex gap-8">
                         <div className="lg:w-[320px] shrink-0 mb-6">
                             <div className="bg-white rounded-3xl shadow-sm border p-5 sticky top-36">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="font-bold">{currentMonth.getFullYear()} / {currentMonth.getMonth() + 1}</h2>
+                                <div className="flex justify-between items-center mb-6 px-1">
+                                    <h2 className="font-bold text-slate-700">{currentMonth.getFullYear()} / {currentMonth.getMonth() + 1}</h2>
                                     <div className="flex gap-1">
                                         <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-left" /></button>
                                         <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-right" /></button>
@@ -196,13 +206,12 @@
                                     {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-bold text-slate-300 py-2">{d}</div>)}
                                     {daysArray.map((dateStr, i) => {
                                         const isSelected = dateStr === selectedDate;
-                                        // 直接從索引 Map 中取值，大幅加快渲染
                                         const dayOrdersCount = orderIndexByDate[dateStr] || 0;
                                         return (
                                             <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
-                                                className={`h-10 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all ${!dateStr ? '' : isSelected ? 'bg-slate-800 text-white shadow-lg' : 'hover:bg-slate-50 border border-transparent'}`}>
+                                                className={`h-10 rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all ${!dateStr ? '' : isSelected ? 'bg-emerald-800 text-white shadow-lg' : 'hover:bg-slate-50 border border-transparent'}`}>
                                                 <span className="text-sm font-bold">{dateStr ? parseInt(dateStr.split('-')[2]) : ""}</span>
-                                                {dayOrdersCount > 0 && <div className={`mt-0.5 h-1 w-1 rounded-full ${isSelected ? 'bg-blue-400' : 'bg-slate-300'}`}></div>}
+                                                {dayOrdersCount > 0 && <div className={`mt-0.5 h-1 w-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-400'}`}></div>}
                                             </div>
                                         );
                                     })}
@@ -211,41 +220,49 @@
                         </div>
 
                         <div className="flex-1">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-bold text-slate-600 flex items-center gap-2"><LucideIcon name="calendar-check" size={20} /> {selectedDate} · {currentCategory}</h3>
-                                <span className="text-xs font-bold bg-slate-200 text-slate-500 px-3 py-1 rounded-full">{filteredOrders.length} 筆</span>
+                            <div className="flex items-center justify-between mb-4 px-2">
+                                <h3 className="font-bold text-slate-600 flex items-center gap-2"><LucideIcon name="calendar-check" size={20} className="text-emerald-600" /> {selectedDate} · {currentCategory}</h3>
+                                <span className="text-xs font-bold bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-100">{filteredOrders.length} 筆</span>
                             </div>
                             <div className="space-y-4">
                                 {filteredOrders.length === 0 ? (
                                     <div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100 text-slate-300 font-bold">目前無效訂單</div>
                                 ) : (
                                     filteredOrders.map((o) => (
-                                        <div key={o["__sheet__"] + o["__row__"]} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6">
+                                        <div key={o["__sheet__"] + o["__row__"]} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow">
                                             <div className="flex justify-between mb-4 items-start">
                                                 <div>
-                                                    <span className="text-[10px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded uppercase">{o["__sheet__"]}</span>
+                                                    <div className="flex gap-2 mb-2">
+                                                        <span className="text-[10px] font-black bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded uppercase tracking-tighter border border-emerald-100">{o["__sheet__"]}</span>
+                                                        <span className="text-[10px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded tracking-wide">#{o._id}</span>
+                                                    </div>
                                                     <h4 className="font-bold text-xl text-slate-800 mt-1">{o._name}</h4>
                                                 </div>
-                                                <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${o._status.includes("檢查完畢") ? "bg-green-100 text-green-700 border-green-200" : o._status.includes("已備貨") ? "bg-amber-100 text-amber-700 border-amber-200" : "bg-blue-50 text-blue-600 border-blue-100"}`}>
-                                                    {o._status}
+                                                <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${getStatusStyles(o._status)}`}>
+                                                    {o._status || "未備貨"}
                                                 </div>
                                             </div>
                                             <div className="text-sm text-slate-500 space-y-3 mb-6">
-                                                <div className="flex items-center gap-2 font-medium text-slate-700"><LucideIcon name="clock" size={16} />{o._time}</div>
-                                                <div className="flex items-start gap-2 leading-snug"><LucideIcon name="map-pin" size={16} className="shrink-0 mt-0.5"/>{o._address}</div>
+                                                <div className="flex items-center gap-2 font-medium text-slate-700"><LucideIcon name="clock" size={16} className="text-emerald-500" />{o._time}</div>
+                                                <div className="flex items-start gap-2 leading-snug"><LucideIcon name="map-pin" size={16} className="shrink-0 mt-0.5 text-slate-300"/>{o._address}</div>
                                                 {o._remark && o._remark !== "-" && (
-                                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex gap-2">
-                                                        <LucideIcon name="info" size={16} className="shrink-0 mt-0.5"/><p className="text-xs text-slate-500">{o._remark}</p>
+                                                    <div className="bg-emerald-50/30 p-4 rounded-2xl border border-emerald-100 flex gap-2">
+                                                        <LucideIcon name="info" size={16} className="shrink-0 mt-0.5 text-emerald-400"/><p className="text-xs text-slate-600 italic leading-relaxed">{o._remark}</p>
                                                     </div>
                                                 )}
                                             </div>
                                             <div className="grid grid-cols-3 gap-2">
-                                                {["未備貨", "已備貨", "檢查完畢"].map((st) => (
-                                                    <button key={st} onClick={() => updateStatus(o, st)}
-                                                        className={`py-3.5 rounded-2xl text-[11px] font-black transition-all ${o._status.includes(st) ? "bg-slate-800 text-white shadow-lg" : "bg-slate-50 text-slate-400 border border-slate-200/50"}`}>
-                                                        {st}
-                                                    </button>
-                                                ))}
+                                                {["未備貨", "已備貨", "檢查完畢"].map((st) => {
+                                                    const isActive = o._status.includes(st) || (o._status === "" && st === "未備貨");
+                                                    return (
+                                                        <button key={st} onClick={() => updateStatus(o, st)}
+                                                            className={`py-3.5 rounded-2xl text-[11px] font-black transition-all active:scale-95 ${
+                                                                isActive ? getBtnActiveStyles(st) : "bg-slate-50 text-slate-400 border border-slate-200/50 hover:bg-slate-100"
+                                                            }`}>
+                                                            {st}
+                                                        </button>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     ))
@@ -255,7 +272,14 @@
                     </main>
 
                     {toast && <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-50 text-sm font-bold bg-slate-900 text-white">{toast.text}</div>}
-                    {loading && <div className="fixed inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-[100] font-black text-slate-400 tracking-widest">SYNCING...</div>}
+                    {loading && (
+                        <div className="fixed inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center z-[100]">
+                             <div className="bg-white p-6 rounded-3xl shadow-xl flex flex-col items-center gap-4 border border-emerald-100">
+                                <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                                <span className="font-black text-emerald-600 text-xs tracking-widest">SYNCING...</span>
+                             </div>
+                        </div>
+                    )}
                 </div>
             );
         };
