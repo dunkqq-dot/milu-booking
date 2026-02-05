@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>麋鹿氣球 - 綜合管理系統</title>
+    <title>麋鹿氣球 - 備貨管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -15,7 +15,6 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        /* 更新為清新綠色漸層 */
         .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
     </style>
 </head>
@@ -30,15 +29,16 @@
 
         const CATEGORIES = ["全部", "專人佈置", "氣球外送", "工作室取貨", "後車箱佈置"];
 
-        // 欄位匹配定義 - 修正：優先匹配「撿貨狀態」
+        // 欄位匹配定義 - 嚴格區分「撿貨狀態」與「付款狀態」
         const FIELD_MAPS = {
-            id: ["訂單編號", "編號", "OrderID", "ID"],
+            id: ["訂單編號", "編號", "OrderID"],
             name: ["收件人姓名", "收件人", "客戶名稱", "LINE名稱", "姓名"],
-            address: ["送貨地址", "詳細地址", "地址", "地點", "location"],
-            date: ["送貨日期", "預約日期", "日期", "date"],
-            time: ["送貨時段", "預約時間", "時間", "time"],
-            status: ["撿貨狀態", "狀態", "備貨狀態", "status"], // 移除「付款狀態」，避免衝突
-            remark: ["備註", "備註欄", "注意事項", "remark"]
+            address: ["送貨地址", "詳細地址", "地址", "地點"],
+            date: ["送貨日期", "預約日期", "日期"],
+            time: ["送貨時段", "預約時間", "時間"],
+            pickingStatus: ["撿貨狀態", "備貨狀態"], // 專門對應撿貨資訊
+            paymentStatus: ["付款狀態", "狀態", "付款"], // 專門對應付款資訊（用於過濾）
+            remark: ["備註", "備註欄", "注意事項"]
         };
 
         const LucideIcon = ({ name, size = 18, className = "" }) => {
@@ -56,7 +56,8 @@
 
             const findVal = (order, targets) => {
                 const keys = Object.keys(order);
-                const realKey = keys.find(k => targets.some(t => k === t.trim() || k.includes(t)));
+                // 優先尋找精確匹配，再尋找包含關鍵字的 Key
+                const realKey = keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
                 return realKey ? order[realKey] : "";
             };
 
@@ -80,7 +81,8 @@
                         _address: findVal(o, FIELD_MAPS.address),
                         _date: String(d).trim(),
                         _time: String(t).trim(),
-                        _status: findVal(o, FIELD_MAPS.status),
+                        _status: findVal(o, FIELD_MAPS.pickingStatus) || o["撿貨狀態"] || "", // 確保讀取到撿貨欄位
+                        _payStatus: findVal(o, FIELD_MAPS.paymentStatus),
                         _remark: findVal(o, FIELD_MAPS.remark)
                     };
                 });
@@ -113,7 +115,8 @@
                         action: 'updateStatus',
                         sheet: order["__sheet__"],
                         row: order["__row__"],
-                        status: newStatus
+                        status: newStatus,
+                        columnName: "撿貨狀態" // 核心修正：明確指示後端更新「撿貨狀態」這一欄
                     };
                     await fetch(API_URL, { method: "POST", body: JSON.stringify(payload) });
                     showToast(`狀態更新：${newStatus}`);
@@ -125,9 +128,7 @@
             const orderIndexByDate = useMemo(() => {
                 const index = {};
                 orders.forEach(o => {
-                    // 這裡的邏輯依然需要檢查試算表中的「付款狀態」來過濾
-                    // 但顯示與修改則是以「撿貨狀態」為主
-                    const pStatus = findVal(o, ["付款狀態", "付款"]);
+                    const pStatus = o._payStatus;
                     if (pStatus.includes("未付款") || pStatus.toUpperCase().includes("UNPAID")) return;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return;
                     const dateKey = o._date.replace(/\//g, '-');
@@ -138,7 +139,7 @@
 
             const filteredOrders = useMemo(() => {
                 return orders.filter(o => {
-                    const pStatus = findVal(o, ["付款狀態", "付款"]);
+                    const pStatus = o._payStatus;
                     if (pStatus.includes("未付款") || pStatus.toUpperCase().includes("UNPAID")) return false;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
                     const orderDate = o._date.replace(/\//g, '-');
@@ -157,17 +158,16 @@
                 });
             }, [currentMonth]);
 
-            // 狀態顏色映射邏輯
             const getStatusStyles = (status) => {
                 if (status.includes("檢查完畢")) return "bg-emerald-100 text-emerald-700 border-emerald-200";
                 if (status.includes("已備貨")) return "bg-amber-100 text-amber-700 border-amber-200";
-                return "bg-rose-100 text-rose-700 border-rose-200"; // 預設或未備貨
+                return "bg-rose-100 text-rose-700 border-rose-200"; 
             };
 
             const getBtnActiveStyles = (st) => {
-                if (st === "檢查完畢") return "bg-emerald-600 text-white shadow-lg shadow-emerald-100";
-                if (st === "已備貨") return "bg-amber-500 text-white shadow-lg shadow-amber-100";
-                return "bg-rose-500 text-white shadow-lg shadow-rose-100"; // 未備貨
+                if (st === "檢查完畢") return "bg-emerald-600 text-white shadow-lg";
+                if (st === "已備貨") return "bg-amber-500 text-white shadow-lg";
+                return "bg-rose-500 text-white shadow-lg"; 
             };
 
             return (
@@ -175,7 +175,7 @@
                     <header className="primary-gradient text-white p-4 shadow-md sticky top-0 z-30 flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <LucideIcon name="package" size={24} />
-                            <h1 className="text-lg font-bold tracking-tight">MILU 備貨管理</h1>
+                            <h1 className="text-lg font-bold tracking-tight">MILU 備貨系統</h1>
                         </div>
                         <button onClick={fetchOrders} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                             <LucideIcon name="refresh-cw" size={20} className={loading ? "spin" : ""} />
@@ -227,7 +227,7 @@
                             </div>
                             <div className="space-y-4">
                                 {filteredOrders.length === 0 ? (
-                                    <div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-100 text-slate-300 font-bold">目前無效訂單</div>
+                                    <div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-300 font-bold">目前無有效預訂</div>
                                 ) : (
                                     filteredOrders.map((o) => (
                                         <div key={o["__sheet__"] + o["__row__"]} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6 hover:shadow-md transition-shadow">
