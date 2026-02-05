@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>麋鹿氣球 - 綜合管理系統</title>
+    <!-- 載入外部套件 -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .primary-gradient { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); }
+        .tab-active { @apply bg-white text-slate-900 shadow-sm; }
+    </style>
+</head>
+<body class="min-h-screen">
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        /**
+         * 📦 綜合訂單備貨管理系統
+         * 分類：專人佈置、氣球外送、工作室取貨、後車箱佈置
+         */
+        
+        const API_URL = "https://script.google.com/macros/s/AKfycbya7e4XKsmBp1c885BTSLj386yvtt6_k7QGSXH8d1-7HrdzPfFWccgGAy3Dvd_nWFDTSw/exec"; 
+
+        const CATEGORIES = ["全部", "專人佈置", "氣球外送", "工作室取貨", "後車箱佈置"];
+
+        const LucideIcon = ({ name, size = 18, className = "" }) => {
+            useEffect(() => {
+                if (window.lucide) window.lucide.createIcons();
+            }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        };
+
+        const App = () => {
+            const [orders, setOrders] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [currentCategory, setCurrentCategory] = useState("全部");
+            const [currentMonth, setCurrentMonth] = useState(new Date());
+            const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+            const [toast, setToast] = useState(null);
+
+            // 欄位匹配邏輯
+            const FIELD_MAPS = {
+                id: ["訂單編號", "編號", "OrderID", "ID"],
+                name: ["姓名", "收件人", "收件人姓名", "客戶名稱"],
+                address: ["地址", "詳細地址", "送貨地址", "地點"],
+                date: ["日期", "送貨日期", "取貨日期", "預約日期", "取貨/送貨日期"],
+                time: ["時間", "時段", "送貨時段", "取貨時間"],
+                itemType: ["品項", "品項類型", "內容", "類型", "服務項目"],
+                stockStatus: ["備貨狀態", "狀態", "進度"],
+                remark: ["備註", "備註欄", "注意事項"],
+                paymentStatus: ["付款狀態", "付款", "支付狀態"] 
+            };
+
+            const getVal = (order, type) => {
+                if (!order) return "";
+                const keys = Object.keys(order);
+                const targets = FIELD_MAPS[type] || [];
+                const realKey = keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
+                
+                if (!realKey) return "";
+                let val = order[realKey];
+
+                if (type === 'time' && String(val).includes("1899")) {
+                    try {
+                        const d = new Date(val);
+                        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                    } catch (e) { return String(val); }
+                }
+
+                if (type === 'date' && val) {
+                    const d = new Date(val);
+                    if (isNaN(d.getTime())) return String(val).trim();
+                    if (String(val).includes("T") && !String(val).includes("1899")) {
+                        d.setHours(d.getHours() + 8);
+                    }
+                    return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+                }
+
+                return String(val || "").trim();
+            };
+
+            const fetchOrders = async () => {
+                setLoading(true);
+                try {
+                    const response = await fetch(`${API_URL}?action=getOrders&t=${Date.now()}`);
+                    const data = await response.json();
+                    setOrders(Array.isArray(data) ? data : []);
+                } catch (err) {
+                    showToast("同步失敗", "error");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            useEffect(() => { fetchOrders(); }, []);
+
+            const showToast = (text, type = "success") => {
+                setToast({ text, type });
+                setTimeout(() => setToast(null), 3000);
+            };
+
+            const updateStatus = async (row, newStatus) => {
+                setLoading(true);
+                try {
+                    await fetch(API_URL, {
+                        method: "POST",
+                        body: JSON.stringify({ action: "updateStatus", row: row, status: newStatus })
+                    });
+                    showToast(`狀態更新：${newStatus}`);
+                    fetchOrders(); 
+                } catch (err) {
+                    showToast("更新失敗", "error");
+                } finally {
+                    setLoading(false);
+                }
+            };
+
+            const { firstDay, daysCount } = useMemo(() => {
+                const year = currentMonth.getFullYear();
+                const month = currentMonth.getMonth();
+                return {
+                    firstDay: new Date(year, month, 1).getDay(),
+                    daysCount: new Date(year, month + 1, 0).getDate()
+                };
+            }, [currentMonth]);
+
+            const daysArray = Array.from({ length: 42 }, (_, i) => {
+                const day = i - firstDay + 1;
+                return (day > 0 && day <= daysCount) ? new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toISOString().split('T')[0] : null;
+            });
+
+            // 核心過濾邏輯：排除未付款 + 依分類過濾
+            const filteredOrders = useMemo(() => {
+                return orders.filter(o => {
+                    // 1. 排除未付款
+                    if (getVal(o, 'paymentStatus') === "未付款") return false;
+                    
+                    // 2. 分類過濾
+                    if (currentCategory !== "全部") {
+                        const itemType = getVal(o, 'itemType');
+                        if (!itemType.includes(currentCategory)) return false;
+                    }
+
+                    // 3. 日期過濾
+                    let d = getVal(o, 'date');
+                    const cleanDate = d.replace(/\//g, '-');
+                    return cleanDate.includes(selectedDate);
+                }).sort((a, b) => getVal(a, 'time').localeCompare(getVal(b, 'time')));
+            }, [orders, selectedDate, currentCategory]);
+
+            return (
+                <div className="min-h-screen pb-10">
+                    <header className="primary-gradient text-white p-4 shadow-md sticky top-0 z-30 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <LucideIcon name="package" size={24} />
+                            <h1 className="text-lg font-bold">麋鹿氣球管理系統</h1>
+                        </div>
+                        <button onClick={fetchOrders} className="p-2 hover:bg-white/10 rounded-full">
+                            <LucideIcon name="refresh-cw" size={20} className={loading ? "spin" : ""} />
+                        </button>
+                    </header>
+
+                    {/* 分類切換器 */}
+                    <div className="bg-slate-100 p-2 sticky top-[64px] z-20 overflow-x-auto no-scrollbar border-b border-slate-200">
+                        <div className="flex gap-2 max-w-6xl mx-auto px-2">
+                            {CATEGORIES.map(cat => (
+                                <button
+                                    key={cat}
+                                    onClick={() => setCurrentCategory(cat)}
+                                    className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                                        currentCategory === cat ? 'bg-slate-800 text-white shadow-md' : 'text-slate-500 hover:bg-slate-200'
+                                    }`}
+                                >
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <main className="max-w-6xl mx-auto p-4 lg:flex gap-8">
+                        {/* 日曆 */}
+                        <div className="lg:w-[350px] shrink-0 mb-6">
+                            <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-5 sticky top-36">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="font-bold text-slate-700">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</h2>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-left" /></button>
+                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-right" /></button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-7 gap-1 text-center">
+                                    {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-bold text-slate-300 py-2">{d}</div>)}
+                                    {daysArray.map((dateStr, i) => {
+                                        const dayNum = dateStr ? parseInt(dateStr.split('-')[2]) : null;
+                                        const isSelected = dateStr === selectedDate;
+                                        const isToday = dateStr === new Date().toISOString().split('T')[0];
+                                        
+                                        const dayOrdersCount = dateStr ? orders.filter(o => {
+                                            if (getVal(o, 'paymentStatus') === "未付款") return false;
+                                            if (currentCategory !== "全部" && !getVal(o, 'itemType').includes(currentCategory)) return false;
+                                            return getVal(o, 'date').replace(/\//g,'-').includes(dateStr);
+                                        }).length : 0;
+                                        
+                                        return (
+                                            <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
+                                                className={`h-12 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all relative ${
+                                                    !dateStr ? '' : 
+                                                    isSelected ? 'bg-slate-800 text-white shadow-lg z-10' : 
+                                                    isToday ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-white hover:bg-slate-50 border border-slate-100'
+                                                }`}
+                                            >
+                                                <span className="text-sm font-bold">{dayNum}</span>
+                                                {dayOrdersCount > 0 && (
+                                                    <div className={`mt-1 h-1 w-1 rounded-full ${isSelected ? 'bg-blue-400' : 'bg-slate-300'}`}></div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 清單 */}
+                        <div className="flex-1">
+                            <div className="flex items-center justify-between mb-4 px-2">
+                                <h3 className="font-bold text-slate-600 flex items-center gap-2">
+                                    <LucideIcon name="calendar-check" size={20} />
+                                    {selectedDate} · {currentCategory}
+                                </h3>
+                                <span className="text-xs font-bold bg-slate-200 text-slate-500 px-3 py-1 rounded-full">{filteredOrders.length} 筆</span>
+                            </div>
+
+                            <div className="space-y-4">
+                                {filteredOrders.length === 0 ? (
+                                    <div className="py-24 text-center bg-white rounded-3xl border-2 border-dashed border-slate-200 text-slate-300 font-bold">
+                                        此分類當日無有效訂單
+                                    </div>
+                                ) : (
+                                    filteredOrders.map((o) => (
+                                        <div key={o["__row__"]} className="bg-white rounded-[2rem] shadow-sm border border-slate-100 p-6">
+                                            <div className="flex justify-between mb-4 items-start">
+                                                <div>
+                                                    <div className="flex gap-2 mb-2">
+                                                        <span className="text-[10px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded uppercase tracking-tighter">{getVal(o, 'id') || 'ORDER'}</span>
+                                                        <span className="text-[10px] font-black bg-blue-50 text-blue-600 px-2 py-0.5 rounded tracking-wide">#{getVal(o, 'itemType')}</span>
+                                                    </div>
+                                                    <h4 className="font-bold text-xl text-slate-800">{getVal(o, 'name')}</h4>
+                                                </div>
+                                                <div className={`text-[10px] font-bold px-3 py-1 rounded-full border ${
+                                                    getVal(o, 'stockStatus') === "檢查完畢" ? "bg-green-100 text-green-700 border-green-200" : 
+                                                    getVal(o, 'stockStatus') === "已備貨" ? "bg-amber-100 text-amber-700 border-amber-200" : 
+                                                    "bg-red-50 text-red-600 border-red-100"
+                                                }`}>
+                                                    {getVal(o, 'stockStatus') || "未撿取"}
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="text-sm text-slate-500 space-y-3 mb-6">
+                                                <div className="flex items-center gap-2"><LucideIcon name="clock" size={16} /><span className="font-bold text-slate-700">{getVal(o, 'time')}</span></div>
+                                                <div className="flex items-start gap-2"><LucideIcon name="map-pin" size={16} className="shrink-0 mt-0.5"/><span className="text-slate-600">{getVal(o, 'address')}</span></div>
+                                                {getVal(o, 'remark') && getVal(o, 'remark') !== "-" && (
+                                                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex gap-2">
+                                                        <LucideIcon name="info" size={16} className="shrink-0 mt-0.5"/><p className="text-xs text-slate-500">{getVal(o, 'remark')}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {["未撿取", "已備貨", "檢查完畢"].map((st) => (
+                                                    <button
+                                                        key={st}
+                                                        disabled={loading}
+                                                        onClick={() => updateStatus(o["__row__"], st)}
+                                                        className={`py-3.5 rounded-2xl text-[11px] font-black transition-all ${
+                                                            getVal(o, 'stockStatus') === st || (!getVal(o, 'stockStatus') && st === "未撿取")
+                                                            ? (st === "未撿取" ? "bg-red-500 text-white" : st === "已備貨" ? "bg-amber-500 text-white" : "bg-green-600 text-white")
+                                                            : "bg-slate-50 text-slate-400 border border-slate-200/50 hover:bg-slate-100"
+                                                        }`}
+                                                    >
+                                                        {st}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    </main>
+
+                    {toast && (
+                        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 rounded-full shadow-2xl z-50 text-sm font-bold bg-slate-900 text-white">
+                            {toast.text}
+                        </div>
+                    )}
+
+                    {loading && (
+                        <div className="fixed inset-0 bg-slate-900/10 backdrop-blur-[2px] flex items-center justify-center z-[100]">
+                            <div className="bg-white p-5 rounded-3xl shadow-xl flex items-center gap-3">
+                                <div className="w-5 h-5 border-3 border-slate-800 border-t-transparent rounded-full animate-spin"></div>
+                                <span className="font-bold text-slate-600 text-sm tracking-widest uppercase">Syncing...</span>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
