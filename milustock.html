@@ -51,8 +51,8 @@
             id: ["訂單編號", "編號", "OrderID"],
             name: ["收件人姓名", "收件人", "客戶名稱", "姓名"],
             address: ["詳細地址", "地址", "送貨地址", "地點"],
-            date: ["送貨日期", "取貨/送貨日期", "預約日期", "日期"],
-            time: ["送貨時段", "配送時段", "預約時間", "時間"],
+            date: ["日期", "送貨日期", "預約日期", "取貨/送貨日期"],
+            time: ["時間/時段", "送貨時段", "配送時段", "預約時間", "時間"],
             status: ["備貨狀態", "撿貨狀態", "備貨"],
             payment: ["付款狀態", "狀態", "付款"],
             remark: ["備註", "備註欄", "注意事項"],
@@ -146,12 +146,30 @@
             const [toast, setToast] = useState(null);
             const [quoteModal, setQuoteModal] = useState({ isOpen: false, url: "", name: "", api: "" });
 
-            // 資料對齊輔助工具
             const findVal = (order, type) => {
                 const keys = Object.keys(order);
-                const targets = FIELD_MAPS[type] || [];
-                const realKey = keys.find(k => targets.some(t => k.trim() === t)) || keys.find(k => targets.some(t => k.includes(t)));
-                let val = realKey ? order[realKey] : "";
+                let targets = [...(FIELD_MAPS[type] || [])];
+                
+                const cleanKeys = keys.filter(k => 
+                    !k.includes("戳記") && 
+                    !k.toLowerCase().includes("timestamp")
+                );
+
+                let actualKey = null;
+
+                for (let t of targets) {
+                    actualKey = cleanKeys.find(k => k.trim() === t);
+                    if (actualKey) break;
+                }
+
+                if (!actualKey) {
+                    for (let t of targets) {
+                        actualKey = cleanKeys.find(k => k.includes(t));
+                        if (actualKey) break;
+                    }
+                }
+                
+                let val = actualKey ? order[actualKey] : "";
 
                 if (type === 'date' && val) {
                     const d = new Date(val);
@@ -160,10 +178,14 @@
                         return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
                     }
                 }
-                if (type === 'time' && String(val).includes("1899")) {
+                
+                if (type === 'time' && val && (String(val).includes("1899") || String(val).includes("T"))) {
                     const d = new Date(val);
-                    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                    if (!isNaN(d.getTime())) {
+                        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                    }
                 }
+                
                 return String(val || "").trim();
             };
 
@@ -181,7 +203,7 @@
                     setOrders([...data1, ...data2]);
                     showToast("同步完成");
                 } catch (err) {
-                    showToast("讀取失敗", "error");
+                    showToast("資料讀取失敗", "error");
                 } finally {
                     setLoading(false);
                 }
@@ -215,7 +237,6 @@
                 }
             };
 
-            // 日曆點位狀態預算 (優化：加入黃色點位)
             const dayStatusMap = useMemo(() => {
                 const stats = {};
                 const exclude = ["未付款", "UNPAID", "已取消", "CANCELED"];
@@ -224,6 +245,8 @@
                     if (exclude.some(k => payStatus.includes(k))) return;
                     
                     const dateKey = findVal(o, 'date').replace(/\//g, '-');
+                    if (!dateKey) return;
+                    
                     if (!stats[dateKey]) stats[dateKey] = { hasOrders: true, hasUnpicked: false, hasPendingCheck: false };
                     
                     const status = findVal(o, 'status');
@@ -236,18 +259,17 @@
                 return stats;
             }, [orders]);
 
-            // 過濾列表邏輯
             const filteredOrders = useMemo(() => {
                 const exclude = ["未付款", "UNPAID", "已取消", "CANCELED"];
                 return orders.filter(o => {
                     const payStatus = findVal(o, 'payment').toUpperCase();
                     if (exclude.some(k => payStatus.includes(k))) return false;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
-                    return findVal(o, 'date').replace(/\//g, '-').includes(selectedDate);
+                    const oDate = findVal(o, 'date').replace(/\//g, '-');
+                    return oDate.includes(selectedDate);
                 }).sort((a, b) => findVal(a, 'time').localeCompare(findVal(b, 'time')));
             }, [orders, selectedDate, currentCategory]);
 
-            // 日曆陣列生成
             const daysArray = useMemo(() => {
                 const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
                 const firstDay = new Date(year, month, 1).getDay(), daysCount = new Date(year, month + 1, 0).getDate();
@@ -264,7 +286,7 @@
                             <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md"><LucideIcon name="package" size={24} /></div>
                             <h1 className="text-xl font-black tracking-tight">麋鹿氣球 · 整合備貨系統</h1>
                         </div>
-                        <button onClick={fetchAllData} className="p-2 hover:bg-white/20 rounded-full transition-all active:scale-90">
+                        <button onClick={fetchAllData} className="p-2 hover:bg-white/10 rounded-full transition-all active:scale-90">
                             <LucideIcon name="refresh-cw" size={22} className={loading ? "spin" : ""} />
                         </button>
                     </header>
@@ -283,7 +305,6 @@
                     </div>
 
                     <main className="max-w-6xl mx-auto p-4 lg:flex gap-8 mt-4">
-                        {/* 左側日曆 */}
                         <div className="lg:w-[340px] shrink-0 mb-6">
                             <div className="bg-white rounded-[2.5rem] shadow-sm border p-6 sticky top-[150px]">
                                 <div className="flex justify-between items-center mb-6 px-1">
@@ -306,12 +327,12 @@
                                                     !dateStr ? '' : isSelected ? 'bg-emerald-800 text-white shadow-lg scale-110 z-10' : isToday ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'hover:bg-slate-50 text-slate-600'
                                                 }`}>
                                                 <span>{dateStr ? parseInt(dateStr.split('-')[2]) : ""}</span>
-                                                {/* 狀態點點 (綠、黃、紅共存) */}
+                                                {/* 狀態點點 (改為紅、黃、綠共存) */}
                                                 {stats && (
                                                     <div className="flex gap-1 absolute bottom-1.5">
                                                         {stats.hasOrders && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`}></div>}
                                                         {stats.hasPendingCheck && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-amber-200' : 'bg-amber-400'}`}></div>}
-                                                        {stats.hasUnpicked && <div className={`w-1 h-1 rounded-full animate-pulse ${isSelected ? 'bg-rose-300' : 'bg-rose-500'}`}></div>}
+                                                        {stats.hasUnpicked && <div className={`w-1 h-1 rounded-full animate-pulse ${isSelected ? 'bg-red-200' : 'bg-red-600'}`}></div>}
                                                     </div>
                                                 )}
                                             </div>
@@ -328,14 +349,13 @@
                                         <span>尚有「已備貨 / 製作中」訂單</span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse"></div>
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div>
                                         <span>尚有「未撿取」訂單</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* 右側訂單列表 */}
                         <div className="flex-1 space-y-4">
                             <div className="flex items-center justify-between mb-2 px-2">
                                 <h3 className="font-black text-slate-600 flex items-center gap-2">
@@ -371,7 +391,7 @@
                                                 <div className="flex flex-col items-end gap-2">
                                                     <div className={`text-[10px] font-black px-4 py-1.5 rounded-full border shadow-sm ${
                                                         status.includes("檢查完畢") ? "bg-emerald-500 text-white border-emerald-600" : 
-                                                        status.includes("已備貨") ? "bg-amber-400 text-white border-amber-500" : "bg-rose-50 text-rose-500 border-rose-100"
+                                                        status.includes("已備貨") ? "bg-amber-400 text-white border-amber-500" : "bg-red-50 text-red-600 border-red-100"
                                                     }`}>{status || "未撿取"}</div>
                                                     
                                                     {qUrl && (
@@ -428,7 +448,7 @@
 
                     {toast && (
                         <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-full shadow-2xl z-[300] text-sm font-black animate-bounce ${
-                            toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'
+                            toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'
                         }`}>
                             {toast.text}
                         </div>
