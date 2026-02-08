@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>麋鹿氣球 - 整合備貨管理系統</title>
+    <title>麋鹿氣球 - 整合備貨管理系統 (診斷版)</title>
     <!-- 載入核心套件 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
@@ -18,11 +18,10 @@
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
         .order-card { transition: all 0.2s ease-out; }
-        /* 修正手機版月曆顯示空間 */
         .calendar-grid-container { min-height: 280px; }
-        /* 確保手機版長列表可以順暢捲動 */
-        html, body { height: 100%; overflow-x: hidden; }
-        #root { min-height: 100%; }
+        /* 診斷面板動畫 */
+        .fade-in { animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body class="min-h-screen">
@@ -32,7 +31,6 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback, memo, useRef } = React;
 
-        // --- 輔助函式：取得本地日期 YYYY-MM-DD ---
         const getLocalDateString = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -40,38 +38,16 @@
             return `${y}-${m}-${d}`;
         };
 
-        // 標準化日期格式為 YYYY-MM-DD，解決跨瀏覽器（iOS Safari）解析問題
-        const normalizeDateString = (dateVal) => {
-            if (!dateVal) return "";
-            try {
-                // 如果是字串，先處理常見的分隔符號
-                if (typeof dateVal === 'string') {
-                    // 處理像 "2024/2/8" 或 "2024.2.8" 的格式
-                    const parts = dateVal.split(/[/\-.]/);
-                    if (parts.length === 3) {
-                        const y = parts[0].length === 4 ? parts[0] : `20${parts[0]}`;
-                        const m = parts[1].padStart(2, '0');
-                        const d = parts[2].split(' ')[0].padStart(2, '0'); // 移除可能的空格後綴
-                        return `${y}-${m}-${d}`;
-                    }
-                }
-                const d = new Date(dateVal);
-                if (isNaN(d.getTime())) return "";
-                return getLocalDateString(d);
-            } catch (e) {
-                return "";
-            }
-        };
-
-        // --- 系統設定 ---
         const CONFIG = {
             OFFICIAL: {
+                id: "OFFICIAL",
                 name: "官網系統",
                 url: "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec",
                 statusField: "備貨狀態",
                 params: "action=getOrders"
             },
             MILU: {
+                id: "MILU",
                 name: "MILU系統",
                 url: "https://script.google.com/macros/s/AKfycbyL1VarFpdQhPe24Fj9RQrGYoGunAcm1XNxlZwIW-kr_3CqG_hvQgWoS0xpCb9zb0vdjQ/exec",
                 statusField: "撿貨狀態",
@@ -97,6 +73,56 @@
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         });
+
+        // 診斷面板元件
+        const DiagnosticPanel = ({ status, onClose }) => {
+            return (
+                <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
+                    <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl p-6 fade-in" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4 border-b pb-3">
+                            <h3 className="font-black text-slate-800 text-lg flex items-center gap-2">
+                                <LucideIcon name="activity" className="text-blue-500" /> 系統連線診斷
+                            </h3>
+                            <button onClick={onClose} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200">
+                                <LucideIcon name="x" size={16} />
+                            </button>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            {[CONFIG.OFFICIAL, CONFIG.MILU].map(conf => {
+                                const s = status[conf.id];
+                                return (
+                                    <div key={conf.id} className={`p-4 rounded-xl border-l-4 ${s.ok ? 'bg-emerald-50 border-emerald-500' : 'bg-red-50 border-red-500'}`}>
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="font-bold text-slate-700">{conf.name}</span>
+                                            {s.ok ? 
+                                                <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-bold">連線成功</span> : 
+                                                <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-bold">連線失敗</span>
+                                            }
+                                        </div>
+                                        <div className="text-xs text-slate-500 space-y-1">
+                                            <p>📦 資料筆數: <span className="font-mono font-bold">{s.count}</span> 筆</p>
+                                            <p>📡 狀態訊息: {s.msg}</p>
+                                            {s.sampleDate && (
+                                                <p className="mt-2 pt-2 border-t border-slate-200/50 text-[10px] text-slate-400">
+                                                    🔍 日期樣本: <span className="font-mono bg-white px-1 rounded">{String(s.sampleDate)}</span>
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        
+                        <div className="mt-6 text-center">
+                            <p className="text-[10px] text-slate-400">
+                                若連線失敗，請檢查網路或確認 Google Apps Script 部署網址是否正確。
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
         const OrderCard = memo(({ order, config, findVal, handleUpdate, isSyncing }) => {
             const status = findVal(order, 'status');
@@ -158,10 +184,17 @@
             const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
             const [currentCategory, setCurrentCategory] = useState("全部");
             const [toast, setToast] = useState(null);
+            const [showDiagnostic, setShowDiagnostic] = useState(false);
+            
+            // 系統連線狀態
+            const [sysStatus, setSysStatus] = useState({
+                OFFICIAL: { ok: false, count: 0, msg: "等待連線...", sampleDate: "" },
+                MILU: { ok: false, count: 0, msg: "等待連線...", sampleDate: "" }
+            });
+
             const [syncingIds, setSyncingIds] = useState(new Set());
             const lastUpdateRef = useRef({});
 
-            // 強化型資料提取函數
             const findVal = useCallback((order, type) => {
                 if (!order) return "";
                 const keys = Object.keys(order);
@@ -174,61 +207,102 @@
                 let val = actualKey ? order[actualKey] : "";
 
                 if (type === 'date' && val) {
-                    return normalizeDateString(val);
+                    const strVal = String(val).trim();
+                    if (strVal.includes('T')) {
+                        const d = new Date(strVal);
+                        if (!isNaN(d.getTime())) return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+                    }
+                    const match = strVal.match(/(\d{4})[\-\/\.](\d{1,2})[\-\/\.](\d{1,2})/);
+                    if (match) return `${match[1]}/${match[2].padStart(2, '0')}/${match[3].padStart(2, '0')}`;
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
                 }
 
                 if (type === 'time' && val) {
-                    const d = new Date(val);
-                    if (!isNaN(d.getTime())) {
-                        if (order._src === "MILU") { d.setMinutes(d.getMinutes() - 38); }
-                        const hh = d.getHours(), mm = d.getMinutes();
-                        return `${hh >= 12 ? '下午' : '上午'} ${hh % 12 || 12}:${String(mm).padStart(2, '0')}`;
-                    }
+                    try {
+                        const d = new Date(val);
+                        if (!isNaN(d.getTime())) {
+                            if (order._src === "MILU") { d.setMinutes(d.getMinutes() - 38); }
+                            const hh = d.getHours(), mm = d.getMinutes();
+                            return `${hh >= 12 ? '下午' : '上午'} ${hh % 12 || 12}:${String(mm).padStart(2, '0')}`;
+                        }
+                    } catch(e) {}
+                    return String(val);
                 }
                 return String(val || "").trim();
             }, []);
 
+            // 獨立的 Fetch 函式，用於單獨追蹤每個來源的狀態
+            const fetchSource = async (config) => {
+                try {
+                    const res = await fetch(`${config.url}?${config.params}&t=${Date.now()}`);
+                    const text = await res.text();
+                    
+                    if (!text || text.includes("系統運作中")) {
+                        throw new Error("回傳資料為空或系統運作中");
+                    }
+
+                    let parsedData = [];
+                    try {
+                        const json = JSON.parse(text);
+                        if (!Array.isArray(json)) throw new Error("非陣列格式");
+                        
+                        // 針對不同來源做預處理
+                        if (config.id === "MILU") {
+                            parsedData = json.filter(row => Array.isArray(row) && row.length > 5).map(row => ({
+                                "訂單編號": row[0], "客戶名稱": row[3], "日期": row[5], "時間/時段": row[6],
+                                "地點": row[7], "狀態": row[10], "撿貨狀態": row[21], "_src": "MILU", "_apiUrl": config.url, "__sheet__": row[row.length - 1] 
+                            }));
+                        } else {
+                            parsedData = json.map(o => ({ ...o, _src: "OFFICIAL", _apiUrl: config.url, "__sheet__": "官網訂單" }));
+                        }
+                    } catch (parseError) {
+                        throw new Error("JSON 解析失敗: " + parseError.message);
+                    }
+
+                    // 更新該來源的狀態為成功
+                    const sample = parsedData.length > 0 ? (config.id === "MILU" ? parsedData[0]["日期"] : parsedData[0]["送貨日期"] || parsedData[0]["日期"]) : "無資料";
+                    setSysStatus(prev => ({
+                        ...prev,
+                        [config.id]: { ok: true, count: parsedData.length, msg: "正常", sampleDate: String(sample) }
+                    }));
+
+                    return parsedData;
+
+                } catch (e) {
+                    // 更新該來源的狀態為失敗
+                    setSysStatus(prev => ({
+                        ...prev,
+                        [config.id]: { ok: false, count: 0, msg: e.message, sampleDate: "-" }
+                    }));
+                    return [];
+                }
+            };
+
             const fetchAllData = useCallback(async (silent = false) => {
                 if (!silent) setLoading(true);
-                try {
-                    const [resOffText, resMiluText] = await Promise.all([
-                        fetch(`${CONFIG.OFFICIAL.url}?${CONFIG.OFFICIAL.params}&t=${Date.now()}`).then(r => r.text()).catch(() => "[]"),
-                        fetch(`${CONFIG.MILU.url}?${CONFIG.MILU.params}&t=${Date.now()}`).then(r => r.text()).catch(() => "[]")
-                    ]);
+                
+                // 平行執行兩個請求
+                const [officialData, miluData] = await Promise.all([
+                    fetchSource(CONFIG.OFFICIAL),
+                    fetchSource(CONFIG.MILU)
+                ]);
 
-                    let combined = [];
-                    const processJson = (text, src, apiUrl, isMilu = false) => {
-                        try {
-                            if (!text || text.includes("系統運作中")) return [];
-                            const json = JSON.parse(text);
-                            if (!Array.isArray(json)) return [];
-                            if (isMilu) {
-                                return json.filter(row => Array.isArray(row) && row.length > 5).map(row => ({
-                                    "訂單編號": row[0], "客戶名稱": row[3], "日期": row[5], "時間/時段": row[6],
-                                    "地點": row[7], "狀態": row[10], "撿貨狀態": row[21], "_src": "MILU", "_apiUrl": apiUrl, "__sheet__": row[row.length - 1] 
-                                }));
-                            }
-                            return json.map(o => ({ ...o, _src: src, _apiUrl: apiUrl, "__sheet__": "官網訂單" }));
-                        } catch(e) { return []; }
-                    };
+                const combined = [...officialData, ...miluData];
 
-                    combined.push(...processJson(resOffText, "OFFICIAL", CONFIG.OFFICIAL.url));
-                    combined.push(...processJson(resMiluText, "MILU", CONFIG.MILU.url, true));
-
-                    setOrders(prevOrders => {
-                        return combined.map(newItem => {
-                            const key = newItem._src + (newItem["訂單編號"] || newItem["__row__"]);
-                            const lastUpdate = lastUpdateRef.current[key];
-                            if (lastUpdate && (Date.now() - lastUpdate < 10000)) {
-                                const localItem = prevOrders.find(o => (o._src + (o["訂單編號"] || o["__row__"])) === key);
-                                return localItem || newItem;
-                            }
-                            return newItem;
-                        });
+                setOrders(prevOrders => {
+                    return combined.map(newItem => {
+                        const key = newItem._src + (newItem["訂單編號"] || newItem["__row__"]);
+                        const lastUpdate = lastUpdateRef.current[key];
+                        if (lastUpdate && (Date.now() - lastUpdate < 10000)) {
+                            const localItem = prevOrders.find(o => (o._src + (o["訂單編號"] || o["__row__"])) === key);
+                            return localItem || newItem;
+                        }
+                        return newItem;
                     });
-                } finally {
-                    setLoading(false);
-                }
+                });
+                
+                setLoading(false);
             }, []);
 
             useEffect(() => {
@@ -257,6 +331,7 @@
                     } : {
                         action: "updateStatus", row: order["__row__"], status: newStatus, columnName: CONFIG.OFFICIAL.statusField
                     };
+
                     await fetch(order._apiUrl, { method: "POST", body: JSON.stringify(payload) });
                     showToast(`更新成功：${newStatus}`);
                     setTimeout(() => fetchAllData(true), 1500);
@@ -279,8 +354,9 @@
                     const payStatus = (findVal(o, 'payment') || "").toUpperCase();
                     if (exclude.some(k => payStatus.includes(k))) return;
 
-                    const dateKey = findVal(o, 'date'); // 已是 YYYY-MM-DD
-                    if (!dateKey) return;
+                    const dateStr = findVal(o, 'date');
+                    if (!dateStr) return;
+                    const dateKey = dateStr.replace(/\//g, '-');
                     
                     if (!stats[dateKey]) stats[dateKey] = { hasOrders: true, hasUnpicked: false, hasPending: false };
                     
@@ -299,16 +375,21 @@
                     const payStatus = (findVal(o, 'payment') || "").toUpperCase();
                     if (exclude.some(k => payStatus.includes(k))) return false;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
-                    const orderDate = findVal(o, 'date');
+                    
+                    const orderDate = findVal(o, 'date').replace(/\//g, '-');
                     return orderDate === selectedDate;
-                }).sort((a, b) => findVal(a, 'time').localeCompare(findVal(b, 'time')));
+                }).sort((a, b) => {
+                    const tA = findVal(a, 'time') || "";
+                    const tB = findVal(b, 'time') || "";
+                    return tA.localeCompare(tB);
+                });
             }, [orders, selectedDate, currentCategory, findVal]);
 
             const daysArray = useMemo(() => {
                 const year = currentMonth.getFullYear();
                 const month = currentMonth.getMonth();
                 const firstDayDate = new Date(year, month, 1, 12, 0, 0);
-                const startDayOfWeek = firstDayDate.getDay();
+                const startDayOfWeek = firstDayDate.getDay(); 
                 const totalDays = new Date(year, month + 1, 0).getDate();
                 
                 return Array.from({ length: 42 }, (_, i) => {
@@ -320,16 +401,25 @@
                 });
             }, [currentMonth]);
 
+            const hasError = !sysStatus.OFFICIAL.ok || !sysStatus.MILU.ok;
+
             return (
-                <div className="min-h-screen pb-20">
+                <div className="min-h-screen pb-20 overflow-x-hidden">
                     <header className="primary-gradient text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-lg">
                         <div className="flex items-center gap-3">
                             <LucideIcon name="package" size={22} />
                             <h1 className="text-lg md:text-xl font-black tracking-tight">麋鹿氣球 · 整合管理</h1>
                         </div>
-                        <button onClick={() => fetchAllData()} className="p-2 hover:bg-white/20 rounded-full transition-all">
-                            <LucideIcon name="refresh-cw" size={20} className={loading ? "spin" : ""} />
-                        </button>
+                        <div className="flex gap-2">
+                             {/* 診斷按鈕 */}
+                            <button onClick={() => setShowDiagnostic(true)} 
+                                className={`p-2 rounded-full transition-all ${hasError ? 'bg-red-500 animate-pulse' : 'hover:bg-white/20'}`}>
+                                <LucideIcon name="activity" size={20} className={hasError ? "text-white" : ""} />
+                            </button>
+                            <button onClick={() => fetchAllData()} className="p-2 hover:bg-white/20 rounded-full transition-all">
+                                <LucideIcon name="refresh-cw" size={20} className={loading ? "spin" : ""} />
+                            </button>
+                        </div>
                     </header>
 
                     <div className="bg-white/80 backdrop-blur-md border-b sticky top-[60px] z-30 overflow-x-auto no-scrollbar">
@@ -346,6 +436,7 @@
                     </div>
 
                     <main className="max-w-6xl mx-auto p-4 lg:flex gap-8 mt-4">
+                        {/* 左側日曆 */}
                         <div className="lg:w-[340px] shrink-0 mb-6">
                             <div className="bg-white rounded-[2.5rem] shadow-sm border p-6 lg:sticky lg:top-[150px]">
                                 <div className="flex justify-between items-center mb-6">
@@ -385,25 +476,28 @@
                             </div>
                         </div>
 
+                        {/* 右側列表 */}
                         <div className="flex-1 space-y-4">
                             <h3 className="font-black text-slate-600 flex items-center gap-2 px-2">
                                 <LucideIcon name="list-checks" size={18} className="text-emerald-600" /> {selectedDate} 排程 ({filteredOrders.length})
                             </h3>
                             {filteredOrders.length === 0 ? (
-                                <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">當日尚無待辦事項</div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {filteredOrders.map((o) => (
-                                        <OrderCard 
-                                            key={o._src + (o["訂單編號"] || o["__row__"])} 
-                                            order={o} config={CONFIG} findVal={findVal} handleUpdate={handleUpdate} 
-                                            isSyncing={syncingIds.has(o._src + (o["訂單編號"] || o["__row__"]))}
-                                        />
-                                    ))}
+                                <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">
+                                    當日尚無待辦事項
                                 </div>
+                            ) : (
+                                filteredOrders.map((o) => (
+                                    <OrderCard 
+                                        key={o._src + (o["訂單編號"] || o["__row__"])} 
+                                        order={o} config={CONFIG} findVal={findVal} handleUpdate={handleUpdate} 
+                                        isSyncing={syncingIds.has(o._src + (o["訂單編號"] || o["__row__"]))}
+                                    />
+                                ))
                             )}
                         </div>
                     </main>
+
+                    {showDiagnostic && <DiagnosticPanel status={sysStatus} onClose={() => setShowDiagnostic(false)} />}
 
                     {toast && <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-full shadow-2xl z-[300] bg-slate-900 text-white text-sm font-black animate-bounce whitespace-nowrap">{toast}</div>}
                     {loading && (
@@ -420,3 +514,4 @@
     </script>
 </body>
 </html>
+
