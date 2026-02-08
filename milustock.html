@@ -20,6 +20,9 @@
         .order-card { transition: all 0.2s ease-out; }
         /* 修正手機版月曆顯示空間 */
         .calendar-grid-container { min-height: 280px; }
+        /* 確保手機版長列表可以順暢捲動 */
+        html, body { height: 100%; overflow-x: hidden; }
+        #root { min-height: 100%; }
     </style>
 </head>
 <body class="min-h-screen">
@@ -29,12 +32,35 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback, memo, useRef } = React;
 
-        // --- 輔助函式：取得本地日期 YYYY-MM-DD，絕對避開 UTC 偏移 ---
+        // --- 輔助函式：取得本地日期 YYYY-MM-DD ---
         const getLocalDateString = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
             const d = String(date.getDate()).padStart(2, '0');
             return `${y}-${m}-${d}`;
+        };
+
+        // 標準化日期格式為 YYYY-MM-DD，解決跨瀏覽器（iOS Safari）解析問題
+        const normalizeDateString = (dateVal) => {
+            if (!dateVal) return "";
+            try {
+                // 如果是字串，先處理常見的分隔符號
+                if (typeof dateVal === 'string') {
+                    // 處理像 "2024/2/8" 或 "2024.2.8" 的格式
+                    const parts = dateVal.split(/[/\-.]/);
+                    if (parts.length === 3) {
+                        const y = parts[0].length === 4 ? parts[0] : `20${parts[0]}`;
+                        const m = parts[1].padStart(2, '0');
+                        const d = parts[2].split(' ')[0].padStart(2, '0'); // 移除可能的空格後綴
+                        return `${y}-${m}-${d}`;
+                    }
+                }
+                const d = new Date(dateVal);
+                if (isNaN(d.getTime())) return "";
+                return getLocalDateString(d);
+            } catch (e) {
+                return "";
+            }
         };
 
         // --- 系統設定 ---
@@ -76,7 +102,6 @@
             const status = findVal(order, 'status');
             const iType = findVal(order, 'itemType');
             const rawId = findVal(order, 'id');
-            // 修正：確保只有一個 #，避免出現 ##
             const displayId = String(rawId).startsWith('#') ? rawId : `#${rawId}`;
 
             return (
@@ -133,11 +158,10 @@
             const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
             const [currentCategory, setCurrentCategory] = useState("全部");
             const [toast, setToast] = useState(null);
-            
             const [syncingIds, setSyncingIds] = useState(new Set());
             const lastUpdateRef = useRef({});
 
-            // 強化型資料提取函數：徹底解決 2/8 變 2/7 的日期解析誤差
+            // 強化型資料提取函數
             const findVal = useCallback((order, type) => {
                 if (!order) return "";
                 const keys = Object.keys(order);
@@ -149,13 +173,8 @@
                 
                 let val = actualKey ? order[actualKey] : "";
 
-                // 日期解析修正：不再直接用 Regex 抓數字，改用 Date 物件轉換為在地時間提取
                 if (type === 'date' && val) {
-                    const d = new Date(val);
-                    if (!isNaN(d.getTime())) {
-                        // 提取「在地」的年月日，這能正確處理 ISO 字串導致的 8 小時時差問題
-                        return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
-                    }
+                    return normalizeDateString(val);
                 }
 
                 if (type === 'time' && val) {
@@ -222,8 +241,6 @@
 
             const handleUpdate = useCallback(async (order, newStatus) => {
                 const key = order._src + (order["訂單編號"] || order["__row__"]);
-                const oldStatus = order._src === "MILU" ? order["撿貨狀態"] : order[CONFIG.OFFICIAL.statusField];
-
                 lastUpdateRef.current[key] = Date.now();
                 setSyncingIds(prev => new Set(prev).add(key));
                 setOrders(prev => prev.map(o => {
@@ -240,7 +257,6 @@
                     } : {
                         action: "updateStatus", row: order["__row__"], status: newStatus, columnName: CONFIG.OFFICIAL.statusField
                     };
-
                     await fetch(order._apiUrl, { method: "POST", body: JSON.stringify(payload) });
                     showToast(`更新成功：${newStatus}`);
                     setTimeout(() => fetchAllData(true), 1500);
@@ -263,9 +279,8 @@
                     const payStatus = (findVal(o, 'payment') || "").toUpperCase();
                     if (exclude.some(k => payStatus.includes(k))) return;
 
-                    const dateStr = findVal(o, 'date');
-                    if (!dateStr) return;
-                    const dateKey = dateStr.replace(/\//g, '-');
+                    const dateKey = findVal(o, 'date'); // 已是 YYYY-MM-DD
+                    if (!dateKey) return;
                     
                     if (!stats[dateKey]) stats[dateKey] = { hasOrders: true, hasUnpicked: false, hasPending: false };
                     
@@ -284,19 +299,16 @@
                     const payStatus = (findVal(o, 'payment') || "").toUpperCase();
                     if (exclude.some(k => payStatus.includes(k))) return false;
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
-                    const orderDate = findVal(o, 'date').replace(/\//g, '-');
+                    const orderDate = findVal(o, 'date');
                     return orderDate === selectedDate;
                 }).sort((a, b) => findVal(a, 'time').localeCompare(findVal(b, 'time')));
             }, [orders, selectedDate, currentCategory, findVal]);
 
-            // --- 核心修正：星期與日期的精準對齊 ---
             const daysArray = useMemo(() => {
                 const year = currentMonth.getFullYear();
                 const month = currentMonth.getMonth();
-                
-                // 強制將 1 號設為中午，避免本地時區偏移導致 getDay() 判定錯誤
                 const firstDayDate = new Date(year, month, 1, 12, 0, 0);
-                const startDayOfWeek = firstDayDate.getDay(); // 0=日, 1=一
+                const startDayOfWeek = firstDayDate.getDay();
                 const totalDays = new Date(year, month + 1, 0).getDate();
                 
                 return Array.from({ length: 42 }, (_, i) => {
@@ -309,7 +321,7 @@
             }, [currentMonth]);
 
             return (
-                <div className="min-h-screen pb-20 overflow-x-hidden">
+                <div className="min-h-screen pb-20">
                     <header className="primary-gradient text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-lg">
                         <div className="flex items-center gap-3">
                             <LucideIcon name="package" size={22} />
@@ -369,7 +381,6 @@
                                     <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div><span>🟢 當日有預訂訂單</span></div>
                                     <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div><span>🟡 尚有「製作中」訂單</span></div>
                                     <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div><span>🔴 尚有「未撿取」訂單</span></div>
-                                    <div className="mt-1 text-[9px] font-normal italic text-slate-300">※ 當日訂單皆「檢查完畢」後燈號將自動消失</div>
                                 </div>
                             </div>
                         </div>
@@ -381,13 +392,15 @@
                             {filteredOrders.length === 0 ? (
                                 <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">當日尚無待辦事項</div>
                             ) : (
-                                filteredOrders.map((o) => (
-                                    <OrderCard 
-                                        key={o._src + (o["訂單編號"] || o["__row__"])} 
-                                        order={o} config={CONFIG} findVal={findVal} handleUpdate={handleUpdate} 
-                                        isSyncing={syncingIds.has(o._src + (o["訂單編號"] || o["__row__"]))}
-                                    />
-                                ))
+                                <div className="space-y-4">
+                                    {filteredOrders.map((o) => (
+                                        <OrderCard 
+                                            key={o._src + (o["訂單編號"] || o["__row__"])} 
+                                            order={o} config={CONFIG} findVal={findVal} handleUpdate={handleUpdate} 
+                                            isSyncing={syncingIds.has(o._src + (o["訂單編號"] || o["__row__"]))}
+                                        />
+                                    ))}
+                                </div>
                             )}
                         </div>
                     </main>
