@@ -20,7 +20,6 @@
         .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
         .modal-overlay { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
         .order-card { transition: all 0.2s ease-out; }
-        /* 增加按鈕點擊後的視覺反饋速度 */
         .status-btn { transition: all 0.1s ease-in-out; }
         .status-btn:active { transform: scale(0.95); }
     </style>
@@ -30,9 +29,9 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useCallback, memo } = React;
+        const { useState, useEffect, useMemo, useCallback, memo, useRef } = React;
 
-        // --- 輔助函式：取得本地日期字串 YYYY-MM-DD，避免時區偏差 ---
+        // --- 輔助函式：取得本地日期字串 YYYY-MM-DD ---
         const getLocalDateString = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -68,7 +67,6 @@
             payment: ["付款狀態", "狀態", "付款", "支付狀態"],
             remark: ["備註", "備註欄", "注意事項"],
             itemType: ["品項類型", "品項"],
-            quoteUrl: ["報價單連結", "報價單網址"]
         };
 
         const LucideIcon = memo(({ name, size = 18, className = "" }) => {
@@ -76,16 +74,20 @@
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         });
 
-        // --- 優化：子元件快取 ---
-        const OrderCard = memo(({ order, config, findVal, handleUpdate }) => {
+        // --- 訂單卡片元件 ---
+        const OrderCard = memo(({ order, config, findVal, handleUpdate, isSyncing }) => {
             const status = findVal(order, 'status');
             const iType = findVal(order, 'itemType');
             const rawId = findVal(order, 'id');
-            // 修正：確保只有一個 #
             const displayId = String(rawId).startsWith('#') ? rawId : `#${rawId}`;
 
             return (
-                <div className="order-card bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-7">
+                <div className={`order-card bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-7 relative ${isSyncing ? 'opacity-70' : ''}`}>
+                    {isSyncing && (
+                        <div className="absolute top-4 right-8 flex items-center gap-1 text-[9px] font-bold text-emerald-600 animate-pulse">
+                            <LucideIcon name="cloud-upload" size={12} /> 同步中...
+                        </div>
+                    )}
                     <div className="flex justify-between items-start mb-5">
                         <div className="space-y-1.5">
                             <div className="flex gap-2 flex-wrap">
@@ -116,9 +118,9 @@
 
                     <div className="grid grid-cols-3 gap-2">
                         {["未撿取", "已備貨", "檢查完畢"].map((st) => (
-                            <button key={st} onClick={() => handleUpdate(order, st)} 
+                            <button key={st} disabled={isSyncing} onClick={() => handleUpdate(order, st)} 
                                 className={`status-btn py-4 rounded-2xl text-[11px] font-black border transition-all active:scale-95 ${
-                                    status === st || (!status && st === "未撿取") ? "bg-slate-800 text-white shadow-xl" : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
+                                    status === st || (!status && st === "未撿取") ? 'bg-slate-800 text-white shadow-xl' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'
                                 }`}>{st}</button>
                         ))}
                     </div>
@@ -133,6 +135,11 @@
             const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
             const [currentCategory, setCurrentCategory] = useState("全部");
             const [toast, setToast] = useState(null);
+            
+            // 追蹤正在同步中的訂單 ID，防止被背景刷新覆蓋
+            const [syncingIds, setSyncingIds] = useState(new Set());
+            // 記錄最近更新的時間戳，用於 Anti-Flicker
+            const lastUpdateRef = useRef({});
 
             const findVal = useCallback((order, type) => {
                 if (!order) return "";
@@ -162,51 +169,69 @@
                 return String(val || "").trim();
             }, []);
 
-            const fetchAllData = async (silent = false) => {
+            const fetchAllData = useCallback(async (silent = false) => {
                 if (!silent) setLoading(true);
-                let combined = [];
                 try {
                     const [resOff, resMilu] = await Promise.all([
                         fetch(`${CONFIG.OFFICIAL.url}?${CONFIG.OFFICIAL.params}&t=${Date.now()}`).then(r => r.json()).catch(() => []),
                         fetch(`${CONFIG.MILU.url}?${CONFIG.MILU.params}&t=${Date.now()}`).then(r => r.json()).catch(() => [])
                     ]);
 
+                    let combined = [];
                     if (Array.isArray(resOff)) {
                         combined.push(...resOff.map(o => ({ 
                             ...o, _src: "OFFICIAL", _apiUrl: CONFIG.OFFICIAL.url, "__sheet__": "官網訂單" 
                         })));
                     }
-
                     if (Array.isArray(resMilu) && resMilu.length > 0 && Array.isArray(resMilu[0])) {
                         combined.push(...resMilu.map(row => ({
                             "訂單編號": row[0], "客戶名稱": row[3], "日期": row[5], "時間/時段": row[6],
                             "地點": row[7], "狀態": row[10], "撿貨狀態": row[21], "_src": "MILU", "_apiUrl": CONFIG.MILU.url, "__sheet__": row[row.length - 1] 
                         })));
                     }
-                    setOrders(combined);
+
+                    // --- 核心改動：防止資料回彈 ---
+                    setOrders(prevOrders => {
+                        return combined.map(newItem => {
+                            const key = newItem._src + (newItem["訂單編號"] || newItem["__row__"]);
+                            // 如果這筆訂單在 10 秒內更新過，則保留本地狀態，忽略試算表的舊狀態
+                            const lastUpdate = lastUpdateRef.current[key];
+                            if (lastUpdate && (Date.now() - lastUpdate < 10000)) {
+                                const localItem = prevOrders.find(o => (o._src + (o["訂單編號"] || o["__row__"])) === key);
+                                return localItem || newItem;
+                            }
+                            return newItem;
+                        });
+                    });
                 } finally {
                     setLoading(false);
                 }
-            };
+            }, []);
 
-            useEffect(() => { fetchAllData(); }, []);
+            // 初始化與自動輪詢（每 60 秒）
+            useEffect(() => {
+                fetchAllData();
+                const timer = setInterval(() => fetchAllData(true), 60000);
+                return () => clearInterval(timer);
+            }, [fetchAllData]);
 
             const showToast = (text) => { setToast(text); setTimeout(() => setToast(null), 3000); };
 
+            // --- 樂觀更新 + 防止回彈機制 ---
             const handleUpdate = useCallback(async (order, newStatus) => {
-                const orderKey = order._src + (order["訂單編號"] || order["__row__"]);
-                const oldStatus = order._src === "MILU" ? order["撿貨狀態"] : order[CONFIG.OFFICIAL.statusField];
-
+                const key = order._src + (order["訂單編號"] || order["__row__"]);
+                
+                // 1. 立即更新本地狀態與記錄更新時間
+                lastUpdateRef.current[key] = Date.now();
+                setSyncingIds(prev => new Set(prev).add(key));
                 setOrders(prev => prev.map(o => {
-                    const currentKey = o._src + (o["訂單編號"] || o["__row__"]);
-                    if (currentKey === orderKey) {
-                        return o._src === "MILU" 
-                            ? { ...o, "撿貨狀態": newStatus } 
-                            : { ...o, [CONFIG.OFFICIAL.statusField]: newStatus };
+                    if ((o._src + (o["訂單編號"] || o["__row__"])) === key) {
+                        return o._src === "MILU" ? { ...o, "撿貨狀態": newStatus } : { ...o, [CONFIG.OFFICIAL.statusField]: newStatus };
                     }
                     return o;
                 }));
 
+                // 2. 背景發送請求
                 try {
                     const isMilu = order._src === "MILU";
                     const payload = isMilu ? {
@@ -216,21 +241,20 @@
                     };
 
                     const response = await fetch(order._apiUrl, { method: "POST", body: JSON.stringify(payload) });
-                    if (!response.ok) throw new Error("Update failed");
+                    if (!response.ok) throw new Error();
                     
                     showToast(`更新成功：${newStatus}`);
-                    fetchAllData(true);
+                    // 成功後延遲一下再重新整理，讓 Google 有時間寫入
+                    setTimeout(() => fetchAllData(true), 2000);
                 } catch (e) { 
-                    showToast("更新同步失敗，請檢查網路"); 
-                    setOrders(prev => prev.map(o => {
-                        const currentKey = o._src + (o["訂單編號"] || o["__row__"]);
-                        if (currentKey === orderKey) {
-                            return o._src === "MILU" 
-                                ? { ...o, "撿貨狀態": oldStatus } 
-                                : { ...o, [CONFIG.OFFICIAL.statusField]: oldStatus };
-                        }
-                        return o;
-                    }));
+                    showToast("同步失敗，請檢查網路"); 
+                    delete lastUpdateRef.current[key]; // 失敗則清除記錄，讓同步能蓋回來
+                } finally {
+                    setSyncingIds(prev => {
+                        const next = new Set(prev);
+                        next.delete(key);
+                        return next;
+                    });
                 }
             }, [fetchAllData]);
 
@@ -246,7 +270,6 @@
                     if (!stats[dateKey]) stats[dateKey] = { hasOrders: true, hasUnpicked: false, hasPending: false };
                     
                     const status = o._src === "MILU" ? o["撿貨狀態"] : o[CONFIG.OFFICIAL.statusField];
-                    // 修正：當日訂單皆完成（檢查完畢）則無紅黃燈
                     if (status !== "檢查完畢") {
                         if (!status || status === "未撿取") stats[dateKey].hasUnpicked = true;
                         else if (status === "已備貨") stats[dateKey].hasPending = true;
@@ -265,28 +288,16 @@
                 }).sort((a, b) => findVal(a, 'time').localeCompare(findVal(b, 'time')));
             }, [orders, selectedDate, currentCategory, findVal]);
 
-            // --- 核心修正：準確計算月曆格子的星期與日期對應 ---
             const daysArray = useMemo(() => {
                 const year = currentMonth.getFullYear();
                 const month = currentMonth.getMonth();
-                // 取得該月第一天是星期幾 (0-6, 0=日)
-                const startDayOfWeek = new Date(year, month, 1).getDay();
-                // 取得該月總天數
-                const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
-                
+                const startDayOfWeek = new Date(year, month, 1).getDay(); // 0=日
+                const totalDays = new Date(year, month + 1, 0).getDate();
                 return Array.from({ length: 42 }, (_, i) => {
                     const dayNum = i - startDayOfWeek + 1;
-                    if (dayNum > 0 && dayNum <= totalDaysInMonth) {
-                        // 使用本地日期建構，避免 UTC 偏差
-                        return getLocalDateString(new Date(year, month, dayNum));
-                    }
-                    return null;
+                    return (dayNum > 0 && dayNum <= totalDays) ? getLocalDateString(new Date(year, month, dayNum)) : null;
                 });
             }, [currentMonth]);
-
-            const changeMonth = (offset) => {
-                setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
-            };
 
             return (
                 <div className="min-h-screen pb-20">
@@ -316,11 +327,11 @@
                     <main className="max-w-6xl mx-auto p-4 lg:flex gap-8 mt-4">
                         <div className="lg:w-[340px] shrink-0 mb-6">
                             <div className="bg-white rounded-[2.5rem] shadow-sm border p-6 sticky top-[150px]">
-                                <div className="flex justify-between items-center mb-6 px-1">
+                                <div className="flex justify-between items-center mb-6">
                                     <h2 className="font-black text-slate-700 text-lg">{currentMonth.getFullYear()} / {currentMonth.getMonth() + 1}</h2>
                                     <div className="flex gap-1">
-                                        <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-left" /></button>
-                                        <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-right" /></button>
+                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-left" /></button>
+                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-right" /></button>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-7 gap-1 text-center">
@@ -344,20 +355,10 @@
                                         );
                                     })}
                                 </div>
-                                {/* 修正：月曆紅黃綠燈的說明 */}
                                 <div className="mt-6 pt-4 border-t border-slate-50 text-[10px] text-slate-400 font-bold flex flex-col gap-2 px-1">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                                        <span>🟢 當日有預訂訂單</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div>
-                                        <span>🟡 尚有「已備貨 / 製作中」訂單</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div>
-                                        <span>🔴 尚有「未撿取」訂單</span>
-                                    </div>
+                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div><span>🟢 當日有預訂訂單</span></div>
+                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div><span>🟡 尚有「已備貨 / 製作中」訂單</span></div>
+                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div><span>🔴 尚有「未撿取」訂單</span></div>
                                     <div className="mt-1 text-[9px] font-normal italic text-slate-300">※ 當日訂單皆「檢查完畢」後紅黃燈將自動熄滅</div>
                                 </div>
                             </div>
@@ -367,17 +368,14 @@
                             <h3 className="font-black text-slate-600 flex items-center gap-2 px-2">
                                 <LucideIcon name="list-checks" className="text-emerald-600" /> {selectedDate} 排程 ({filteredOrders.length})
                             </h3>
-
                             {filteredOrders.length === 0 ? (
                                 <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">當日尚無待辦事項</div>
                             ) : (
                                 filteredOrders.map((o) => (
                                     <OrderCard 
                                         key={o._src + (o["訂單編號"] || o["__row__"])} 
-                                        order={o} 
-                                        config={CONFIG} 
-                                        findVal={findVal} 
-                                        handleUpdate={handleUpdate} 
+                                        order={o} config={CONFIG} findVal={findVal} handleUpdate={handleUpdate} 
+                                        isSyncing={syncingIds.has(o._src + (o["訂單編號"] || o["__row__"]))}
                                     />
                                 ))
                             )}
