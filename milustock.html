@@ -18,7 +18,7 @@
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
         .order-card { transition: all 0.2s ease-out; }
-        /* 確保月曆格子在手機上不會被縮小 */
+        /* 修正手機版月曆顯示空間 */
         .calendar-grid-container { min-height: 280px; }
     </style>
 </head>
@@ -29,7 +29,7 @@
     <script type="text/babel">
         const { useState, useEffect, useMemo, useCallback, memo, useRef } = React;
 
-        // --- 輔助函式：取得本地日期 YYYY-MM-DD ---
+        // --- 輔助函式：取得本地日期 YYYY-MM-DD，絕對避開 UTC 偏移 ---
         const getLocalDateString = (date) => {
             const y = date.getFullYear();
             const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -76,6 +76,7 @@
             const status = findVal(order, 'status');
             const iType = findVal(order, 'itemType');
             const rawId = findVal(order, 'id');
+            // 修正：確保只有一個 #，避免出現 ##
             const displayId = String(rawId).startsWith('#') ? rawId : `#${rawId}`;
 
             return (
@@ -97,7 +98,7 @@
                             <h4 className="font-black text-xl md:text-2xl text-slate-800 break-words leading-tight">{findVal(order, 'name')}</h4>
                             <p className="text-[10px] font-bold text-slate-300 tracking-wider truncate">{displayId}</p>
                         </div>
-                        <div className={`text-[10px] font-black px-3 md:px-4 py-1.5 rounded-full shadow-sm transition-colors duration-200 shrink-0 whitespace-nowrap mt-1 ${
+                        <div className={`text-[10px] font-black px-3 py-1.5 rounded-full shadow-sm transition-colors duration-200 shrink-0 whitespace-nowrap mt-1 ${
                             status.includes("檢查") ? "bg-emerald-500 text-white" : status.includes("已備") ? "bg-amber-400 text-white" : "bg-red-600 text-white"
                         }`}>{status || "未撿取"}</div>
                     </div>
@@ -136,7 +137,7 @@
             const [syncingIds, setSyncingIds] = useState(new Set());
             const lastUpdateRef = useRef({});
 
-            // 強化型資料提取函數：徹底解決時區偏差
+            // 強化型資料提取函數：徹底解決 2/8 變 2/7 的日期解析誤差
             const findVal = useCallback((order, type) => {
                 if (!order) return "";
                 const keys = Object.keys(order);
@@ -148,15 +149,11 @@
                 
                 let val = actualKey ? order[actualKey] : "";
 
-                // 日期解析修正：優先採集字串特徵，避免 Date 物件在手機上的 8 小時偏移
+                // 日期解析修正：不再直接用 Regex 抓數字，改用 Date 物件轉換為在地時間提取
                 if (type === 'date' && val) {
-                    const sVal = String(val);
-                    const match = sVal.match(/(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
-                    if (match) {
-                        return `${match[1]}/${match[2].padStart(2, '0')}/${match[3].padStart(2, '0')}`;
-                    }
                     const d = new Date(val);
                     if (!isNaN(d.getTime())) {
+                        // 提取「在地」的年月日，這能正確處理 ISO 字串導致的 8 小時時差問題
                         return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
                     }
                 }
@@ -292,13 +289,22 @@
                 }).sort((a, b) => findVal(a, 'time').localeCompare(findVal(b, 'time')));
             }, [orders, selectedDate, currentCategory, findVal]);
 
+            // --- 核心修正：星期與日期的精準對齊 ---
             const daysArray = useMemo(() => {
-                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
-                const firstDay = new Date(year, month, 1).getDay(); 
+                const year = currentMonth.getFullYear();
+                const month = currentMonth.getMonth();
+                
+                // 強制將 1 號設為中午，避免本地時區偏移導致 getDay() 判定錯誤
+                const firstDayDate = new Date(year, month, 1, 12, 0, 0);
+                const startDayOfWeek = firstDayDate.getDay(); // 0=日, 1=一
                 const totalDays = new Date(year, month + 1, 0).getDate();
+                
                 return Array.from({ length: 42 }, (_, i) => {
-                    const dayNum = i - firstDay + 1;
-                    return (dayNum > 0 && dayNum <= totalDays) ? getLocalDateString(new Date(year, month, dayNum)) : null;
+                    const dayNum = i - startDayOfWeek + 1;
+                    if (dayNum > 0 && dayNum <= totalDays) {
+                        return getLocalDateString(new Date(year, month, dayNum, 12, 0, 0));
+                    }
+                    return null;
                 });
             }, [currentMonth]);
 
