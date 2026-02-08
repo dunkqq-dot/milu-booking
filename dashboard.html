@@ -2,930 +2,406 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MILU 預約管理後台</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>麋鹿氣球 - 整合備貨管理系統</title>
+    <!-- 載入核心套件 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Playfair+Display:ital,wght@0,600;1,600&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: { milu: { gold: '#C69C6D', dark: '#4A4A4A', beige: '#F9F7F2' } }
-                }
-            }
-        }
-    </script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; color: #4A4A4A; height: 100vh; overflow: hidden; }
+        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .card-shadow { box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
-        .active-item { background-color: #FDFbf7; border-left: 4px solid #C69C6D; }
-        [v-cloak] { display: none; }
-        .debug-modal pre { white-space: pre-wrap; word-wrap: break-word; font-size: 11px; color: #333; max-height: 400px; overflow-y: auto; background: #f1f1f1; padding: 15px; border-radius: 5px; text-align: left; }
-        .price-input:focus { border-color: #C69C6D; background-color: #fff; }
-        .edit-input { width: 100%; border-bottom: 1px solid #ddd; background: transparent; padding: 2px 0; font-weight: bold; color: #4A4A4A; }
-        
-        /* 自定義 SweetAlert 按鈕樣式 */
-        .swal2-confirm { background-color: #10B981 !important; } /* 綠色 */
-        .swal2-deny { background-color: #6B7280 !important; } /* 灰色 */
+        .spin { animation: spin 1s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        /* 品牌綠色漸層 */
+        .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
+        .modal-overlay { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
+        .order-card { transition: all 0.2s ease-out; }
+        .status-btn { transition: all 0.1s ease-in-out; }
+        .status-btn:active { transform: scale(0.95); }
     </style>
 </head>
-<body id="app" v-cloak>
+<body class="min-h-screen">
 
-    <div class="flex h-full">
-        <!-- 左側列表 -->
-        <div class="w-full md:w-1/3 bg-white border-r border-gray-200 flex flex-col h-full z-10" :class="{'hidden md:flex': selectedOrder}">
-            
-            <!-- Header 區塊：標題 + 工具列 -->
-            <div class="p-4 border-b border-gray-100 bg-[#F9F7F2] space-y-3">
-                <div class="flex justify-between items-center">
-                    <div>
-                        <h1 class="text-xl font-bold text-milu-gold tracking-wide font-serif">MILU ADMIN</h1>
-                        <p class="text-xs text-gray-400 mt-1">訂單核對系統</p>
-                    </div>
-                    <div class="flex flex-col items-end gap-1">
-                        <div class="flex gap-2">
-                            <button @click="showDebug" class="text-xs px-2 py-1 bg-gray-200 rounded text-gray-600 hover:bg-gray-300">🔍 診斷</button>
-                            <div class="text-xs px-2 py-1 bg-white rounded text-gray-400 border flex items-center gap-1" v-if="loading">
-                                <i class="fa-solid fa-circle-notch fa-spin"></i> 更新中...
-                            </div>
-                            <button @click="fetchData" v-else class="text-gray-400 hover:text-milu-gold transition" title="手動更新"><i class="fa-solid fa-rotate-right"></i></button>
-                        </div>
-                        <span v-if="lastUpdated" class="text-[10px] text-gray-300">更新: {{ lastUpdated }}</span>
-                    </div>
-                </div>
+    <div id="root"></div>
 
-                <!-- 🔍 新增：搜尋與進階篩選區塊 -->
-                <div class="bg-white p-2 rounded-lg border border-gray-200 space-y-2">
-                    <!-- 關鍵字搜尋 -->
-                    <div class="relative">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-300 text-xs"></i>
-                        <input type="text" v-model="searchQuery" placeholder="搜尋姓名、電話、LINE..." 
-                               class="w-full pl-8 pr-2 py-1.5 text-xs bg-gray-50 border border-gray-100 rounded focus:outline-none focus:border-milu-gold focus:bg-white transition">
-                        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-2 text-gray-300 hover:text-gray-500">
-                            <i class="fa-solid fa-times"></i>
-                        </button>
-                    </div>
-                    
-                    <!-- 日期與服務篩選 -->
-                    <div class="flex gap-2">
-                        <input type="date" v-model="filterDate" class="flex-1 text-xs px-2 py-1.5 bg-gray-50 border border-gray-100 rounded focus:outline-none focus:border-milu-gold text-gray-500">
-                        <select v-model="filterService" class="flex-1 text-xs px-2 py-1.5 bg-gray-50 border border-gray-100 rounded focus:outline-none focus:border-milu-gold text-gray-500">
-                            <option value="">所有服務</option>
-                            <option v-for="(conf, key) in configMap" :key="key" :value="key">{{ key }}</option>
-                        </select>
-                        <!-- 清除篩選按鈕 -->
-                        <button v-if="filterDate || filterService" @click="clearFilters" class="px-2 text-gray-400 hover:text-red-400" title="清除篩選">
-                            <i class="fa-solid fa-filter-circle-xmark"></i>
-                        </button>
-                    </div>
-                </div>
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback, memo, useRef } = React;
 
-                <div v-if="errorMsg" class="p-2 bg-red-50 text-red-500 text-xs rounded border border-red-100 break-words">{{ errorMsg }}</div>
-            </div>
-
-            <!-- 狀態頁籤 (全部/未付款/已付款) -->
-            <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto">
-                <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">全部</button>
-                <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">未付款</button>
-                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已付款</button>
-            </div>
-
-            <!-- 訂單列表 -->
-            <div class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
-                <div v-if="filteredList.length === 0" class="text-center py-10 text-gray-400 text-sm flex flex-col items-center">
-                    <i class="fa-regular fa-folder-open text-2xl mb-2 opacity-50"></i>
-                    沒有符合條件的訂單
-                </div>
-
-                <div v-for="order in filteredList" :key="order.oid" @click="selectOrder(order)" 
-                     class="p-4 rounded-xl cursor-pointer transition-all bg-white border border-transparent hover:border-gray-200 card-shadow"
-                     :class="{'active-item': selectedOrder && selectedOrder.oid === order.oid}">
-                    
-                    <div class="flex justify-between items-start mb-2">
-                        <span class="text-xs font-mono text-gray-400 bg-gray-100 px-1 rounded">#{{ order.oid }}</span>
-                        <span class="text-[10px] px-2 py-1 rounded-full font-bold"
-                              :class="{
-                                  'bg-green-100 text-green-600': order.status === 'CONFIRMED',
-                                  'bg-red-100 text-red-500': order.status === 'UNPAID',
-                                  'bg-gray-200 text-gray-600': order.status === 'CANCELED',
-                                  'bg-yellow-100 text-yellow-600': order.status === 'REFUNDED',
-                                  'bg-blue-100 text-blue-600': order.status === 'COMPLETED',
-                                  'bg-blue-400 text-white': order.status === 'WAITING_PAYMENT'
-                              }">
-                            {{ getStatusText(order.status) }}
-                        </span>
-                    </div>
-                    <div class="flex justify-between items-center">
-                        <h3 class="font-bold text-gray-800">
-                            <span v-html="highlightText(order.contactName)"></span>
-                        </h3>
-                        <span class="text-xs text-gray-400">{{ order.service }}</span>
-                    </div>
-                    <div class="flex items-center text-xs text-gray-500 mt-2 gap-3">
-                        <span class="flex items-center gap-1">📅 {{ order.date }}</span>
-                        <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
-                    </div>
-                    
-                    <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.status !== 'CANCELED' && order.status !== 'COMPLETED'">
-                        <span class="text-xs text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
-                        <span class="text-xs font-bold" :class="order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500') : 'text-gray-400'">
-                            {{ order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? `尚欠: NT$ ${formatMoney(order.rawPrice - order.receivedPrice)}` : '已付清') : '待報價' }}
-                        </span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 右側詳情 -->
-        <div class="w-full md:w-2/3 bg-[#F9F9F9] flex flex-col relative h-full" :class="{'hidden md:flex': !selectedOrder}">
-            
-            <div class="md:hidden absolute top-4 left-4 z-20">
-                <button @click="selectedOrder = null" class="bg-white p-2 rounded-full shadow text-gray-500">⬅</button>
-            </div>
-
-            <div v-if="selectedOrder" class="flex-1 overflow-y-auto relative">
-                <div class="min-h-full flex flex-col items-center justify-center p-4 md:p-10 py-16 md:py-10">
-                    <div class="bg-white rounded-3xl shadow-xl border border-gray-100 overflow-hidden w-full max-w-md mx-auto">
-                    
-                        <div class="h-28 flex items-center justify-center transition-colors duration-300 relative"
-                             :class="{
-                                  'bg-[#10B981]': selectedOrder.status === 'CONFIRMED',
-                                  'bg-[#EF4444]': selectedOrder.status === 'UNPAID',
-                                  'bg-gray-500': selectedOrder.status === 'CANCELED',
-                                  'bg-yellow-500': selectedOrder.status === 'REFUNDED',
-                                  'bg-blue-500': selectedOrder.status === 'COMPLETED',
-                                  'bg-blue-400': selectedOrder.status === 'WAITING_PAYMENT'
-                             }">
-                            
-                            <!-- 編輯模式按鈕區 -->
-                            <button v-if="!isEditing" @click="startEdit" class="absolute top-4 right-4 bg-white/20 hover:bg-white/30 text-white p-2 rounded-full transition backdrop-blur-sm" title="編輯資料">
-                                <i class="fa-solid fa-pen"></i>
-                            </button>
-                            <div v-else class="absolute top-4 right-4 flex items-center gap-2">
-                                <!-- 移除原本的 checkbox，改用確認視窗邏輯 -->
-                                <button @click="saveEdit" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm shadow font-bold flex items-center gap-1">
-                                    <i class="fa-solid fa-floppy-disk"></i> 儲存
-                                </button>
-                                <button @click="cancelEdit" class="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg text-sm backdrop-blur-sm">
-                                    取消
-                                </button>
-                            </div>
-
-                            <div class="text-center text-white">
-                                <div class="text-4xl mb-1">
-                                    <i v-if="selectedOrder.status === 'CONFIRMED'" class="fa-solid fa-circle-check"></i>
-                                    <i v-else-if="selectedOrder.status === 'CANCELED'" class="fa-solid fa-circle-xmark"></i>
-                                    <i v-else-if="selectedOrder.status === 'REFUNDED'" class="fa-solid fa-money-bill-transfer"></i>
-                                    <i v-else-if="selectedOrder.status === 'COMPLETED'" class="fa-solid fa-flag-checkered"></i>
-                                    <i v-else-if="selectedOrder.status === 'WAITING_PAYMENT'" class="fa-solid fa-hourglass-half"></i>
-                                    <i v-else class="fa-solid fa-circle-exclamation"></i>
-                                </div>
-                                <h2 class="text-lg font-bold tracking-widest opacity-90">
-                                    {{ getStatusText(selectedOrder.status, true) }}
-                                </h2>
-                            </div>
-                        </div>
-
-                        <div class="p-8 space-y-6 relative">
-                            <div v-if="isEditing" class="absolute top-0 left-0 w-full h-1 bg-yellow-400 animate-pulse"></div>
-
-                            <!-- 客戶資訊 -->
-                            <div class="flex justify-between border-b border-gray-100 pb-4">
-                                <div class="flex-1 mr-4">
-                                    <p class="text-xs text-gray-400 mb-1">CUSTOMER</p>
-                                    <div v-if="isEditing">
-                                        <label class="text-[10px] text-gray-400">LINE名稱</label>
-                                        <input v-model="editForm.lineName" class="edit-input text-sm mb-1" placeholder="LINE名稱">
-                                        <label class="text-[10px] text-gray-400">聯絡人姓名</label>
-                                        <input v-model="editForm.contactName" class="edit-input text-xl mb-1" placeholder="聯絡人姓名">
-                                        <label class="text-[10px] text-gray-400">電話</label>
-                                        <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
-                                    </div>
-                                    <div v-else>
-                                        <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
-                                            <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
-                                        </p>
-                                        <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
-                                        <p class="text-sm text-gray-600 mt-2 flex items-center gap-1">
-                                            <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
-                                        </p>
-                                    </div>
-                                    <p class="text-xs text-gray-300 font-mono mt-2" v-if="!isEditing">
-                                        {{ selectedOrder.userId ? `ID: ...${selectedOrder.userId.substr(-4)}` : '未綁定LINE ID' }}
-                                    </p>
-                                </div>
-                                <div class="text-right">
-                                    <p class="text-xs text-gray-400 mb-1">SERVICE</p>
-                                    <p class="font-bold text-lg text-milu-gold">{{ selectedOrder.service }}</p>
-                                </div>
-                            </div>
-
-                            <!-- 時間日期 -->
-                            <div class="grid grid-cols-2 gap-4">
-                                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                    <p class="text-xs text-gray-400 mb-1">DATE</p>
-                                    <input v-if="isEditing" type="date" v-model="editForm.date" class="edit-input">
-                                    <p v-else class="font-bold text-gray-700">{{ selectedOrder.date }}</p>
-                                </div>
-                                <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                    <p class="text-xs text-gray-400 mb-1">{{ getLabel('time', selectedOrder.service) }}</p>
-                                    <template v-if="isEditing">
-                                        <select v-if="isTimeSlotService(selectedOrder.service)" v-model="editForm.time" class="edit-input">
-                                            <option value="" disabled>請選擇時段</option>
-                                            <option v-for="slot in timeSlots" :key="slot" :value="slot">{{ slot }}</option>
-                                        </select>
-                                        <input v-else type="time" v-model="editForm.time" class="edit-input">
-                                    </template>
-                                    <p v-else class="font-bold text-gray-700">{{ selectedOrder.time }}</p>
-                                </div>
-                            </div>
-                            
-                            <!-- 款項明細 -->
-                            <div class="bg-yellow-50/50 p-4 rounded-xl border border-yellow-100 space-y-3">
-                                <div class="flex justify-between items-center">
-                                    <p class="text-xs text-gray-500 font-bold">總金額 (填入報價)</p>
-                                    <div class="flex items-center">
-                                        <span class="text-xs mr-1 text-gray-400">NT$</span>
-                                        <input type="number" v-model.number="displayRawPrice" 
-                                               @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-gray-800 bg-transparent border-b border-gray-300 w-24 text-right focus:outline-none" 
-                                               placeholder="0">
-                                    </div>
-                                </div>
-                                <div class="flex justify-between items-center mb-2">
-                                    <p class="text-xs text-green-600 font-bold">已收款 (對帳)</p>
-                                    <div class="flex items-center gap-2">
-                                        <button @click="fillFullPayment" class="text-[10px] bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition">
-                                            ⚡同上
-                                        </button>
-                                        <span class="text-xs mr-1 text-green-600">NT$</span>
-                                        <input type="number" v-model.number="displayReceivedPrice" 
-                                               @focus="handlePriceFocus"
-                                               class="price-input font-bold text-lg text-green-600 bg-transparent border-b border-green-200 w-24 text-right focus:outline-none" 
-                                               placeholder="0">
-                                    </div>
-                                </div>
-                                <div class="border-t pt-2 flex justify-between items-center border-yellow-200">
-                                    <p class="text-xs text-red-500 font-bold">尚欠尾款</p>
-                                    <p class="font-bold text-xl text-red-500">
-                                        NT$ {{ formatMoney(displayRawPrice - displayReceivedPrice) }}
-                                    </p>
-                                </div>
-                            </div>
-                            
-                            <!-- 地址 -->
-                            <div class="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                 <p class="text-xs text-gray-400 mb-1">{{ getLabel('location', selectedOrder.service) }}</p>
-                                 <input v-if="isEditing" type="text" v-model="editForm.location" class="edit-input">
-                                 <p v-else class="font-bold text-gray-600 text-sm break-words">{{ selectedOrder.location }}</p>
-                            </div>
-
-                            <!-- 動作按鈕 -->
-                            <div v-if="!isEditing" class="pt-2 space-y-3">
-                                
-                                <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
-                                    <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知 & 帳號
-                                </button>
-
-                                <button v-if="selectedOrder.status === 'UNPAID' || selectedOrder.status === 'WAITING_PAYMENT'" @click="updateOrderStatus('CONFIRM')" class="w-full bg-[#10B981] hover:bg-green-700 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
-                                    <i class="fa-solid fa-check-circle"></i> 確認收款並登記
-                                </button>
-                                
-                                <div v-if="selectedOrder.status === 'CONFIRMED'" class="space-y-2">
-                                    <button @click="updateOrderStatus('COMPLETE')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
-                                        <i class="fa-solid fa-flag-checkered"></i> 完成訂單 (結案)
-                                    </button>
-                                    <p class="text-center text-xs text-gray-400">已付款，可進行結案</p>
-                                </div>
-
-                                <div v-if="selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELED' || selectedOrder.status === 'REFUNDED'" class="space-y-3">
-                                    <div class="text-center py-3 bg-gray-100 text-gray-500 rounded-xl font-bold border border-gray-200">
-                                        此訂單已結案 ({{ getStatusText(selectedOrder.status) }})
-                                    </div>
-                                    <button @click="updateOrderStatus('RESTORE')" class="w-full bg-gray-500 hover:bg-gray-600 text-white py-3 rounded-xl font-bold transition shadow active:scale-95 flex items-center justify-center gap-2">
-                                        <i class="fa-solid fa-rotate-left"></i> 恢復訂單 (重設為未付款)
-                                    </button>
-                                </div>
-
-                                <div class="flex gap-2" v-if="selectedOrder.status !== 'CANCELED' && selectedOrder.status !== 'REFUNDED' && selectedOrder.status !== 'COMPLETED'">
-                                    <button v-if="selectedOrder.status === 'CONFIRMED'" @click="updateOrderStatus('REFUND')" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
-                                        <i class="fa-solid fa-money-bill-transfer"></i> 辦理退款
-                                    </button>
-                                    <button @click="updateOrderStatus('CANCEL')" class="flex-1 bg-gray-400 hover:bg-gray-500 text-white py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 shadow active:scale-95">
-                                        <i class="fa-solid fa-ban"></i> 取消訂單
-                                    </button>
-                                </div>
-
-                                <p class="text-center text-xs text-gray-400 pt-2">* 點擊按鈕將同步更新試算表與發送 LINE 通知</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div v-else class="flex-1 flex items-center justify-center text-gray-400">
-                <p>請從左側選擇一筆訂單查看詳情</p>
-            </div>
-        </div>
-    </div>
-
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-    <script>
-        const { createApp, ref, computed, onMounted } = Vue;
-
-        const configMap = {
-            '專人佈置': { time: '進場佈置時間', location: '佈置地址', icon: '✨' },
-            '工作室取貨': { time: '取貨時間', location: '取貨門市', icon: '🛒' },
-            '後車廂佈置': { time: '抵達時間', location: '施作地點', icon: '🚗' },
-            '氣球外送': { time: '外送時段', location: '外送地址', icon: '🚚' }
+        // --- 輔助函式：取得本地日期字串 YYYY-MM-DD，確保不受時區偏移干擾 ---
+        const getLocalDateString = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
         };
 
-        const timeSlots = [
-            "12:30 - 13:00", "13:00 - 14:00", "14:00 - 15:00", "15:00 - 16:00", 
-            "16:00 - 17:00", "17:00 - 18:00", "18:00 - 19:00"
-        ];
-
-        createApp({
-            setup() {
-                const DATA_API_URL = 'https://script.google.com/macros/s/AKfycbwfAyj7ktWXv4gPoFo7wVPLn1_nQ6w0hX8kTToggetxt3jqqD7yp67cxlrg5l1N1rsLaA/exec'; 
-                // ⚠️ Make Webhook URL (用於直接發送 LINE 訊息)
-                const SEND_MSG_WEBHOOK = 'https://hook.eu1.make.com/63u0kheb71v9vengzdggfy1ga7r8gmng';
-
-                const reservations = ref([]);
-                const selectedOrder = ref(null);
-                const isEditing = ref(false);
-                const editForm = ref({});
-                const filter = ref('ALL');
-                
-                // 🔍 新增篩選變數
-                const searchQuery = ref('');
-                const filterDate = ref('');
-                const filterService = ref('');
-
-                const loading = ref(true);
-                const errorMsg = ref(null);
-                const rawJsonData = ref(null);
-                const lastUpdated = ref(null);
-
-                const safeText = (text) => (text && String(text).trim() !== '') ? String(text) : ' ';
-                const formatMoney = (val) => (!val && val !== 0) ? '0' : val.toLocaleString();
-                const parseMoney = (val) => {
-                    if (!val) return 0;
-                    const str = String(val).replace(/[^\d.-]/g, '');
-                    return parseInt(str) || 0;
-                };
-
-                // 增加了 '取貨' 判斷，使工作室取貨也能顯示選單
-                const isTimeSlotService = (service) => service.includes('外送') || service.includes('自取') || service.includes('取貨');
-
-                const displayRawPrice = computed({
-                    get: () => isEditing.value ? editForm.value.rawPrice : (selectedOrder.value ? selectedOrder.value.rawPrice : 0),
-                    set: (val) => {
-                        if (isEditing.value) editForm.value.rawPrice = val;
-                        else if (selectedOrder.value) selectedOrder.value.rawPrice = val;
-                    }
-                });
-
-                const displayReceivedPrice = computed({
-                    get: () => isEditing.value ? editForm.value.receivedPrice : (selectedOrder.value ? selectedOrder.value.receivedPrice : 0),
-                    set: (val) => {
-                        if (isEditing.value) editForm.value.receivedPrice = val;
-                        else if (selectedOrder.value) selectedOrder.value.receivedPrice = val;
-                    }
-                });
-
-                const fillFullPayment = () => {
-                    if (isEditing.value) editForm.value.receivedPrice = editForm.value.rawPrice;
-                    else if (selectedOrder.value) selectedOrder.value.receivedPrice = selectedOrder.value.rawPrice;
-                };
-
-                const calculateDaysDiff = (dateStr) => {
-                    if (!dateStr) return 0;
-                    const targetDate = new Date(dateStr);
-                    const today = new Date();
-                    targetDate.setHours(0, 0, 0, 0);
-                    today.setHours(0, 0, 0, 0);
-                    const diffTime = targetDate - today;
-                    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                };
-
-                const getPaymentMessage = (type, dateStr) => {
-                    const diffDays = calculateDaysDiff(dateStr);
-                    const rules = {
-                        DECO_NORMAL: "1. 單一時段僅服務一組客人，以先支付訂金者優先。\n2. 匯款期限：請於三日內完成匯款。\n3. 訂金規則：可付全額或 50% 訂金，尾款於活動當日支付。\n4. 改期與取消：僅接受一次改期；個人因素取消收 30% 服務費。",
-                        DECO_URGENT: "⚠️ 3日內急單專用規則\n1. 請於預約時「支付全額款項」並截圖回傳。\n2. 預約前 5 小時未收款視為未成立。\n3. 24小時內急件需加收 $500。\n4. 取消不退還任何款項。",
-                        SIMPLE: "1. 請於預約當下「支付全額款項」並截圖回傳。\n2. 預約前 24 小時未收款視為未成立。\n3. 急件加收 $500。\n4. 24小時內取消不退款。"
-                    };
-                    if (type.includes('佈置') || type.includes('後車廂')) return diffDays <= 3 ? rules.DECO_URGENT : rules.DECO_NORMAL;
-                    return rules.SIMPLE;
-                };
-
-                const formatForLine = (htmlText) => {
-                    if (!htmlText) return "無";
-                    return htmlText.replace(/<br\s*\/?>/gi, '\n')
-                                   .replace(/<\/p>/gi, '\n\n')
-                                   .replace(/<li>/gi, '• ')
-                                   .replace(/<\/li>/gi, '\n')
-                                   .replace(/<[^>]+>/g, '') 
-                                   .replace(/&nbsp;/g, ' ').trim();
-                };
-
-                const formatGASDate = (val) => {
-                    if (!val) return '';
-                    const s = String(val);
-                    if (s.includes('T')) {
-                        const d = new Date(s);
-                        if (isNaN(d.getTime())) return s;
-                        const y = d.getFullYear();
-                        const m = String(d.getMonth() + 1).padStart(2, '0');
-                        const day = String(d.getDate()).padStart(2, '0');
-                        return `${y}-${m}-${day}`;
-                    }
-                    return s;
-                };
-
-                // 🛠️ 終極修復版 4.0：全面時差校正 (Force LMT Correction)
-                // 針對所有帶有 1899/1900 年份標記的日期，一律扣除 38 分鐘
-                const formatGASTime = (val) => {
-                    if (!val) return '';
-                    let s = String(val).trim();
-
-                    // 1. 保護區間時段 (如: "13:00 - 14:00")
-                    if (s.includes(' - ') || s.includes('~')) return s;
-
-                    // 2. 處理 1899/1900 年預設日期格式 (Google Sheets Time Column)
-                    if (s.includes('T') && (s.includes('1899') || s.includes('1900'))) {
-                        const match = s.match(/T(\d{2}):(\d{2})/);
-                        if (match) {
-                            let h = parseInt(match[1]); // UTC Hour
-                            let m = parseInt(match[2]); // UTC Minute
-                            
-                            // 轉為分鐘計算
-                            let totalMinutes = h * 60 + m;
-                            
-                            // 加上台灣時區 (+8小時 = +480分鐘)
-                            totalMinutes += 480;
-                            
-                            // 🔥 強制扣除 38 分鐘 (修正 Google Sheets 1899年 LMT 誤差)
-                            totalMinutes -= 38;
-
-                            // 處理跨日與負數
-                            while (totalMinutes < 0) totalMinutes += 1440; // 1440 mins in a day
-                            while (totalMinutes >= 1440) totalMinutes -= 1440;
-                            
-                            // 轉回 HH:mm
-                            h = Math.floor(totalMinutes / 60);
-                            m = totalMinutes % 60;
-                            
-                            return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-                        }
-                    }
-
-                    // 3. 一般格式處理
-                    const simpleTimeRegex = /^(\d{1,2}):(\d{2})(:(\d{2}))?$/;
-                    const match = s.match(simpleTimeRegex);
-                    if (match) return `${match[1].padStart(2, '0')}:${match[2]}`;
-                    
-                    return s;
-                };
-
-                const fetchData = async () => {
-                    if (isEditing.value) return; // 編輯中不更新
-                    loading.value = true; errorMsg.value = null;
-                    if (!DATA_API_URL) { errorMsg.value = "尚未設定 GAS API 網址"; loading.value = false; return; }
-
-                    try {
-                        const res = await fetch(`${DATA_API_URL}?mode=api`);
-                        const text = await res.text();
-                        if (text.trim() === "Accepted") throw new Error("Make API 目前沒有回傳資料。");
-                        let data = JSON.parse(text);
-                        
-                        data = data.filter(item => item[0] && String(item[0]).trim() !== '' && item[3] && String(item[3]).trim() !== '');
-                        rawJsonData.value = data;
-
-                        const formattedData = data.map((item, index) => {
-                            let serviceName = item[8] || '服務';
-                            if (serviceName.includes('自取')) serviceName = '工作室取貨'; 
-                            else if (serviceName.includes('後車廂')) serviceName = '後車廂佈置';
-                            else if (serviceName.includes('外送')) serviceName = '氣球外送';
-                            else if (serviceName.includes('佈置')) serviceName = '專人佈置';
-
-                            const rawStatus = (item[10] || '').trim();
-                            let status = 'UNPAID';
-                            if ((rawStatus.includes('已') || rawStatus.includes('確認') || rawStatus.includes('OK')) && !(rawStatus.includes('未') || rawStatus.includes('待'))) status = 'CONFIRMED';
-                            if (rawStatus.includes('取消')) status = 'CANCELED';
-                            if (rawStatus.includes('退款')) status = 'REFUNDED';
-                            if (rawStatus.includes('完成') || rawStatus.includes('結案')) status = 'COMPLETED';
-                            if (rawStatus.includes('等待') || rawStatus.includes('須知')) status = 'WAITING_PAYMENT';
-
-                            return {
-                                id: index.toString(), 
-                                oid: item[0] || `M-${index}`, 
-                                lineName: item[2] || '未知LINE', 
-                                contactName: item[3] || '未知客戶', 
-                                phone: item[4] || '', 
-                                service: serviceName, 
-                                date: formatGASDate(item[5]), 
-                                time: formatGASTime(item[6]), 
-                                location: item[7] || '未填寫地點', 
-                                userId: item[9] || '', 
-                                status, 
-                                rawPrice: parseMoney(item[11]), 
-                                receivedPrice: parseMoney(item[12])
-                            };
-                        });
-                        reservations.value = formattedData.sort((a, b) => new Date(b.date) - new Date(a.date));
-                        
-                        if (selectedOrder.value) {
-                             const updated = formattedData.find(r => r.oid === selectedOrder.value.oid);
-                             if (updated && !isEditing.value) Object.assign(selectedOrder.value, updated);
-                        } else if (formattedData.length > 0 && window.innerWidth >= 768) {
-                             selectedOrder.value = formattedData[0];
-                        }
-                        
-                        lastUpdated.value = new Date().toLocaleTimeString();
-                    } catch (e) { errorMsg.value = e.message; }
-                    loading.value = false;
-                };
-
-                const getStatusText = (status, isEnglish = false) => {
-                    if (isEnglish) return status === 'CONFIRMED' ? 'PAYMENT CONFIRMED' : (status === 'COMPLETED' ? 'ORDER COMPLETED' : 'WAITING FOR PAYMENT');
-                    return status === 'CONFIRMED' ? '已付款' : (status === 'COMPLETED' ? '已完成' : (status === 'CANCELED' ? '已取消' : (status === 'REFUNDED' ? '已退款' : (status === 'WAITING_PAYMENT' ? '等待匯款' : '未付款'))));
-                };
-
-                const getLabel = (type, service) => (configMap[service] || configMap['專人佈置'])[type];
-                const selectOrder = (order) => { if(!isEditing.value) selectedOrder.value = order; };
-
-                // 🔍 強化版篩選邏輯
-                const filteredList = computed(() => {
-                    let result = reservations.value;
-
-                    // 1. 狀態篩選
-                    if (filter.value === 'UNPAID') result = result.filter(r => r.status === 'UNPAID' || r.status === 'WAITING_PAYMENT');
-                    else if (filter.value !== 'ALL') result = result.filter(r => r.status === filter.value);
-
-                    // 2. 關鍵字搜尋 (支援姓名、電話、LINE)
-                    if (searchQuery.value) {
-                        const q = searchQuery.value.toLowerCase();
-                        result = result.filter(r => 
-                            r.contactName.toLowerCase().includes(q) || 
-                            r.phone.includes(q) || 
-                            r.lineName.toLowerCase().includes(q)
-                        );
-                    }
-
-                    // 3. 日期篩選
-                    if (filterDate.value) {
-                        result = result.filter(r => r.date === filterDate.value);
-                    }
-
-                    // 4. 服務篩選
-                    if (filterService.value) {
-                        result = result.filter(r => r.service === filterService.value);
-                    }
-
-                    return result;
-                });
-
-                const clearFilters = () => {
-                    filterDate.value = '';
-                    filterService.value = '';
-                };
-                
-                // 簡單的高亮文字功能 (增加防呆)
-                const highlightText = (text) => {
-                    if (!text) return ''; // 👈 防呆
-                    if (!searchQuery.value) return text;
-                    const regex = new RegExp(`(${searchQuery.value})`, 'gi');
-                    return text.replace(regex, '<span class="bg-yellow-200 text-black">$1</span>');
-                };
-
-                const buildRichFlexMessage = (order, actionType) => {
-                      const config = configMap[order.service] || configMap['專人佈置'];
-                      const total = parseInt(order.rawPrice) || 0;
-                      const paid = parseInt(order.receivedPrice) || 0;
-                      const balance = total - paid;
-                      let titleText = 'PAYMENT CONFIRMED'; let descText = '預約與款項已確認'; let statusColor = '#10B981';
-                      let bodyContents = [];
-
-                      if (actionType === 'CANCEL') { titleText = 'ORDER CANCELED'; descText = '預約已取消'; statusColor = '#EF4444'; }
-                      else if (actionType === 'REFUND') { titleText = 'REFUND COMPLETED'; descText = '退款辦理完成'; statusColor = '#EAB308'; }
-                      else if (actionType === 'COMPLETE') { titleText = 'SERVICE COMPLETED'; descText = '服務已完成'; statusColor = '#2563EB'; }
-                      else if (actionType === 'RESTORE') { titleText = 'ORDER RESTORED'; descText = '訂單狀態已恢復'; statusColor = '#EF4444'; }
-                      else if (actionType === 'UPDATE') { titleText = 'BOOKING UPDATED'; descText = '預約資料已更新'; statusColor = '#3B82F6'; }
-                      else if (actionType === 'PAYMENT_REQUEST') { 
-                          titleText = 'PAYMENT REQUEST'; 
-                          descText = '請詳閱付款規則並完成匯款'; 
-                          statusColor = '#2563EB'; 
-                          const ruleText = formatForLine(getPaymentMessage(order.service, order.date));
-                          bodyContents = [
-                            { "type": "text", "text": `本次訂單總金額: NT$ ${total.toLocaleString()}`, "weight": "bold", "size": "md", "color": "#C69C6D", "align": "center", "margin": "md" },
-                            { "type": "separator", "margin": "md" },
-                            { "type": "text", "text": "付款注意事項", "weight": "bold", "size": "md", "color": "#2563EB", "margin": "md" },
-                            { "type": "text", "text": safeText(ruleText), "size": "xs", "color": "#666666", "wrap": true, "margin": "sm" },
-                            { "type": "separator", "margin": "lg" },
-                            { "type": "text", "text": "匯款資訊：彰化銀行 (009)", "size": "xs", "color": "#aaaaaa", "margin": "lg" },
-                            { 
-                                "type": "text", 
-                                "text": "54320100686300", 
-                                "weight": "bold", 
-                                "size": "xl", 
-                                "color": "#4A4A4A", 
-                                "margin": "md", 
-                                "align": "center", 
-                                "wrap": true,
-                                "action": { "type": "clipboard", "clipboardText": "54320100686300", "label": "複製帳號" } 
-                            },
-                            { "type": "text", "text": "(點擊上方數字即可複製)", "size": "xxs", "color": "#cccccc", "align": "center", "margin": "xs" }
-                          ];
-                      }
-
-                      if (bodyContents.length === 0) {
-                          if (actionType === 'COMPLETE') {
-                              bodyContents = [ { "type": "text", "text": "感謝您選擇 MILU BALLOONS！", "weight": "bold", "size": "md", "color": "#4A4A4A", "align": "center", "margin": "lg", "wrap": true }, { "type": "text", "text": "期待再次為您服務 ❤️", "size": "sm", "color": "#666666", "align": "center", "margin": "sm" } ];
-                          } else {
-                              bodyContents = [
-                                { "type": "box", "layout": "vertical", "margin": "md", "spacing": "sm",
-                                    "contents": [
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "客戶姓名", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": safeText(order.contactName), "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "聯絡電話", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": safeText(order.phone), "size": "xs", "color": "#666666", "align": "end", "flex": 4 } ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": "預約日期", "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": safeText(order.date), "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ { "type": "text", "text": config.time, "size": "xs", "color": "#aaaaaa", "flex": 2 }, { "type": "text", "text": safeText(order.time), "size": "xs", "color": "#666666", "align": "end", "flex": 4, "weight": "bold" } ] },
-                                        { "type": "box", "layout": "vertical", "margin": "sm", "contents": [ { "type": "text", "text": config.location, "size": "xs", "color": "#aaaaaa" }, { "type": "text", "text": safeText(order.location), "size": "xs", "color": "#666666", "margin": "xs", "wrap": true, "weight": "bold" } ] }
-                                    ]
-                                },
-                                { "type": "separator", "margin": "xl" },
-                                { "type": "box", "layout": "vertical", "margin": "lg", "spacing": "sm", 
-                                    "contents": [
-                                        { "type": "box", "layout": "horizontal", "contents": [ 
-                                            { "type": "text", "text": "總計金額", "size": "sm", "color": "#aaaaaa", "flex": 2 }, 
-                                            { "type": "text", "text": `NT$ ${total.toLocaleString()}`, "size": "sm", "color": "#666666", "align": "end", "flex": 3, "weight": "bold" } 
-                                        ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ 
-                                            { "type": "text", "text": "已收款", "size": "sm", "color": "#10B981", "weight": "bold", "flex": 2 }, 
-                                            { "type": "text", "text": `NT$ ${paid.toLocaleString()}`, "size": "sm", "color": "#10B981", "align": "end", "weight": "bold", "flex": 3 } 
-                                        ] },
-                                        { "type": "box", "layout": "horizontal", "contents": [ 
-                                            { "type": "text", "text": "尚欠尾款", "size": "sm", "color": "#EF4444", "weight": "bold", "flex": 2 }, 
-                                            { "type": "text", "text": `NT$ ${balance.toLocaleString()}`, "size": "sm", "color": "#EF4444", "align": "end", "weight": "bold", "flex": 3 } 
-                                        ] }
-                                    ]
-                                }
-                             ];
-                          }
-                      }
-
-                      return {
-                         "type": "bubble", "size": "mega",
-                         "header": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": safeText(titleText), "weight": "bold", "color": statusColor, "size": "xs", "align": "center" } ], "paddingBottom": "none" },
-                          "body": {
-                              "type": "box", "layout": "vertical",
-                              "contents": [
-                                  { "type": "text", "text": `${config.icon} ${safeText(order.service)}`, "weight": "bold", "size": "xl", "align": "center", "color": "#4A4A4A", "wrap": true },
-                                  { "type": "text", "text": safeText(descText), "size": "sm", "color": "#999999", "align": "center", "margin": "xs" },
-                                  { "type": "separator", "margin": "md" },
-                                  ...bodyContents
-                              ]
-                          },
-                          "footer": { "type": "box", "layout": "vertical", "contents": [ { "type": "text", "text": "如有任何問題請隨時私訊我們", "size": "xxs", "color": "#cccccc", "align": "center" } ] }
-                      };
-                };
-
-                // ⚡ 專門負責發送 LINE 訊息的函式 (修正版：傳送所有欄位 + 強制覆寫設定)
-                const sendToMake = async (payload, flex) => {
-                    // 1. 合併完整資料，確保 Make 收到所有欄位 (解決"資料很少"的問題)
-                    // 2. 強制設定 notifyMake 為 'true'，確保 Make 收到正確訊號
-                    const makePayload = {
-                        ...payload, // 包含 orderId, service, date, time, price, balance 等所有欄位
-                        
-                        // Override specific fields for Make to ensure success
-                        notifyMake: 'true', 
-                        flexContents: flex, 
-                        flexJson: JSON.stringify(flex), 
-                        altText: payload.message ? payload.message.altText : '新通知',
-                        
-                        // 額外確保這些欄位存在
-                        lineName: payload.lineName,
-                        clientName: payload.clientName,
-                        
-                        // 模擬 LINE Bot API 格式 (備用)
-                        messages: [ 
-                            { 
-                                type: "flex", 
-                                altText: payload.message ? payload.message.altText : '新通知', 
-                                contents: flex 
-                            } 
-                        ]
-                    };
-
-                    // 3. 深拷貝移除 Vue Proxy 殘留
-                    const cleanBody = JSON.parse(JSON.stringify(makePayload));
-
-                    console.log("Sending to Make (Full Payload):", cleanBody);
-
-                    return fetch(SEND_MSG_WEBHOOK, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-                        body: JSON.stringify(cleanBody)
-                    });
-                };
-
-                const updateOrderStatus = async (actionType) => {
-                    const order = selectedOrder.value;
-                    if (!order) return;
-                    if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID', 'warning');
-                    
-                    Swal.fire({
-                        title: '確認發送通知？',
-                        text: `即將發送 LINE 通知給 ${order.contactName}`,
-                        icon: 'question',
-                        showCancelButton: true,
-                        confirmButtonText: '確定發送',
-                        cancelButtonText: '取消'
-                    }).then(async (result) => {
-                        if (result.isConfirmed) {
-                            try {
-                                Swal.fire({ title: '處理中...', text: '正在發送通知並更新資料', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-                                const flex = buildRichFlexMessage(order, actionType);
-                                
-                                let statusText = '';
-                                if (actionType === 'CONFIRM') statusText = '✅ 已付款'; 
-                                else if (actionType === 'PAYMENT_REQUEST') statusText = '⏳ 等待匯款';
-                                else if (actionType === 'COMPLETE') statusText = '🏁 已完成'; 
-                                else if (actionType === 'CANCEL') statusText = '❌ 已取消';
-                                else if (actionType === 'REFUND') statusText = '💸 已退款';
-                                else if (actionType === 'RESTORE') statusText = '⚠️ 未付款';
-
-                                const price = parseInt(order.rawPrice) || 0;
-                                const received = parseInt(order.receivedPrice) || 0;
-                                const balance = price - received;
-
-                                const payload = {
-                                    action: 'UPDATE_ORDER',
-                                    orderId: order.oid,
-                                    service: order.service,
-                                    lineName: order.lineName,
-                                    clientName: order.contactName, 
-                                    phone: order.phone,
-                                    date: order.date,
-                                    time: order.time,
-                                    location: order.location,
-                                    status: statusText,
-                                    price: price,
-                                    received: received,
-                                    balance: balance,
-                                    createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
-                                    notifyMake: 'false', // ⛔ 告訴 GAS 不要發送，因為我們自己發
-                                    to: order.userId,
-                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
-                                    flexContents: flex
-                                };
-
-                                // 🚀 修正：個別處理 Promise 錯誤，防止單一請求失敗導致整體流程中斷
-                                // 這樣即便 GAS 回傳 CORS 錯誤 (實際上已成功)，也不會卡住 UI
-                                const p1 = fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) })
-                                           .then(res => { /* ok */ })
-                                           .catch(err => console.log("GAS Request finished (ignore error):", err));
-
-                                const p2 = sendToMake(payload, flex)
-                                           .catch(err => console.log("Make Request finished (ignore error):", err));
-
-                                await Promise.all([p1, p2]);
-                                
-                                if (actionType === 'CONFIRM') order.status = 'CONFIRMED';
-                                else if (actionType === 'PAYMENT_REQUEST') order.status = 'WAITING_PAYMENT';
-                                else if (actionType === 'COMPLETE') order.status = 'COMPLETED';
-                                else if (actionType === 'CANCEL') order.status = 'CANCELED';
-                                else if (actionType === 'REFUND') order.status = 'REFUNDED';
-                                else if (actionType === 'RESTORE') order.status = 'UNPAID';
-                                
-                                Swal.fire('成功', '通知已送出！', 'success');
-                            } catch (e) { Swal.fire('錯誤', '發送失敗：' + e.message, 'error'); }
-                        }
-                    });
-                };
-                
-                const handlePriceFocus = () => { if (!isEditing.value) startEdit(); };
-                const startEdit = () => { 
-                    const formData = { ...selectedOrder.value };
-                    if (formData.date && formData.date.includes('/')) formData.date = formData.date.replace(/\//g, '-');
-                    editForm.value = formData; 
-                    isEditing.value = true; 
-                };
-                const cancelEdit = () => { isEditing.value = false; editForm.value = {}; };
-                
-                // 🔥 修改後的儲存邏輯 (解決存檔成功卻顯示錯誤的問題)
-                const saveEdit = async () => {
-                    // 1. 先詢問使用者意願
-                    const { isConfirmed, isDenied } = await Swal.fire({
-                        title: '儲存變更',
-                        text: '您希望同時發送 LINE 通知給客人嗎？',
-                        icon: 'question',
-                        showDenyButton: true,
-                        showCancelButton: true,
-                        confirmButtonText: '儲存並發送通知', // isConfirmed = true
-                        denyButtonText: '僅儲存 (不通知)',   // isDenied = true
-                        cancelButtonText: '取消',
-                        confirmButtonColor: '#10B981', // 綠色
-                        denyButtonColor: '#6B7280'     // 灰色
-                    });
-
-                    if (!isConfirmed && !isDenied) return; // 按下取消
-
-                    const order = selectedOrder.value;
-                    const shouldNotify = isConfirmed; // true=發送, false=靜音
-
-                    Swal.fire({ title: '儲存中...', text: shouldNotify ? '正在更新並發送通知...' : '正在安靜儲存...', didOpen: () => Swal.showLoading() });
-                    
-                    let statusText = '';
-                    if (order.status === 'CONFIRMED') statusText = '✅ 已付款';
-                    else if (order.status === 'WAITING_PAYMENT') statusText = '⏳ 等待匯款';
-                    else if (order.status === 'UNPAID') statusText = '⚠️ 未付款';
-                    else if (order.status === 'COMPLETED') statusText = '🏁 已完成';
-
-                    const flex = buildRichFlexMessage({ ...order, ...editForm.value }, 'UPDATE');
-                    
-                    const price = parseMoney(editForm.value.rawPrice);
-                    const received = parseMoney(editForm.value.receivedPrice);
-                    const balance = price - received;
-
-                    const payload = {
-                        action: 'UPDATE_ORDER',
-                        orderId: order.oid,
-                        service: order.service,
-                        lineName: editForm.value.lineName,
-                        clientName: editForm.value.contactName, 
-                        phone: editForm.value.phone,
-                        date: editForm.value.date,
-                        time: editForm.value.time,
-                        location: editForm.value.location,
-                        status: statusText,
-                        price: price,
-                        received: received,
-                        balance: balance,
-                        
-                        // 邏輯控制
-                        createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false',
-                        notifyMake: 'false', // ⛔ 告訴 GAS 不要發送
-                        
-                        // 關鍵：如果選擇不通知，將 to 設為空字串，讓 Make 的 Filter 擋下
-                        to: shouldNotify ? order.userId : '', 
-                        
-                        message: shouldNotify ? { type: "flex", altText: `資料更新：${order.service}`, contents: flex } : null,
-                        flexContents: shouldNotify ? flex : null
-                    };
-
-                    try {
-                        // 🚀 關鍵修正：將請求各自加上 catch 處理
-                        // 這樣即便 GAS 因為轉址回傳 CORS 錯誤，也不會被視為失敗，程式會繼續執行
-                        const p1 = fetch(DATA_API_URL, { method: 'POST', body: JSON.stringify(payload) })
-                                   .then(res => { /* ok */ })
-                                   .catch(err => console.log("GAS Request finished (ignore error):", err));
-
-                        // 發送 LINE 到 Make (修正：無論是否通知都發送，交由 Make Filter 決定)
-                        const p2 = sendToMake(payload, flex)
-                                   .catch(err => console.log("Make Request finished (ignore error):", err));
-
-                        await Promise.all([p1, p2]);
-                        
-                        Object.assign(selectedOrder.value, editForm.value);
-                        selectedOrder.value.contactName = editForm.value.contactName; 
-                        selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
-                        selectedOrder.value.receivedPrice = parseMoney(editForm.value.receivedPrice);
-                        isEditing.value = false;
-                        Swal.fire('成功', shouldNotify ? '資料已更新並發送通知！' : '資料已更新 (未發送通知)', 'success');
-                    } catch (e) { 
-                        // 這個 catch 現在只會捕捉程式邏輯錯誤，而不會捕捉被忽略的網路錯誤
-                        Swal.fire('錯誤', e.message, 'error'); 
-                    }
-                };
-
-                const showDebug = () => {
-                    Swal.fire({
-                        title: '原始資料診斷',
-                        html: `<div class="debug-modal text-left"><p class="text-[10px] mb-2 font-bold text-red-500">檢測到 ${rawJsonData.value.length} 筆資料</p><pre>${JSON.stringify(rawJsonData.value[0], null, 2)}</pre></div>`,
-                        width: '600px'
-                    });
-                };
-
-                // 將自動更新頻率改為 30 秒 (解決問題 3)
-                onMounted(() => { fetchData(); setInterval(fetchData, 30000); });
-                return { 
-                    reservations, selectedOrder, filter, loading, errorMsg, filteredList, 
-                    selectOrder, fetchData, updateOrderStatus, getStatusText, getLabel, showDebug,
-                    isEditing, editForm, startEdit, cancelEdit, saveEdit, formatMoney, displayRawPrice, displayReceivedPrice,
-                    isTimeSlotService, timeSlots, fillFullPayment, lastUpdated, handlePriceFocus,
-                    // 新增的搜尋與篩選變數
-                    searchQuery, filterDate, filterService, clearFilters, configMap, highlightText
-                };
+        // --- 系統設定 ---
+        const CONFIG = {
+            OFFICIAL: {
+                name: "官網系統",
+                url: "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec",
+                statusField: "備貨狀態",
+                params: "action=getOrders"
+            },
+            MILU: {
+                name: "MILU系統",
+                url: "https://script.google.com/macros/s/AKfycbyL1VarFpdQhPe24Fj9RQrGYoGunAcm1XNxlZwIW-kr_3CqG_hvQgWoS0xpCb9zb0vdjQ/exec",
+                statusField: "撿貨狀態",
+                params: "mode=api"
             }
-        }).mount('#app');
+        };
+
+        const CATEGORIES = ["全部", "專人佈置", "氣球外送", "工作室取貨", "後車廂佈置", "官網訂單"];
+
+        const FIELD_MAPS = {
+            id: ["訂單編號", "編號", "OrderID"],
+            name: ["收件人姓名", "收件人", "客戶名稱", "姓名"],
+            address: ["詳細地址", "地址", "送貨地址", "地點"],
+            date: ["日期", "送貨日期", "預約日期", "取貨/送貨日期"],
+            time: ["時間/時段", "送貨時段", "配送時段", "預約時間", "時間"],
+            status: ["備貨狀態", "撿貨狀態", "備貨"],
+            payment: ["付款狀態", "狀態", "付款", "支付狀態"],
+            remark: ["備註", "備註欄", "注意事項"],
+            itemType: ["品項類型", "品項"],
+        };
+
+        const LucideIcon = memo(({ name, size = 18, className = "" }) => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        });
+
+        // --- 訂單卡片元件：優化手機端顯示 ---
+        const OrderCard = memo(({ order, config, findVal, handleUpdate, isSyncing }) => {
+            const status = findVal(order, 'status');
+            const iType = findVal(order, 'itemType');
+            const rawId = findVal(order, 'id');
+            // 修正：確保只有一個 # 符號
+            const displayId = String(rawId).startsWith('#') ? rawId : `#${rawId}`;
+
+            return (
+                <div className={`order-card bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-6 md:p-7 relative ${isSyncing ? 'opacity-70' : ''}`}>
+                    {isSyncing && (
+                        <div className="absolute top-4 right-8 flex items-center gap-1 text-[9px] font-bold text-emerald-600 animate-pulse">
+                            <LucideIcon name="cloud-upload" size={12} /> 同步中...
+                        </div>
+                    )}
+                    <div className="flex justify-between items-start mb-5 gap-4">
+                        <div className="flex-1 min-w-0 space-y-1.5">
+                            <div className="flex gap-2 flex-wrap">
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded border shrink-0 ${order._src === "OFFICIAL" ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"}`}>
+                                    {config[order._src].name}
+                                </span>
+                                <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded uppercase truncate max-w-[100px]">{order["__sheet__"]}</span>
+                                {iType && iType !== "-" && <span className="text-[9px] font-black bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-100 shrink-0">✨ {iType}</span>}
+                            </div>
+                            <h4 className="font-black text-xl md:text-2xl text-slate-800 break-words leading-tight">{findVal(order, 'name')}</h4>
+                            <p className="text-[10px] font-bold text-slate-300 tracking-wider truncate">{displayId}</p>
+                        </div>
+                        <div className={`text-[10px] font-black px-3 py-1.5 rounded-full shadow-sm transition-colors duration-200 shrink-0 whitespace-nowrap mt-1 ${
+                            status.includes("檢查") ? "bg-emerald-500 text-white" : status.includes("已備") ? "bg-amber-400 text-white" : "bg-red-600 text-white"
+                        }`}>{status || "未撿取"}</div>
+                    </div>
+
+                    <div className="space-y-3 mb-6">
+                        <div className="flex items-center gap-3 text-slate-700 font-black bg-slate-50 p-3 rounded-2xl w-fit border border-slate-100">
+                            <LucideIcon name="clock" className="text-emerald-500" />
+                            <span className="whitespace-nowrap">{findVal(order, 'time')}</span>
+                        </div>
+                        <div className="flex items-start gap-3 px-1">
+                            <LucideIcon name="map-pin" className="shrink-0 mt-0.5 text-slate-300" />
+                            <span className="text-sm text-slate-500 font-bold leading-relaxed break-words">{findVal(order, 'address')}</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                        {["未撿取", "已備貨", "檢查完畢"].map((st) => (
+                            <button key={st} disabled={isSyncing} onClick={() => handleUpdate(order, st)} 
+                                className={`status-btn py-3 md:py-4 rounded-2xl text-[10px] md:text-[11px] font-black border transition-all active:scale-95 ${
+                                    status === st || (!status && st === "未撿取") ? 'bg-slate-800 text-white shadow-xl' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'
+                                }`}>{st}</button>
+                        ))}
+                    </div>
+                </div>
+            );
+        });
+
+        const App = () => {
+            const [orders, setOrders] = useState([]);
+            const [loading, setLoading] = useState(false);
+            const [currentMonth, setCurrentMonth] = useState(new Date());
+            const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
+            const [currentCategory, setCurrentCategory] = useState("全部");
+            const [toast, setToast] = useState(null);
+            
+            const [syncingIds, setSyncingIds] = useState(new Set());
+            const lastUpdateRef = useRef({});
+
+            const findVal = useCallback((order, type) => {
+                if (!order) return "";
+                const keys = Object.keys(order);
+                const targets = FIELD_MAPS[type] || [];
+                const cleanKeys = keys.filter(k => !k.includes("戳記") && !k.toLowerCase().includes("timestamp"));
+                
+                let actualKey = targets.reduce((found, t) => found || cleanKeys.find(k => k.trim() === t), null) || 
+                                targets.reduce((found, t) => found || cleanKeys.find(k => k.includes(t)), null);
+                
+                let val = actualKey ? order[actualKey] : "";
+                if (type === 'date' && val) {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) {
+                        if (String(val).includes("T") && !String(val).includes("1899")) d.setHours(d.getHours() + 8);
+                        return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
+                    }
+                }
+                if (type === 'time' && val) {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) {
+                        // 修正 MILU 38分鐘偏差
+                        if (order._src === "MILU") { d.setMinutes(d.getMinutes() - 38); }
+                        const hh = d.getHours(), mm = d.getMinutes();
+                        return `${hh >= 12 ? '下午' : '上午'} ${hh % 12 || 12}:${String(mm).padStart(2, '0')}`;
+                    }
+                }
+                return String(val || "").trim();
+            }, []);
+
+            const fetchAllData = useCallback(async (silent = false) => {
+                if (!silent) setLoading(true);
+                try {
+                    const [resOffText, resMiluText] = await Promise.all([
+                        fetch(`${CONFIG.OFFICIAL.url}?${CONFIG.OFFICIAL.params}&t=${Date.now()}`).then(r => r.text()).catch(() => "[]"),
+                        fetch(`${CONFIG.MILU.url}?${CONFIG.MILU.params}&t=${Date.now()}`).then(r => r.text()).catch(() => "[]")
+                    ]);
+
+                    let combined = [];
+                    
+                    // 安全解析 JSON，避免「系統運作中」導致崩潰
+                    try {
+                        const jsonOff = JSON.parse(resOffText);
+                        if (Array.isArray(jsonOff)) {
+                            combined.push(...jsonOff.map(o => ({ 
+                                ...o, _src: "OFFICIAL", _apiUrl: CONFIG.OFFICIAL.url, "__sheet__": "官網訂單" 
+                            })));
+                        }
+                    } catch(e) { console.warn("官網資料解析異常", resOffText); }
+
+                    try {
+                        const jsonMilu = JSON.parse(resMiluText);
+                        if (Array.isArray(jsonMilu) && jsonMilu.length > 0 && Array.isArray(jsonMilu[0])) {
+                            combined.push(...jsonMilu.map(row => ({
+                                "訂單編號": row[0], "客戶名稱": row[3], "日期": row[5], "時間/時段": row[6],
+                                "地點": row[7], "狀態": row[10], "撿貨狀態": row[21], "_src": "MILU", "_apiUrl": CONFIG.MILU.url, "__sheet__": row[row.length - 1] 
+                            })));
+                        }
+                    } catch(e) { console.warn("MILU資料解析異常", resMiluText); }
+
+                    setOrders(prevOrders => {
+                        return combined.map(newItem => {
+                            const key = newItem._src + (newItem["訂單編號"] || newItem["__row__"]);
+                            const lastUpdate = lastUpdateRef.current[key];
+                            if (lastUpdate && (Date.now() - lastUpdate < 10000)) {
+                                const localItem = prevOrders.find(o => (o._src + (o["訂單編號"] || o["__row__"])) === key);
+                                return localItem || newItem;
+                            }
+                            return newItem;
+                        });
+                    });
+                } finally {
+                    setLoading(false);
+                }
+            }, []);
+
+            useEffect(() => {
+                fetchAllData();
+                const timer = setInterval(() => fetchAllData(true), 30000); // 每 30 秒自動更新
+                return () => clearInterval(timer);
+            }, [fetchAllData]);
+
+            const showToast = (text) => { setToast(text); setTimeout(() => setToast(null), 3000); };
+
+            const handleUpdate = useCallback(async (order, newStatus) => {
+                const key = order._src + (order["訂單編號"] || order["__row__"]);
+                const oldStatus = order._src === "MILU" ? order["撿貨狀態"] : order[CONFIG.OFFICIAL.statusField];
+
+                lastUpdateRef.current[key] = Date.now();
+                setSyncingIds(prev => new Set(prev).add(key));
+                setOrders(prev => prev.map(o => {
+                    if ((o._src + (o["訂單編號"] || o["__row__"])) === key) {
+                        return o._src === "MILU" ? { ...o, "撿貨狀態": newStatus } : { ...o, [CONFIG.OFFICIAL.statusField]: newStatus };
+                    }
+                    return o;
+                }));
+
+                try {
+                    const isMilu = order._src === "MILU";
+                    const payload = isMilu ? {
+                        action: "UPDATE_ORDER", orderId: order["訂單編號"], service: order["__sheet__"], pickingStatus: newStatus
+                    } : {
+                        action: "updateStatus", row: order["__row__"], status: newStatus, columnName: CONFIG.OFFICIAL.statusField
+                    };
+
+                    await fetch(order._apiUrl, { method: "POST", body: JSON.stringify(payload) });
+                    showToast(`更新成功：${newStatus}`);
+                    setTimeout(() => fetchAllData(true), 1500);
+                } catch (e) { 
+                    showToast("同步失敗，請檢查網路"); 
+                    delete lastUpdateRef.current[key];
+                } finally {
+                    setSyncingIds(prev => {
+                        const next = new Set(prev);
+                        next.delete(key);
+                        return next;
+                    });
+                }
+            }, [fetchAllData]);
+
+            const dayStatusMap = useMemo(() => {
+                const stats = {};
+                const exclude = ["未付款", "UNPAID", "已取消", "CANCELED"];
+                orders.forEach(o => {
+                    const payStatus = findVal(o, 'payment').toUpperCase();
+                    if (exclude.some(k => payStatus.includes(k))) return;
+
+                    const dateKey = findVal(o, 'date').replace(/\//g, '-');
+                    if (!dateKey) return;
+                    if (!stats[dateKey]) stats[dateKey] = { hasOrders: true, hasUnpicked: false, hasPending: false };
+                    
+                    const status = o._src === "MILU" ? o["撿貨狀態"] : o[CONFIG.OFFICIAL.statusField];
+                    // 修正：僅在未完成時顯示紅黃燈
+                    if (status !== "檢查完畢") {
+                        if (!status || status === "未撿取") stats[dateKey].hasUnpicked = true;
+                        else if (status === "已備貨") stats[dateKey].hasPending = true;
+                    }
+                });
+                return stats;
+            }, [orders, findVal]);
+
+            const filteredOrders = useMemo(() => {
+                const exclude = ["未付款", "UNPAID", "已取消", "CANCELED"];
+                return orders.filter(o => {
+                    const payStatus = findVal(o, 'payment').toUpperCase();
+                    if (exclude.some(k => payStatus.includes(k))) return false;
+                    if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
+                    return findVal(o, 'date').replace(/\//g, '-').includes(selectedDate);
+                }).sort((a, b) => findVal(a, 'time').localeCompare(findVal(b, 'time')));
+            }, [orders, selectedDate, currentCategory, findVal]);
+
+            // --- 核心修正：月曆星期精確對齊 ---
+            const daysArray = useMemo(() => {
+                const year = currentMonth.getFullYear();
+                const month = currentMonth.getMonth();
+                const firstDay = new Date(year, month, 1).getDay(); // 本月第一天星期幾
+                const totalDays = new Date(year, month + 1, 0).getDate(); // 本月總天數
+                
+                return Array.from({ length: 42 }, (_, i) => {
+                    const dayNum = i - firstDay + 1;
+                    if (dayNum > 0 && dayNum <= totalDays) {
+                        return getLocalDateString(new Date(year, month, dayNum));
+                    }
+                    return null;
+                });
+            }, [currentMonth]);
+
+            return (
+                <div className="min-h-screen pb-20 overflow-x-hidden">
+                    <header className="primary-gradient text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-lg">
+                        <div className="flex items-center gap-3">
+                            <LucideIcon name="package" size={22} />
+                            <h1 className="text-lg md:text-xl font-black tracking-tight">麋鹿氣球 · 整合管理</h1>
+                        </div>
+                        <button onClick={() => fetchAllData()} className="p-2 hover:bg-white/20 rounded-full transition-all">
+                            <LucideIcon name="refresh-cw" size={20} className={loading ? "spin" : ""} />
+                        </button>
+                    </header>
+
+                    <div className="bg-white/80 backdrop-blur-md border-b sticky top-[60px] z-30 overflow-x-auto no-scrollbar">
+                        <div className="flex gap-2 max-w-6xl mx-auto p-3 px-4">
+                            {CATEGORIES.map(cat => (
+                                <button key={cat} onClick={() => setCurrentCategory(cat)}
+                                    className={`px-5 py-2 rounded-full text-xs font-black whitespace-nowrap transition-all border ${
+                                        currentCategory === cat ? 'bg-emerald-800 text-white border-emerald-800 shadow-md' : 'bg-slate-50 text-slate-400 border-slate-100'
+                                    }`}>
+                                    {cat}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <main className="max-w-6xl mx-auto p-4 lg:flex gap-8 mt-4">
+                        {/* 月曆：手機端取消 Sticky 以免擋住訂單 */}
+                        <div className="lg:w-[340px] shrink-0 mb-6">
+                            <div className="bg-white rounded-[2.5rem] shadow-sm border p-6 lg:sticky lg:top-[150px]">
+                                <div className="flex justify-between items-center mb-6 px-1">
+                                    <h2 className="font-black text-slate-700 text-lg">{currentMonth.getFullYear()} / {currentMonth.getMonth() + 1}</h2>
+                                    <div className="flex gap-1">
+                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-left" /></button>
+                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-right" /></button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-7 gap-1 text-center">
+                                    {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-black text-slate-300 py-2 uppercase">{d}</div>)}
+                                    {daysArray.map((d, i) => {
+                                        const s = dayStatusMap[d];
+                                        return (
+                                            <div key={i} onClick={() => d && setSelectedDate(d)}
+                                                className={`h-11 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-sm font-bold transition-all relative ${
+                                                    !d ? '' : d === selectedDate ? 'bg-emerald-800 text-white shadow-lg scale-105 z-10' : 'hover:bg-slate-50 text-slate-600'
+                                                }`}>
+                                                <span>{d ? parseInt(d.split('-')[2]) : ""}</span>
+                                                {s && (
+                                                    <div className="flex gap-0.5 absolute bottom-1.5">
+                                                        {s.hasOrders && <div className={`w-1 h-1 rounded-full ${d === selectedDate ? 'bg-white' : 'bg-emerald-500'}`}></div>}
+                                                        {s.hasPending && <div className={`w-1 h-1 rounded-full ${d === selectedDate ? 'bg-amber-200' : 'bg-amber-400'}`}></div>}
+                                                        {s.hasUnpicked && <div className={`w-1 h-1 rounded-full animate-pulse ${d === selectedDate ? 'bg-red-200' : 'bg-red-600'}`}></div>}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                <div className="mt-6 pt-4 border-t border-slate-50 text-[10px] text-slate-400 font-bold flex flex-col gap-2 px-1">
+                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div><span>🟢 當日有預訂訂單</span></div>
+                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div><span>🟡 尚有「製作中」訂單</span></div>
+                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div><span>🔴 尚有「未撿取」訂單</span></div>
+                                    <div className="mt-1 text-[9px] font-normal italic text-slate-300">※ 當日訂單皆「檢查完畢」後燈號將自動消失</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex-1 space-y-4">
+                            <h3 className="font-black text-slate-600 flex items-center gap-2 px-2">
+                                <LucideIcon name="list-checks" size={18} className="text-emerald-600" /> {selectedDate} 排程 ({filteredOrders.length})
+                            </h3>
+                            {filteredOrders.length === 0 ? (
+                                <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">當日尚無待辦事項</div>
+                            ) : (
+                                filteredOrders.map((o) => (
+                                    <OrderCard 
+                                        key={o._src + (o["訂單編號"] || o["__row__"])} 
+                                        order={o} config={CONFIG} findVal={findVal} handleUpdate={handleUpdate} 
+                                        isSyncing={syncingIds.has(o._src + (o["訂單編號"] || o["__row__"]))}
+                                    />
+                                ))
+                            )}
+                        </div>
+                    </main>
+
+                    {toast && <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-full shadow-2xl z-[300] bg-slate-900 text-white text-sm font-black animate-bounce whitespace-nowrap">{toast}</div>}
+                    {loading && (
+                        <div className="fixed inset-0 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center z-[500]">
+                            <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>
-
