@@ -35,18 +35,20 @@
             OFFICIAL: {
                 name: "官網系統",
                 url: "https://script.google.com/macros/s/AKfycbwhH5axa1J6Q9nThs0Z8SQ3O4aEUAsTg5p9aTa1Mdwe-iJAd1GbI8t2SS1KnF6MDCTqBQ/exec",
-                statusField: "備貨狀態"
+                statusField: "備貨狀態",
+                params: "action=getOrders"
             },
             MILU: {
                 name: "MILU系統",
                 url: "https://script.google.com/macros/s/AKfycbyL1VarFpdQhPe24Fj9RQrGYoGunAcm1XNxlZwIW-kr_3CqG_hvQgWoS0xpCb9zb0vdjQ/exec",
-                statusField: "撿貨狀態"
+                statusField: "撿貨狀態",
+                // 修正：根據 GAS 腳本要求，必須加入 mode=api
+                params: "mode=api"
             }
         };
 
         const CATEGORIES = ["全部", "專人佈置", "氣球外送", "工作室取貨", "後車廂佈置"];
 
-        // 綜合欄位匹配字典
         const FIELD_MAPS = {
             id: ["訂單編號", "編號", "OrderID"],
             name: ["收件人姓名", "收件人", "客戶名稱", "姓名"],
@@ -78,7 +80,14 @@
                 setLoading(true);
                 try {
                     const res = await fetch(`${apiUrl}?action=getQuoteData&url=${encodeURIComponent(quoteUrl)}`);
-                    const json = await res.json();
+                    const text = await res.text();
+                    let json;
+                    try {
+                        json = JSON.parse(text);
+                    } catch (e) {
+                        throw new Error(`報價單解析失敗`);
+                    }
+                    
                     if (json.error) throw new Error(json.error);
                     const headers = json[0];
                     const rows = json.slice(1);
@@ -107,10 +116,10 @@
                             {loading ? (
                                 <div className="py-20 text-center flex flex-col items-center gap-3">
                                     <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                                    <p className="text-slate-400 font-bold">載入報價單中...</p>
+                                    <p className="text-slate-400 font-bold">載入中...</p>
                                 </div>
                             ) : data.length === 0 ? (
-                                <p className="py-20 text-center text-slate-300 font-bold">找不到材料資料或權限不足</p>
+                                <p className="py-20 text-center text-slate-300 font-bold">找不到材料資料</p>
                             ) : (
                                 data.map(row => (
                                     <div key={row.id} onClick={() => setCheckedItems(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
@@ -147,6 +156,7 @@
             const [quoteModal, setQuoteModal] = useState({ isOpen: false, url: "", name: "", api: "" });
 
             const findVal = (order, type) => {
+                if (!order) return "";
                 const keys = Object.keys(order);
                 let targets = [...(FIELD_MAPS[type] || [])];
                 
@@ -156,12 +166,10 @@
                 );
 
                 let actualKey = null;
-
                 for (let t of targets) {
                     actualKey = cleanKeys.find(k => k.trim() === t);
                     if (actualKey) break;
                 }
-
                 if (!actualKey) {
                     for (let t of targets) {
                         actualKey = cleanKeys.find(k => k.includes(t));
@@ -179,60 +187,110 @@
                     }
                 }
                 
-                if (type === 'time' && val && (String(val).includes("1899") || String(val).includes("T"))) {
-                    const d = new Date(val);
-                    if (!isNaN(d.getTime())) {
-                        return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+                if (type === 'time' && val) {
+                    let timeStr = String(val).trim();
+                    let dateObj = null;
+                    const timeMatch = timeStr.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
+                    if (timeMatch) {
+                        dateObj = new Date();
+                        dateObj.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0);
+                    } 
+                    else if (timeStr.includes("1899") || timeStr.includes("T") || !isNaN(Date.parse(timeStr))) {
+                        const d = new Date(timeStr);
+                        if (!isNaN(d.getTime())) dateObj = d;
+                    }
+                    if (dateObj) {
+                        const h = dateObj.getHours();
+                        const m = String(dateObj.getMinutes()).padStart(2, '0');
+                        const ampm = h >= 12 ? '下午' : '上午';
+                        const displayHour = h % 12 || 12;
+                        return `${ampm} ${displayHour}:${m}`;
                     }
                 }
-                
                 return String(val || "").trim();
+            };
+
+            const safeFetchJson = async (config, sourceKey) => {
+                const sourceName = CONFIG[sourceKey].name;
+                try {
+                    const res = await fetch(`${config.url}?${config.params}&t=${Date.now()}`);
+                    const text = await res.text();
+                    
+                    if (!text.trim().startsWith("[") && !text.trim().startsWith("{")) {
+                        console.warn(`${sourceName} 回傳異常內容:`, text);
+                        showToast(`${sourceName} 處於狀態文字，請檢查網址與模式設定。`, "error");
+                        return [];
+                    }
+
+                    try {
+                        let data = JSON.parse(text);
+                        
+                        // MILU 專屬邏輯：轉換二維陣列為物件陣列
+                        if (sourceKey === "MILU" && Array.isArray(data) && data.length > 0 && Array.isArray(data[0])) {
+                            return data.map((row, index) => ({
+                                "訂單編號": row[0],
+                                "LINE名稱": row[2],
+                                "客戶名稱": row[3],
+                                "電話": row[4],
+                                "日期": row[5],
+                                "時間/時段": row[6],
+                                "地點": row[7],
+                                "狀態": row[10],
+                                "撿貨狀態": row[21],
+                                "__row__": index + 2, // 模擬行號
+                                "__sheet__": "預設" // 腳本 handleRead 沒傳分頁名稱，暫訂預設
+                            }));
+                        }
+                        
+                        return Array.isArray(data) ? data : [];
+                    } catch (e) {
+                        console.error(`${sourceName} 解析失敗:`, text);
+                        return [];
+                    }
+                } catch (e) {
+                    console.error(`${sourceName} 請求失敗:`, e);
+                    return [];
+                }
             };
 
             const fetchAllData = async () => {
                 setLoading(true);
-                try {
-                    const [resOff, resMilu] = await Promise.all([
-                        fetch(`${CONFIG.OFFICIAL.url}?action=getOrders&t=${Date.now()}`).then(r => r.json()),
-                        fetch(`${CONFIG.MILU.url}?action=getOrders&t=${Date.now()}`).then(r => r.json())
-                    ]);
-
-                    const data1 = (Array.isArray(resOff) ? resOff : []).map(o => ({ ...o, _src: "OFFICIAL", _apiUrl: CONFIG.OFFICIAL.url }));
-                    const data2 = (Array.isArray(resMilu) ? resMilu : []).map(o => ({ ...o, _src: "MILU", _apiUrl: CONFIG.MILU.url }));
-
-                    setOrders([...data1, ...data2]);
-                    showToast("同步完成");
-                } catch (err) {
-                    showToast("資料讀取失敗", "error");
-                } finally {
-                    setLoading(false);
-                }
+                let combinedData = [];
+                const [resOff, resMilu] = await Promise.all([
+                    safeFetchJson(CONFIG.OFFICIAL, "OFFICIAL"),
+                    safeFetchJson(CONFIG.MILU, "MILU")
+                ]);
+                combinedData.push(...resOff.map(o => ({ ...o, _src: "OFFICIAL", _apiUrl: CONFIG.OFFICIAL.url })));
+                combinedData.push(...resMilu.map(o => ({ ...o, _src: "MILU", _apiUrl: CONFIG.MILU.url })));
+                setOrders(combinedData);
+                setLoading(false);
             };
 
             useEffect(() => { fetchAllData(); }, []);
 
             const showToast = (text, type = "success") => {
                 setToast({ text, type });
-                setTimeout(() => setToast(null), 3000);
+                setTimeout(() => setToast(null), 4000);
             };
 
             const handleUpdateStatus = async (order, newStatus) => {
                 setLoading(true);
                 try {
-                    const colName = CONFIG[order._src].statusField;
+                    const isMilu = order._src === "MILU";
+                    // MILU 腳本要求 action 為 UPDATE_ORDER
                     const payload = {
-                        action: "updateStatus",
+                        action: isMilu ? "UPDATE_ORDER" : "updateStatus",
+                        orderId: isMilu ? order["訂單編號"] : undefined,
                         row: order["__row__"],
                         sheet: order["__sheet__"] || "", 
                         status: newStatus,
-                        columnName: colName
+                        columnName: CONFIG[order._src].statusField
                     };
                     await fetch(order._apiUrl, { method: "POST", body: JSON.stringify(payload) });
                     showToast(`狀態更新：${newStatus}`);
                     fetchAllData();
                 } catch (err) {
                     showToast("更新失敗", "error");
-                } finally {
                     setLoading(false);
                 }
             };
@@ -243,18 +301,12 @@
                 orders.forEach(o => {
                     const payStatus = findVal(o, 'payment').toUpperCase();
                     if (exclude.some(k => payStatus.includes(k))) return;
-                    
                     const dateKey = findVal(o, 'date').replace(/\//g, '-');
                     if (!dateKey) return;
-                    
                     if (!stats[dateKey]) stats[dateKey] = { hasOrders: true, hasUnpicked: false, hasPendingCheck: false };
-                    
                     const status = findVal(o, 'status');
-                    if (!status || status === "未撿取") {
-                        stats[dateKey].hasUnpicked = true;
-                    } else if (status === "已備貨") {
-                        stats[dateKey].hasPendingCheck = true;
-                    }
+                    if (!status || status === "未撿取") stats[dateKey].hasUnpicked = true;
+                    else if (status === "已備貨") stats[dateKey].hasPendingCheck = true;
                 });
                 return stats;
             }, [orders]);
@@ -286,7 +338,7 @@
                             <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md"><LucideIcon name="package" size={24} /></div>
                             <h1 className="text-xl font-black tracking-tight">麋鹿氣球 · 整合備貨系統</h1>
                         </div>
-                        <button onClick={fetchAllData} className="p-2 hover:bg-white/10 rounded-full transition-all active:scale-90">
+                        <button onClick={fetchAllData} className="p-2 hover:bg-white/20 rounded-full transition-all active:scale-90">
                             <LucideIcon name="refresh-cw" size={22} className={loading ? "spin" : ""} />
                         </button>
                     </header>
@@ -320,14 +372,12 @@
                                         const isSelected = dateStr === selectedDate;
                                         const isToday = dateStr === new Date().toISOString().split('T')[0];
                                         const stats = dayStatusMap[dateStr];
-                                        
                                         return (
                                             <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
                                                 className={`h-11 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-sm font-bold transition-all relative ${
                                                     !dateStr ? '' : isSelected ? 'bg-emerald-800 text-white shadow-lg scale-110 z-10' : isToday ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'hover:bg-slate-50 text-slate-600'
                                                 }`}>
                                                 <span>{dateStr ? parseInt(dateStr.split('-')[2]) : ""}</span>
-                                                {/* 狀態點點 (改為紅、黃、綠共存) */}
                                                 {stats && (
                                                     <div className="flex gap-1 absolute bottom-1.5">
                                                         {stats.hasOrders && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`}></div>}
@@ -340,95 +390,49 @@
                                     })}
                                 </div>
                                 <div className="pt-4 border-t border-slate-50 text-[10px] text-slate-400 font-bold flex flex-col gap-2 px-2">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                                        <span>當日有預訂訂單</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div>
-                                        <span>尚有「已備貨 / 製作中」訂單</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div>
-                                        <span>尚有「未撿取」訂單</span>
-                                    </div>
+                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div><span>當日有預訂訂單</span></div>
+                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div><span>尚有「已備貨 / 製作中」訂單</span></div>
+                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div><span>尚有「未撿取」訂單</span></div>
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex-1 space-y-4">
                             <div className="flex items-center justify-between mb-2 px-2">
-                                <h3 className="font-black text-slate-600 flex items-center gap-2">
-                                    <LucideIcon name="list-checks" size={20} className="text-emerald-600" /> {selectedDate} 排程
-                                </h3>
+                                <h3 className="font-black text-slate-600 flex items-center gap-2"><LucideIcon name="list-checks" size={20} className="text-emerald-600" /> {selectedDate} 排程</h3>
                                 <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full uppercase tracking-widest">{filteredOrders.length} 筆訂單</span>
                             </div>
 
                             {filteredOrders.length === 0 ? (
-                                <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">
-                                    當日尚無備貨需求
-                                </div>
+                                <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">當日尚無備貨需求</div>
                             ) : (
                                 filteredOrders.map((o) => {
                                     const status = findVal(o, 'status');
                                     const qUrl = findVal(o, 'quoteUrl');
-                                    const iType = findVal(o, 'itemType');
-
                                     return (
-                                        <div key={o._src + o["__row__"]} className="order-card bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-7">
+                                        <div key={o._src + (o["訂單編號"] || o["__row__"])} className="order-card bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-7">
                                             <div className="flex justify-between items-start mb-5">
                                                 <div className="space-y-1.5">
                                                     <div className="flex gap-2 flex-wrap">
-                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded tracking-tighter border ${
-                                                            o._src === "OFFICIAL" ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                                        }`}>{CONFIG[o._src].name}</span>
+                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded tracking-tighter border ${o._src === "OFFICIAL" ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"}`}>{CONFIG[o._src].name}</span>
                                                         {o["__sheet__"] && <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded uppercase tracking-tighter">{o["__sheet__"]}</span>}
-                                                        {iType && iType !== "-" && <span className="text-[9px] font-black bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-100">✨ {iType}</span>}
                                                     </div>
                                                     <h4 className="font-black text-2xl text-slate-800">{findVal(o, 'name')}</h4>
                                                     <p className="text-[10px] font-bold text-slate-300 tracking-wider">#{findVal(o, 'id')}</p>
                                                 </div>
                                                 <div className="flex flex-col items-end gap-2">
-                                                    <div className={`text-[10px] font-black px-4 py-1.5 rounded-full border shadow-sm ${
-                                                        status.includes("檢查完畢") ? "bg-emerald-500 text-white border-emerald-600" : 
-                                                        status.includes("已備貨") ? "bg-amber-400 text-white border-amber-500" : "bg-red-50 text-red-600 border-red-100"
-                                                    }`}>{status || "未撿取"}</div>
-                                                    
-                                                    {qUrl && (
-                                                        <button onClick={() => setQuoteModal({ isOpen: true, url: qUrl, name: findVal(o, 'name'), api: o._apiUrl })} 
-                                                            className="flex items-center gap-1.5 text-[10px] font-black bg-slate-800 text-white px-4 py-1.5 rounded-full hover:bg-slate-700 active:scale-95 transition-all shadow-md">
-                                                            <LucideIcon name="eye" size={12} /> 查看材料
-                                                        </button>
-                                                    )}
+                                                    <div className={`text-[10px] font-black px-4 py-1.5 rounded-full border shadow-sm ${status.includes("檢查完畢") ? "bg-emerald-500 text-white border-emerald-600" : status.includes("已備貨") ? "bg-amber-400 text-white border-amber-500" : "bg-red-50 text-red-600 border-red-100"}`}>{status || "未撿取"}</div>
+                                                    {qUrl && <button onClick={() => setQuoteModal({ isOpen: true, url: qUrl, name: findVal(o, 'name'), api: o._apiUrl })} className="flex items-center gap-1.5 text-[10px] font-black bg-slate-800 text-white px-4 py-1.5 rounded-full shadow-md"><LucideIcon name="eye" size={12} /> 查看材料</button>}
                                                 </div>
                                             </div>
-
                                             <div className="space-y-3 mb-6">
-                                                <div className="flex items-center gap-3 text-slate-700 font-black bg-slate-50 p-3 rounded-2xl w-fit border border-slate-100">
-                                                    <LucideIcon name="clock" size={18} className="text-emerald-500" />
-                                                    <span>{findVal(o, 'time')}</span>
-                                                </div>
-                                                <div className="flex items-start gap-3 px-1">
-                                                    <LucideIcon name="map-pin" size={18} className="shrink-0 mt-0.5 text-slate-300" />
-                                                    <span className="text-sm text-slate-500 font-bold leading-relaxed">{findVal(o, 'address')}</span>
-                                                </div>
-                                                {findVal(o, 'remark') && findVal(o, 'remark') !== "-" && (
-                                                    <div className="bg-amber-50/50 p-4 rounded-3xl border border-amber-100/50 flex gap-3">
-                                                        <LucideIcon name="message-square" size={16} className="text-amber-300 shrink-0 mt-0.5" />
-                                                        <p className="text-xs text-amber-700/80 font-bold italic leading-relaxed">{findVal(o, 'remark')}</p>
-                                                    </div>
-                                                )}
+                                                <div className="flex items-center gap-3 text-slate-700 font-black bg-slate-50 p-3 rounded-2xl w-fit border border-slate-100"><LucideIcon name="clock" size={18} className="text-emerald-500" /><span>{findVal(o, 'time')}</span></div>
+                                                <div className="flex items-start gap-3 px-1"><LucideIcon name="map-pin" size={18} className="shrink-0 mt-0.5 text-slate-300" /><span className="text-sm text-slate-500 font-bold leading-relaxed">{findVal(o, 'address')}</span></div>
                                             </div>
-
                                             <div className="grid grid-cols-3 gap-2">
                                                 {["未撿取", "已備貨", "檢查完畢"].map((st) => {
                                                     const active = (status === st) || (!status && st === "未撿取");
-                                                    return (
-                                                        <button key={st} onClick={() => handleUpdateStatus(o, st)} 
-                                                            className={`py-4 rounded-2xl text-[11px] font-black transition-all active:scale-95 border ${
-                                                                active ? "bg-slate-800 text-white border-slate-800 shadow-xl" : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
-                                                            }`}>{st}</button>
-                                                    );
+                                                    return <button key={st} onClick={() => handleUpdateStatus(o, st)} className={`py-4 rounded-2xl text-[11px] font-black transition-all active:scale-95 border ${active ? "bg-slate-800 text-white border-slate-800 shadow-xl" : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"}`}>{st}</button>
                                                 })}
                                             </div>
                                         </div>
@@ -438,28 +442,9 @@
                         </div>
                     </main>
 
-                    <QuoteModal 
-                        isOpen={quoteModal.isOpen} 
-                        onClose={() => setQuoteModal({ ...quoteModal, isOpen: false })} 
-                        quoteUrl={quoteModal.url} 
-                        orderName={quoteModal.name}
-                        apiUrl={quoteModal.api}
-                    />
-
-                    {toast && (
-                        <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-full shadow-2xl z-[300] text-sm font-black animate-bounce ${
-                            toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'
-                        }`}>
-                            {toast.text}
-                        </div>
-                    )}
-
-                    {loading && (
-                        <div className="fixed inset-0 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center z-[500]">
-                            <div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-                            <span className="font-black text-emerald-800 tracking-[0.3em] text-xs uppercase">Syncing Data</span>
-                        </div>
-                    )}
+                    <QuoteModal isOpen={quoteModal.isOpen} onClose={() => setQuoteModal({ ...quoteModal, isOpen: false })} quoteUrl={quoteModal.url} orderName={quoteModal.name} apiUrl={quoteModal.api} />
+                    {toast && <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-full shadow-2xl z-[300] text-sm font-black animate-bounce ${toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'}`}>{toast.text}</div>}
+                    {loading && <div className="fixed inset-0 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center z-[500]"><div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4"></div><span className="font-black text-emerald-800 tracking-[0.3em] text-xs uppercase">Syncing Data</span></div>}
                 </div>
             );
         };
