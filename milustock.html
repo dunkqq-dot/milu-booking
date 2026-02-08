@@ -19,8 +19,10 @@
         /* 品牌綠色漸層 */
         .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
         .modal-overlay { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
-        .order-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .order-card:hover { transform: translateY(-2px); }
+        .order-card { transition: all 0.2s ease-out; }
+        /* 增加按鈕點擊後的視覺反饋速度 */
+        .status-btn { transition: all 0.1s ease-in-out; }
+        .status-btn:active { transform: scale(0.95); }
     </style>
 </head>
 <body class="min-h-screen">
@@ -28,7 +30,15 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo } = React;
+        const { useState, useEffect, useMemo, useCallback, memo } = React;
+
+        // --- 輔助函式：取得本地日期字串 YYYY-MM-DD，避免時區偏差 ---
+        const getLocalDateString = (date) => {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        };
 
         // --- 系統設定 ---
         const CONFIG = {
@@ -48,7 +58,6 @@
 
         const CATEGORIES = ["全部", "專人佈置", "氣球外送", "工作室取貨", "後車廂佈置", "官網訂單"];
 
-        // 綜合欄位匹配字典
         const FIELD_MAPS = {
             id: ["訂單編號", "編號", "OrderID"],
             name: ["收件人姓名", "收件人", "客戶名稱", "姓名"],
@@ -62,46 +71,79 @@
             quoteUrl: ["報價單連結", "報價單網址"]
         };
 
-        // --- 元件區 ---
-
-        const LucideIcon = ({ name, size = 18, className = "" }) => {
+        const LucideIcon = memo(({ name, size = 18, className = "" }) => {
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
-        };
+        });
+
+        // --- 優化：子元件快取 ---
+        const OrderCard = memo(({ order, config, findVal, handleUpdate }) => {
+            const status = findVal(order, 'status');
+            const iType = findVal(order, 'itemType');
+            const rawId = findVal(order, 'id');
+            // 修正：確保只有一個 #
+            const displayId = String(rawId).startsWith('#') ? rawId : `#${rawId}`;
+
+            return (
+                <div className="order-card bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-7">
+                    <div className="flex justify-between items-start mb-5">
+                        <div className="space-y-1.5">
+                            <div className="flex gap-2 flex-wrap">
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded border ${order._src === "OFFICIAL" ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"}`}>
+                                    {config[order._src].name}
+                                </span>
+                                <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded uppercase">{order["__sheet__"]}</span>
+                                {iType && iType !== "-" && <span className="text-[9px] font-black bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-100">✨ {iType}</span>}
+                            </div>
+                            <h4 className="font-black text-2xl text-slate-800">{findVal(order, 'name')}</h4>
+                            <p className="text-[10px] font-bold text-slate-300 tracking-wider">{displayId}</p>
+                        </div>
+                        <div className={`text-[10px] font-black px-4 py-1.5 rounded-full shadow-sm transition-colors duration-200 ${
+                            status.includes("檢查") ? "bg-emerald-500 text-white" : status.includes("已備") ? "bg-amber-400 text-white" : "bg-red-600 text-white"
+                        }`}>{status || "未撿取"}</div>
+                    </div>
+
+                    <div className="space-y-3 mb-6">
+                        <div className="flex items-center gap-3 text-slate-700 font-black bg-slate-50 p-3 rounded-2xl w-fit border border-slate-100">
+                            <LucideIcon name="clock" className="text-emerald-500" />
+                            <span>{findVal(order, 'time')}</span>
+                        </div>
+                        <div className="flex items-start gap-3 px-1">
+                            <LucideIcon name="map-pin" className="shrink-0 mt-0.5 text-slate-300" />
+                            <span className="text-sm text-slate-500 font-bold leading-relaxed">{findVal(order, 'address')}</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                        {["未撿取", "已備貨", "檢查完畢"].map((st) => (
+                            <button key={st} onClick={() => handleUpdate(order, st)} 
+                                className={`status-btn py-4 rounded-2xl text-[11px] font-black border transition-all active:scale-95 ${
+                                    status === st || (!status && st === "未撿取") ? "bg-slate-800 text-white shadow-xl" : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"
+                                }`}>{st}</button>
+                        ))}
+                    </div>
+                </div>
+            );
+        });
 
         const App = () => {
             const [orders, setOrders] = useState([]);
             const [loading, setLoading] = useState(false);
             const [currentMonth, setCurrentMonth] = useState(new Date());
-            const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+            const [selectedDate, setSelectedDate] = useState(getLocalDateString(new Date()));
             const [currentCategory, setCurrentCategory] = useState("全部");
             const [toast, setToast] = useState(null);
 
-            // 資料處理核心函式
-            const findVal = (order, type) => {
+            const findVal = useCallback((order, type) => {
                 if (!order) return "";
                 const keys = Object.keys(order);
                 const targets = FIELD_MAPS[type] || [];
-                
                 const cleanKeys = keys.filter(k => !k.includes("戳記") && !k.toLowerCase().includes("timestamp"));
                 
-                let actualKey = null;
-                // 優先精確匹配
-                for (let t of targets) {
-                    actualKey = cleanKeys.find(k => k.trim() === t);
-                    if (actualKey) break;
-                }
-                // 找不到則模糊匹配
-                if (!actualKey) {
-                    for (let t of targets) {
-                        actualKey = cleanKeys.find(k => k.includes(t));
-                        if (actualKey) break;
-                    }
-                }
+                let actualKey = targets.reduce((found, t) => found || cleanKeys.find(k => k.trim() === t), null) || 
+                                targets.reduce((found, t) => found || cleanKeys.find(k => k.includes(t)), null);
                 
                 let val = actualKey ? order[actualKey] : "";
-
-                // 日期格式修正
                 if (type === 'date' && val) {
                     const d = new Date(val);
                     if (!isNaN(d.getTime())) {
@@ -109,65 +151,38 @@
                         return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
                     }
                 }
-                
-                // 【核心修正】處理時間顯示偏差問題：針對 MILU 系統強制扣除 38 分鐘
                 if (type === 'time' && val) {
                     const d = new Date(val);
                     if (!isNaN(d.getTime())) {
-                        // 僅針對 MILU 系統進行校正
-                        if (order._src === "MILU") {
-                            // 修正 Google Sheets 1899 歷史時區導致的 38 分鐘偏差
-                            d.setMinutes(d.getMinutes() - 38);
-                        }
-                        
-                        const hh = d.getHours();
-                        const mm = d.getMinutes();
-                        const ampm = hh >= 12 ? '下午' : '上午';
-                        const displayHour = hh % 12 || 12;
-                        return `${ampm} ${displayHour}:${String(mm).padStart(2, '0')}`;
+                        if (order._src === "MILU") { d.setMinutes(d.getMinutes() - 38); }
+                        const hh = d.getHours(), mm = d.getMinutes();
+                        return `${hh >= 12 ? '下午' : '上午'} ${hh % 12 || 12}:${String(mm).padStart(2, '0')}`;
                     }
                 }
-                
                 return String(val || "").trim();
-            };
+            }, []);
 
-            const fetchAllData = async () => {
-                setLoading(true);
+            const fetchAllData = async (silent = false) => {
+                if (!silent) setLoading(true);
                 let combined = [];
-                
                 try {
-                    // 1. 抓取官網資料
-                    try {
-                        const resOff = await fetch(`${CONFIG.OFFICIAL.url}?${CONFIG.OFFICIAL.params}&t=${Date.now()}`).then(r => r.json());
-                        if (Array.isArray(resOff)) {
-                            combined.push(...resOff.map(o => ({ 
-                                ...o, 
-                                _src: "OFFICIAL", 
-                                _apiUrl: CONFIG.OFFICIAL.url,
-                                "__sheet__": "官網訂單" 
-                            })));
-                        }
-                    } catch (e) { console.error("官網讀取失敗"); }
+                    const [resOff, resMilu] = await Promise.all([
+                        fetch(`${CONFIG.OFFICIAL.url}?${CONFIG.OFFICIAL.params}&t=${Date.now()}`).then(r => r.json()).catch(() => []),
+                        fetch(`${CONFIG.MILU.url}?${CONFIG.MILU.params}&t=${Date.now()}`).then(r => r.json()).catch(() => [])
+                    ]);
 
-                    // 2. 抓取 MILU 資料
-                    try {
-                        const resMilu = await fetch(`${CONFIG.MILU.url}?${CONFIG.MILU.params}&t=${Date.now()}`).then(r => r.json());
-                        if (Array.isArray(resMilu) && Array.isArray(resMilu[0])) {
-                            combined.push(...resMilu.map(row => ({
-                                "訂單編號": row[0],
-                                "客戶名稱": row[3],
-                                "日期": row[5],
-                                "時間/時段": row[6],
-                                "地點": row[7],
-                                "狀態": row[10],
-                                "撿貨狀態": row[21],
-                                "_src": "MILU",
-                                "_apiUrl": CONFIG.MILU.url,
-                                "__sheet__": row[row.length - 1] 
-                            })));
-                        }
-                    } catch (e) { console.error("MILU 讀取失敗"); }
+                    if (Array.isArray(resOff)) {
+                        combined.push(...resOff.map(o => ({ 
+                            ...o, _src: "OFFICIAL", _apiUrl: CONFIG.OFFICIAL.url, "__sheet__": "官網訂單" 
+                        })));
+                    }
 
+                    if (Array.isArray(resMilu) && resMilu.length > 0 && Array.isArray(resMilu[0])) {
+                        combined.push(...resMilu.map(row => ({
+                            "訂單編號": row[0], "客戶名稱": row[3], "日期": row[5], "時間/時段": row[6],
+                            "地點": row[7], "狀態": row[10], "撿貨狀態": row[21], "_src": "MILU", "_apiUrl": CONFIG.MILU.url, "__sheet__": row[row.length - 1] 
+                        })));
+                    }
                     setOrders(combined);
                 } finally {
                     setLoading(false);
@@ -178,43 +193,67 @@
 
             const showToast = (text) => { setToast(text); setTimeout(() => setToast(null), 3000); };
 
-            const handleUpdate = async (order, newStatus) => {
-                setLoading(true);
+            const handleUpdate = useCallback(async (order, newStatus) => {
+                const orderKey = order._src + (order["訂單編號"] || order["__row__"]);
+                const oldStatus = order._src === "MILU" ? order["撿貨狀態"] : order[CONFIG.OFFICIAL.statusField];
+
+                setOrders(prev => prev.map(o => {
+                    const currentKey = o._src + (o["訂單編號"] || o["__row__"]);
+                    if (currentKey === orderKey) {
+                        return o._src === "MILU" 
+                            ? { ...o, "撿貨狀態": newStatus } 
+                            : { ...o, [CONFIG.OFFICIAL.statusField]: newStatus };
+                    }
+                    return o;
+                }));
+
                 try {
                     const isMilu = order._src === "MILU";
                     const payload = isMilu ? {
-                        action: "UPDATE_ORDER",
-                        orderId: order["訂單編號"],
-                        service: order["__sheet__"],
-                        pickingStatus: newStatus
+                        action: "UPDATE_ORDER", orderId: order["訂單編號"], service: order["__sheet__"], pickingStatus: newStatus
                     } : {
-                        action: "updateStatus",
-                        row: order["__row__"],
-                        status: newStatus,
-                        columnName: CONFIG.OFFICIAL.statusField
+                        action: "updateStatus", row: order["__row__"], status: newStatus, columnName: CONFIG.OFFICIAL.statusField
                     };
-                    await fetch(order._apiUrl, { method: "POST", body: JSON.stringify(payload) });
+
+                    const response = await fetch(order._apiUrl, { method: "POST", body: JSON.stringify(payload) });
+                    if (!response.ok) throw new Error("Update failed");
+                    
                     showToast(`更新成功：${newStatus}`);
-                    fetchAllData();
+                    fetchAllData(true);
                 } catch (e) { 
-                    showToast("更新失敗"); 
-                    setLoading(false);
+                    showToast("更新同步失敗，請檢查網路"); 
+                    setOrders(prev => prev.map(o => {
+                        const currentKey = o._src + (o["訂單編號"] || o["__row__"]);
+                        if (currentKey === orderKey) {
+                            return o._src === "MILU" 
+                                ? { ...o, "撿貨狀態": oldStatus } 
+                                : { ...o, [CONFIG.OFFICIAL.statusField]: oldStatus };
+                        }
+                        return o;
+                    }));
                 }
-            };
+            }, [fetchAllData]);
 
             const dayStatusMap = useMemo(() => {
                 const stats = {};
+                const exclude = ["未付款", "UNPAID", "已取消", "CANCELED"];
                 orders.forEach(o => {
+                    const payStatus = findVal(o, 'payment').toUpperCase();
+                    if (exclude.some(k => payStatus.includes(k))) return;
+
                     const dateKey = findVal(o, 'date').replace(/\//g, '-');
                     if (!dateKey) return;
                     if (!stats[dateKey]) stats[dateKey] = { hasOrders: true, hasUnpicked: false, hasPending: false };
                     
-                    const status = findVal(o, 'status');
-                    if (!status || status === "未撿取") stats[dateKey].hasUnpicked = true;
-                    else if (status === "已備貨") stats[dateKey].hasPending = true;
+                    const status = o._src === "MILU" ? o["撿貨狀態"] : o[CONFIG.OFFICIAL.statusField];
+                    // 修正：當日訂單皆完成（檢查完畢）則無紅黃燈
+                    if (status !== "檢查完畢") {
+                        if (!status || status === "未撿取") stats[dateKey].hasUnpicked = true;
+                        else if (status === "已備貨") stats[dateKey].hasPending = true;
+                    }
                 });
                 return stats;
-            }, [orders]);
+            }, [orders, findVal]);
 
             const filteredOrders = useMemo(() => {
                 const exclude = ["未付款", "UNPAID", "已取消", "CANCELED"];
@@ -224,22 +263,39 @@
                     if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
                     return findVal(o, 'date').replace(/\//g, '-').includes(selectedDate);
                 }).sort((a, b) => findVal(a, 'time').localeCompare(findVal(b, 'time')));
-            }, [orders, selectedDate, currentCategory]);
+            }, [orders, selectedDate, currentCategory, findVal]);
 
+            // --- 核心修正：準確計算月曆格子的星期與日期對應 ---
             const daysArray = useMemo(() => {
-                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
-                const start = new Date(year, month, 1).getDay(), len = new Date(year, month + 1, 0).getDate();
-                return Array.from({ length: 42 }, (_, i) => (i >= start && i < start + len) ? new Date(year, month, i - start + 1).toISOString().split('T')[0] : null);
+                const year = currentMonth.getFullYear();
+                const month = currentMonth.getMonth();
+                // 取得該月第一天是星期幾 (0-6, 0=日)
+                const startDayOfWeek = new Date(year, month, 1).getDay();
+                // 取得該月總天數
+                const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
+                
+                return Array.from({ length: 42 }, (_, i) => {
+                    const dayNum = i - startDayOfWeek + 1;
+                    if (dayNum > 0 && dayNum <= totalDaysInMonth) {
+                        // 使用本地日期建構，避免 UTC 偏差
+                        return getLocalDateString(new Date(year, month, dayNum));
+                    }
+                    return null;
+                });
             }, [currentMonth]);
+
+            const changeMonth = (offset) => {
+                setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + offset, 1));
+            };
 
             return (
                 <div className="min-h-screen pb-20">
                     <header className="primary-gradient text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-lg">
                         <div className="flex items-center gap-3">
                             <LucideIcon name="package" size={24} />
-                            <h1 className="text-xl font-black tracking-tight">麋鹿氣球 · 整合備貨系統</h1>
+                            <h1 className="text-xl font-black tracking-tight">麋鹿氣球 · 整合管理</h1>
                         </div>
-                        <button onClick={fetchAllData} className="p-2 hover:bg-white/20 rounded-full transition-all active:scale-90">
+                        <button onClick={() => fetchAllData()} className="p-2 hover:bg-white/20 rounded-full transition-all">
                             <LucideIcon name="refresh-cw" size={22} className={loading ? "spin" : ""} />
                         </button>
                     </header>
@@ -260,15 +316,15 @@
                     <main className="max-w-6xl mx-auto p-4 lg:flex gap-8 mt-4">
                         <div className="lg:w-[340px] shrink-0 mb-6">
                             <div className="bg-white rounded-[2.5rem] shadow-sm border p-6 sticky top-[150px]">
-                                <div className="flex justify-between items-center mb-6">
+                                <div className="flex justify-between items-center mb-6 px-1">
                                     <h2 className="font-black text-slate-700 text-lg">{currentMonth.getFullYear()} / {currentMonth.getMonth() + 1}</h2>
                                     <div className="flex gap-1">
-                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-left" /></button>
-                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-right" /></button>
+                                        <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-left" /></button>
+                                        <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-50 rounded-xl"><LucideIcon name="chevron-right" /></button>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-7 gap-1 text-center">
-                                    {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-black text-slate-300 py-2">{d}</div>)}
+                                    {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-black text-slate-300 py-2 uppercase">{d}</div>)}
                                     {daysArray.map((d, i) => {
                                         const s = dayStatusMap[d];
                                         return (
@@ -288,6 +344,22 @@
                                         );
                                     })}
                                 </div>
+                                {/* 修正：月曆紅黃綠燈的說明 */}
+                                <div className="mt-6 pt-4 border-t border-slate-50 text-[10px] text-slate-400 font-bold flex flex-col gap-2 px-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                        <span>🟢 當日有預訂訂單</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div>
+                                        <span>🟡 尚有「已備貨 / 製作中」訂單</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div>
+                                        <span>🔴 尚有「未撿取」訂單</span>
+                                    </div>
+                                    <div className="mt-1 text-[9px] font-normal italic text-slate-300">※ 當日訂單皆「檢查完畢」後紅黃燈將自動熄滅</div>
+                                </div>
                             </div>
                         </div>
 
@@ -297,52 +369,17 @@
                             </h3>
 
                             {filteredOrders.length === 0 ? (
-                                <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">
-                                    當日尚處理完畢或無預訂
-                                </div>
+                                <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">當日尚無待辦事項</div>
                             ) : (
-                                filteredOrders.map((o) => {
-                                    const status = findVal(o, 'status');
-                                    const iType = findVal(o, 'itemType');
-                                    return (
-                                        <div key={o._src + (o["訂單編號"] || o["__row__"])} className="order-card bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-7">
-                                            <div className="flex justify-between items-start mb-5">
-                                                <div className="space-y-1.5">
-                                                    <div className="flex gap-2 flex-wrap">
-                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded border ${o._src === "OFFICIAL" ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"}`}>{CONFIG[o._src].name}</span>
-                                                        <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded uppercase">{o["__sheet__"]}</span>
-                                                        {iType && iType !== "-" && <span className="text-[9px] font-black bg-amber-50 text-amber-600 px-2 py-0.5 rounded border border-amber-100">✨ {iType}</span>}
-                                                    </div>
-                                                    <h4 className="font-black text-2xl text-slate-800">{findVal(o, 'name')}</h4>
-                                                    <p className="text-[10px] font-bold text-slate-300 tracking-wider">#{findVal(o, 'id')}</p>
-                                                </div>
-                                                <div className={`text-[10px] font-black px-4 py-1.5 rounded-full shadow-sm ${
-                                                    status.includes("檢查") ? "bg-emerald-500 text-white" : status.includes("已備") ? "bg-amber-400 text-white" : "bg-red-600 text-white"
-                                                }`}>{status || "未撿取"}</div>
-                                            </div>
-
-                                            <div className="space-y-3 mb-6">
-                                                <div className="flex items-center gap-3 text-slate-700 font-black bg-slate-50 p-3 rounded-2xl w-fit border border-slate-100">
-                                                    <LucideIcon name="clock" className="text-emerald-500" />
-                                                    <span>{findVal(o, 'time')}</span>
-                                                </div>
-                                                <div className="flex items-start gap-3 px-1">
-                                                    <LucideIcon name="map-pin" className="shrink-0 mt-0.5 text-slate-300" />
-                                                    <span className="text-sm text-slate-500 font-bold leading-relaxed">{findVal(o, 'address')}</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {["未撿取", "已備貨", "檢查完畢"].map((st) => (
-                                                    <button key={st} onClick={() => handleUpdate(o, st)} 
-                                                        className={`py-4 rounded-2xl text-[11px] font-black transition-all active:scale-95 border ${
-                                                            status === st || (!status && st === "未撿取") ? "bg-slate-800 text-white shadow-xl" : "bg-white text-slate-400 border-slate-100"
-                                                        }`}>{st}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    );
-                                })
+                                filteredOrders.map((o) => (
+                                    <OrderCard 
+                                        key={o._src + (o["訂單編號"] || o["__row__"])} 
+                                        order={o} 
+                                        config={CONFIG} 
+                                        findVal={findVal} 
+                                        handleUpdate={handleUpdate} 
+                                    />
+                                ))
                             )}
                         </div>
                     </main>
