@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>麋鹿氣球 - 整合備貨管理系統</title>
-    <!-- 載入核心套件 -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
@@ -16,21 +15,16 @@
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        /* 品牌綠色漸層 */
         .primary-gradient { background: linear-gradient(135deg, #065f46 0%, #10b981 100%); }
         .modal-overlay { background-color: rgba(0, 0, 0, 0.5); backdrop-filter: blur(4px); }
         .order-card { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .order-card:hover { transform: translateY(-2px); }
     </style>
 </head>
 <body class="min-h-screen">
-
     <div id="root"></div>
-
     <script type="text/babel">
         const { useState, useEffect, useMemo } = React;
 
-        // --- 系統設定 ---
         const CONFIG = {
             OFFICIAL: {
                 name: "官網系統",
@@ -42,7 +36,6 @@
                 name: "MILU系統",
                 url: "https://script.google.com/macros/s/AKfycbyL1VarFpdQhPe24Fj9RQrGYoGunAcm1XNxlZwIW-kr_3CqG_hvQgWoS0xpCb9zb0vdjQ/exec",
                 statusField: "撿貨狀態",
-                // 修正：根據 GAS 腳本要求，必須加入 mode=api
                 params: "mode=api"
             }
         };
@@ -58,93 +51,13 @@
             status: ["備貨狀態", "撿貨狀態", "備貨"],
             payment: ["付款狀態", "狀態", "付款"],
             remark: ["備註", "備註欄", "注意事項"],
-            itemType: ["品項類型", "品項"],
             quoteUrl: ["報價單連結", "報價單網址"]
         };
-
-        // --- 元件區 ---
 
         const LucideIcon = ({ name, size = 18, className = "" }) => {
             useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
-
-        const QuoteModal = ({ isOpen, onClose, quoteUrl, orderName, apiUrl }) => {
-            const [data, setData] = useState([]);
-            const [loading, setLoading] = useState(false);
-            const [checkedItems, setCheckedItems] = useState({});
-
-            useEffect(() => { if (isOpen && quoteUrl) fetchQuoteData(); }, [isOpen, quoteUrl]);
-
-            const fetchQuoteData = async () => {
-                setLoading(true);
-                try {
-                    const res = await fetch(`${apiUrl}?action=getQuoteData&url=${encodeURIComponent(quoteUrl)}`);
-                    const text = await res.text();
-                    let json;
-                    try {
-                        json = JSON.parse(text);
-                    } catch (e) {
-                        throw new Error(`報價單解析失敗`);
-                    }
-                    
-                    if (json.error) throw new Error(json.error);
-                    const headers = json[0];
-                    const rows = json.slice(1);
-                    const mIdx = headers.findIndex(h => h.includes("材料"));
-                    const qIdx = headers.findIndex(h => h.includes("數量"));
-                    const rIdx = headers.findIndex(h => h.includes("備註"));
-                    setData(rows.map((row, i) => ({ id: i, item: row[mIdx] || "", qty: row[qIdx] || "", note: row[rIdx] || "" })).filter(r => r.item !== ""));
-                } catch (e) { setData([]); } finally { setLoading(false); }
-            };
-
-            if (!isOpen) return null;
-
-            return (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 modal-overlay" onClick={onClose}>
-                    <div className="bg-white w-full max-w-2xl max-h-[85vh] rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-                        <header className="p-6 border-b flex justify-between items-center bg-slate-50">
-                            <div>
-                                <h3 className="font-black text-xl text-slate-800 flex items-center gap-2">
-                                    <LucideIcon name="clipboard-list" className="text-emerald-600" /> 材料清單
-                                </h3>
-                                <p className="text-xs text-slate-400 font-bold mt-1">{orderName}</p>
-                            </div>
-                            <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors"><LucideIcon name="x" size={24} /></button>
-                        </header>
-                        <div className="flex-1 overflow-y-auto p-6 space-y-3">
-                            {loading ? (
-                                <div className="py-20 text-center flex flex-col items-center gap-3">
-                                    <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                                    <p className="text-slate-400 font-bold">載入中...</p>
-                                </div>
-                            ) : data.length === 0 ? (
-                                <p className="py-20 text-center text-slate-300 font-bold">找不到材料資料</p>
-                            ) : (
-                                data.map(row => (
-                                    <div key={row.id} onClick={() => setCheckedItems(prev => ({ ...prev, [row.id]: !prev[row.id] }))}
-                                        className={`flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer ${checkedItems[row.id] ? 'bg-slate-50 opacity-50' : 'bg-white border-slate-100 shadow-sm'}`}>
-                                        <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center ${checkedItems[row.id] ? 'bg-emerald-500 border-emerald-500' : 'border-slate-200'}`}>
-                                            {checkedItems[row.id] && <LucideIcon name="check" size={14} className="text-white" />}
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className={`font-bold ${checkedItems[row.id] ? 'line-through text-slate-400' : 'text-slate-700'}`}>{row.item}</p>
-                                            <p className="text-xs text-slate-400">{row.note}</p>
-                                        </div>
-                                        <div className="text-emerald-600 font-black">x{row.qty}</div>
-                                    </div>
-                                ))
-                            )}
-                        </div>
-                        <footer className="p-6 border-t bg-slate-50 flex justify-end">
-                            <button onClick={onClose} className="px-8 py-2 bg-slate-800 text-white rounded-xl font-bold shadow-lg">關閉</button>
-                        </footer>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- 主程式區 ---
 
         const App = () => {
             const [orders, setOrders] = useState([]);
@@ -153,32 +66,16 @@
             const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
             const [currentCategory, setCurrentCategory] = useState("全部");
             const [toast, setToast] = useState(null);
-            const [quoteModal, setQuoteModal] = useState({ isOpen: false, url: "", name: "", api: "" });
 
             const findVal = (order, type) => {
                 if (!order) return "";
                 const keys = Object.keys(order);
-                let targets = [...(FIELD_MAPS[type] || [])];
-                
-                const cleanKeys = keys.filter(k => 
-                    !k.includes("戳記") && 
-                    !k.toLowerCase().includes("timestamp")
-                );
-
-                let actualKey = null;
-                for (let t of targets) {
-                    actualKey = cleanKeys.find(k => k.trim() === t);
-                    if (actualKey) break;
-                }
-                if (!actualKey) {
-                    for (let t of targets) {
-                        actualKey = cleanKeys.find(k => k.includes(t));
-                        if (actualKey) break;
-                    }
-                }
+                const targets = FIELD_MAPS[type] || [];
+                const cleanKeys = keys.filter(k => !k.includes("戳記") && !k.toLowerCase().includes("timestamp"));
+                let actualKey = targets.reduce((found, t) => found || cleanKeys.find(k => k.trim() === t), null) || 
+                                targets.reduce((found, t) => found || cleanKeys.find(k => k.includes(t)), null);
                 
                 let val = actualKey ? order[actualKey] : "";
-
                 if (type === 'date' && val) {
                     const d = new Date(val);
                     if (!isNaN(d.getTime())) {
@@ -186,271 +83,139 @@
                         return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}`;
                     }
                 }
-                
-                if (type === 'time' && val) {
-                    let timeStr = String(val).trim();
-                    let dateObj = null;
-                    const timeMatch = timeStr.match(/^(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?$/);
-                    if (timeMatch) {
-                        dateObj = new Date();
-                        dateObj.setHours(parseInt(timeMatch[1]), parseInt(timeMatch[2]), 0);
-                    } 
-                    else if (timeStr.includes("1899") || timeStr.includes("T") || !isNaN(Date.parse(timeStr))) {
-                        const d = new Date(timeStr);
-                        if (!isNaN(d.getTime())) dateObj = d;
-                    }
-                    if (dateObj) {
-                        const h = dateObj.getHours();
-                        const m = String(dateObj.getMinutes()).padStart(2, '0');
-                        const ampm = h >= 12 ? '下午' : '上午';
-                        const displayHour = h % 12 || 12;
-                        return `${ampm} ${displayHour}:${m}`;
+                if (type === 'time' && val && (String(val).includes("1899") || String(val).includes("T"))) {
+                    const d = new Date(val);
+                    if (!isNaN(d.getTime())) {
+                        const h = d.getHours(), m = String(d.getMinutes()).padStart(2, '0');
+                        return `${h >= 12 ? '下午' : '上午'} ${h % 12 || 12}:${m}`;
                     }
                 }
                 return String(val || "").trim();
             };
 
-            const safeFetchJson = async (config, sourceKey) => {
-                const sourceName = CONFIG[sourceKey].name;
-                try {
-                    const res = await fetch(`${config.url}?${config.params}&t=${Date.now()}`);
-                    const text = await res.text();
-                    
-                    if (!text.trim().startsWith("[") && !text.trim().startsWith("{")) {
-                        console.warn(`${sourceName} 回傳異常內容:`, text);
-                        showToast(`${sourceName} 處於狀態文字，請檢查網址與模式設定。`, "error");
-                        return [];
-                    }
-
-                    try {
-                        let data = JSON.parse(text);
-                        
-                        // MILU 專屬邏輯：轉換二維陣列為物件陣列
-                        if (sourceKey === "MILU" && Array.isArray(data) && data.length > 0 && Array.isArray(data[0])) {
-                            return data.map((row, index) => ({
-                                "訂單編號": row[0],
-                                "LINE名稱": row[2],
-                                "客戶名稱": row[3],
-                                "電話": row[4],
-                                "日期": row[5],
-                                "時間/時段": row[6],
-                                "地點": row[7],
-                                "狀態": row[10],
-                                "撿貨狀態": row[21],
-                                "__row__": index + 2, // 模擬行號
-                                "__sheet__": "預設" // 腳本 handleRead 沒傳分頁名稱，暫訂預設
-                            }));
-                        }
-                        
-                        return Array.isArray(data) ? data : [];
-                    } catch (e) {
-                        console.error(`${sourceName} 解析失敗:`, text);
-                        return [];
-                    }
-                } catch (e) {
-                    console.error(`${sourceName} 請求失敗:`, e);
-                    return [];
-                }
-            };
-
             const fetchAllData = async () => {
                 setLoading(true);
-                let combinedData = [];
-                const [resOff, resMilu] = await Promise.all([
-                    safeFetchJson(CONFIG.OFFICIAL, "OFFICIAL"),
-                    safeFetchJson(CONFIG.MILU, "MILU")
-                ]);
-                combinedData.push(...resOff.map(o => ({ ...o, _src: "OFFICIAL", _apiUrl: CONFIG.OFFICIAL.url })));
-                combinedData.push(...resMilu.map(o => ({ ...o, _src: "MILU", _apiUrl: CONFIG.MILU.url })));
-                setOrders(combinedData);
+                let combined = [];
+                for (const key of Object.keys(CONFIG)) {
+                    try {
+                        const res = await fetch(`${CONFIG[key].url}?${CONFIG[key].params}&t=${Date.now()}`);
+                        const data = await res.json();
+                        if (key === "MILU") {
+                            combined.push(...data.map(row => ({
+                                "訂單編號": row[0], "客戶名稱": row[3], "日期": row[5], "時間/時段": row[6],
+                                "地點": row[7], "狀態": row[10], "撿貨狀態": row[21], "_src": "MILU", "_apiUrl": CONFIG.MILU.url, "__sheet__": row[row.length-1]
+                            })));
+                        } else {
+                            combined.push(...data.map(o => ({ ...o, _src: "OFFICIAL", _apiUrl: CONFIG.OFFICIAL.url })));
+                        }
+                    } catch (e) { console.error(key + " 讀取失敗"); }
+                }
+                setOrders(combined);
                 setLoading(false);
             };
 
             useEffect(() => { fetchAllData(); }, []);
 
-            const showToast = (text, type = "success") => {
-                setToast({ text, type });
-                setTimeout(() => setToast(null), 4000);
-            };
+            const showToast = (text) => { setToast(text); setTimeout(() => setToast(null), 3000); };
 
-            const handleUpdateStatus = async (order, newStatus) => {
+            const handleUpdate = async (order, newStatus) => {
                 setLoading(true);
                 try {
                     const isMilu = order._src === "MILU";
-                    // MILU 腳本要求 action 為 UPDATE_ORDER
-                    const payload = {
-                        action: isMilu ? "UPDATE_ORDER" : "updateStatus",
-                        orderId: isMilu ? order["訂單編號"] : undefined,
-                        row: order["__row__"],
-                        sheet: order["__sheet__"] || "", 
-                        status: newStatus,
-                        columnName: CONFIG[order._src].statusField
+                    const payload = isMilu ? {
+                        action: "UPDATE_ORDER", orderId: order["訂單編號"], service: order["__sheet__"], pickingStatus: newStatus
+                    } : {
+                        action: "updateStatus", row: order["__row__"], status: newStatus, columnName: CONFIG.OFFICIAL.statusField
                     };
                     await fetch(order._apiUrl, { method: "POST", body: JSON.stringify(payload) });
-                    showToast(`狀態更新：${newStatus}`);
+                    showToast("更新成功: " + newStatus);
                     fetchAllData();
-                } catch (err) {
-                    showToast("更新失敗", "error");
-                    setLoading(false);
-                }
+                } catch (e) { showToast("更新失敗"); setLoading(false); }
             };
 
-            const dayStatusMap = useMemo(() => {
+            const dayStatus = useMemo(() => {
                 const stats = {};
-                const exclude = ["未付款", "UNPAID", "已取消", "CANCELED"];
                 orders.forEach(o => {
-                    const payStatus = findVal(o, 'payment').toUpperCase();
-                    if (exclude.some(k => payStatus.includes(k))) return;
-                    const dateKey = findVal(o, 'date').replace(/\//g, '-');
-                    if (!dateKey) return;
-                    if (!stats[dateKey]) stats[dateKey] = { hasOrders: true, hasUnpicked: false, hasPendingCheck: false };
-                    const status = findVal(o, 'status');
-                    if (!status || status === "未撿取") stats[dateKey].hasUnpicked = true;
-                    else if (status === "已備貨") stats[dateKey].hasPendingCheck = true;
+                    const date = findVal(o, 'date').replace(/\//g, '-');
+                    if (!date) return;
+                    if (!stats[date]) stats[date] = { green: true, red: false, yellow: false };
+                    const s = findVal(o, 'status');
+                    if (!s || s === "未撿取") stats[date].red = true;
+                    else if (s === "已備貨") stats[date].yellow = true;
                 });
                 return stats;
             }, [orders]);
 
-            const filteredOrders = useMemo(() => {
-                const exclude = ["未付款", "UNPAID", "已取消", "CANCELED"];
-                return orders.filter(o => {
-                    const payStatus = findVal(o, 'payment').toUpperCase();
-                    if (exclude.some(k => payStatus.includes(k))) return false;
-                    if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
-                    const oDate = findVal(o, 'date').replace(/\//g, '-');
-                    return oDate.includes(selectedDate);
-                }).sort((a, b) => findVal(a, 'time').localeCompare(findVal(b, 'time')));
-            }, [orders, selectedDate, currentCategory]);
+            const filtered = orders.filter(o => {
+                if (currentCategory !== "全部" && o["__sheet__"] !== currentCategory) return false;
+                return findVal(o, 'date').replace(/\//g, '-').includes(selectedDate);
+            }).sort((a, b) => findVal(a, 'time').localeCompare(findVal(b, 'time')));
 
-            const daysArray = useMemo(() => {
-                const year = currentMonth.getFullYear(), month = currentMonth.getMonth();
-                const firstDay = new Date(year, month, 1).getDay(), daysCount = new Date(year, month + 1, 0).getDate();
-                return Array.from({ length: 42 }, (_, i) => {
-                    const day = i - firstDay + 1;
-                    return (day > 0 && day <= daysCount) ? new Date(year, month, day).toISOString().split('T')[0] : null;
-                });
+            const days = useMemo(() => {
+                const y = currentMonth.getFullYear(), m = currentMonth.getMonth();
+                const start = new Date(y, m, 1).getDay(), len = new Date(y, m + 1, 0).getDate();
+                return Array.from({ length: 42 }, (_, i) => (i >= start && i < start + len) ? new Date(y, m, i - start + 1).toISOString().split('T')[0] : null);
             }, [currentMonth]);
 
             return (
                 <div className="min-h-screen pb-20">
-                    <header className="primary-gradient text-white p-4 shadow-md sticky top-0 z-40 flex justify-between items-center">
-                        <div className="flex items-center gap-3">
-                            <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md"><LucideIcon name="package" size={24} /></div>
-                            <h1 className="text-xl font-black tracking-tight">麋鹿氣球 · 整合備貨系統</h1>
-                        </div>
-                        <button onClick={fetchAllData} className="p-2 hover:bg-white/20 rounded-full transition-all active:scale-90">
-                            <LucideIcon name="refresh-cw" size={22} className={loading ? "spin" : ""} />
-                        </button>
+                    <header className="primary-gradient text-white p-4 sticky top-0 z-40 flex justify-between items-center shadow-lg">
+                        <div className="flex items-center gap-3"><LucideIcon name="package" size={24} /><h1 className="text-xl font-black">麋鹿氣球備貨系統</h1></div>
+                        <button onClick={fetchAllData} className="p-2"><LucideIcon name="refresh-cw" className={loading ? "spin" : ""} /></button>
                     </header>
-
-                    <div className="bg-white/80 backdrop-blur-md border-b sticky top-[72px] z-30 overflow-x-auto no-scrollbar">
-                        <div className="flex gap-2 max-w-6xl mx-auto p-3 px-4">
-                            {CATEGORIES.map(cat => (
-                                <button key={cat} onClick={() => setCurrentCategory(cat)}
-                                    className={`px-5 py-2 rounded-full text-xs font-black whitespace-nowrap transition-all border ${
-                                        currentCategory === cat ? 'bg-emerald-800 text-white border-emerald-800 shadow-lg' : 'bg-slate-50 text-slate-400 border-slate-100'
-                                    }`}>
-                                    {cat}
-                                </button>
-                            ))}
-                        </div>
+                    <div className="bg-white/80 backdrop-blur-md border-b sticky top-[64px] z-30 flex gap-2 p-3 overflow-x-auto no-scrollbar">
+                        {CATEGORIES.map(c => <button key={c} onClick={() => setCurrentCategory(c)} className={`px-4 py-2 rounded-full text-xs font-black transition-all ${currentCategory === c ? 'bg-emerald-800 text-white' : 'bg-slate-100 text-slate-400'}`}>{c}</button>)}
                     </div>
-
-                    <main className="max-w-6xl mx-auto p-4 lg:flex gap-8 mt-4">
+                    <main className="max-w-6xl mx-auto p-4 lg:flex gap-8">
                         <div className="lg:w-[340px] shrink-0 mb-6">
                             <div className="bg-white rounded-[2.5rem] shadow-sm border p-6 sticky top-[150px]">
-                                <div className="flex justify-between items-center mb-6 px-1">
-                                    <h2 className="font-black text-slate-700 text-lg">{currentMonth.getFullYear()} / {currentMonth.getMonth() + 1}</h2>
-                                    <div className="flex gap-1">
-                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))} className="p-2 hover:bg-slate-50 rounded-xl transition-colors"><LucideIcon name="chevron-left" /></button>
-                                        <button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))} className="p-2 hover:bg-slate-50 rounded-xl transition-colors"><LucideIcon name="chevron-right" /></button>
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-7 gap-1 text-center mb-4">
+                                <div className="flex justify-between items-center mb-6"><h2 className="font-black text-slate-700">{currentMonth.getFullYear()} / {currentMonth.getMonth() + 1}</h2><div className="flex gap-2"><button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(m-1)))}><LucideIcon name="chevron-left" /></button><button onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(m+1)))}><LucideIcon name="chevron-right" /></button></div></div>
+                                <div className="grid grid-cols-7 gap-1 text-center">
                                     {['日', '一', '二', '三', '四', '五', '六'].map(d => <div key={d} className="text-[10px] font-black text-slate-300 py-2">{d}</div>)}
-                                    {daysArray.map((dateStr, i) => {
-                                        const isSelected = dateStr === selectedDate;
-                                        const isToday = dateStr === new Date().toISOString().split('T')[0];
-                                        const stats = dayStatusMap[dateStr];
-                                        return (
-                                            <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
-                                                className={`h-11 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-sm font-bold transition-all relative ${
-                                                    !dateStr ? '' : isSelected ? 'bg-emerald-800 text-white shadow-lg scale-110 z-10' : isToday ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'hover:bg-slate-50 text-slate-600'
-                                                }`}>
-                                                <span>{dateStr ? parseInt(dateStr.split('-')[2]) : ""}</span>
-                                                {stats && (
-                                                    <div className="flex gap-1 absolute bottom-1.5">
-                                                        {stats.hasOrders && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`}></div>}
-                                                        {stats.hasPendingCheck && <div className={`w-1 h-1 rounded-full ${isSelected ? 'bg-amber-200' : 'bg-amber-400'}`}></div>}
-                                                        {stats.hasUnpicked && <div className={`w-1 h-1 rounded-full animate-pulse ${isSelected ? 'bg-red-200' : 'bg-red-600'}`}></div>}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
+                                    {days.map((d, i) => {
+                                        const s = dayStatus[d];
+                                        return <div key={i} onClick={() => d && setSelectedDate(d)} className={`h-11 rounded-2xl flex flex-col items-center justify-center cursor-pointer text-sm font-bold relative ${d === selectedDate ? 'bg-emerald-800 text-white shadow-lg scale-110' : 'hover:bg-slate-50'}`}>
+                                            <span>{d ? parseInt(d.split('-')[2]) : ""}</span>
+                                            {s && <div className="flex gap-0.5 absolute bottom-1">
+                                                {s.green && <div className="w-1 h-1 rounded-full bg-emerald-500"></div>}
+                                                {s.yellow && <div className="w-1 h-1 rounded-full bg-amber-400"></div>}
+                                                {s.red && <div className="w-1 h-1 rounded-full bg-red-600 animate-pulse"></div>}
+                                            </div>}
+                                        </div>
                                     })}
                                 </div>
-                                <div className="pt-4 border-t border-slate-50 text-[10px] text-slate-400 font-bold flex flex-col gap-2 px-2">
-                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div><span>當日有預訂訂單</span></div>
-                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-amber-400"></div><span>尚有「已備貨 / 製作中」訂單</span></div>
-                                    <div className="flex items-center gap-2"><div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div><span>尚有「未撿取」訂單</span></div>
-                                </div>
                             </div>
                         </div>
-
                         <div className="flex-1 space-y-4">
-                            <div className="flex items-center justify-between mb-2 px-2">
-                                <h3 className="font-black text-slate-600 flex items-center gap-2"><LucideIcon name="list-checks" size={20} className="text-emerald-600" /> {selectedDate} 排程</h3>
-                                <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full uppercase tracking-widest">{filteredOrders.length} 筆訂單</span>
-                            </div>
-
-                            {filteredOrders.length === 0 ? (
-                                <div className="py-24 text-center bg-white rounded-[3rem] border-2 border-dashed border-slate-100 text-slate-300 font-black italic">當日尚無備貨需求</div>
-                            ) : (
-                                filteredOrders.map((o) => {
-                                    const status = findVal(o, 'status');
-                                    const qUrl = findVal(o, 'quoteUrl');
-                                    return (
-                                        <div key={o._src + (o["訂單編號"] || o["__row__"])} className="order-card bg-white rounded-[2.5rem] shadow-sm border border-slate-100 p-7">
-                                            <div className="flex justify-between items-start mb-5">
-                                                <div className="space-y-1.5">
-                                                    <div className="flex gap-2 flex-wrap">
-                                                        <span className={`text-[9px] font-black px-2 py-0.5 rounded tracking-tighter border ${o._src === "OFFICIAL" ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-emerald-50 text-emerald-600 border-emerald-100"}`}>{CONFIG[o._src].name}</span>
-                                                        {o["__sheet__"] && <span className="text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded uppercase tracking-tighter">{o["__sheet__"]}</span>}
-                                                    </div>
-                                                    <h4 className="font-black text-2xl text-slate-800">{findVal(o, 'name')}</h4>
-                                                    <p className="text-[10px] font-bold text-slate-300 tracking-wider">#{findVal(o, 'id')}</p>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-2">
-                                                    <div className={`text-[10px] font-black px-4 py-1.5 rounded-full border shadow-sm ${status.includes("檢查完畢") ? "bg-emerald-500 text-white border-emerald-600" : status.includes("已備貨") ? "bg-amber-400 text-white border-amber-500" : "bg-red-50 text-red-600 border-red-100"}`}>{status || "未撿取"}</div>
-                                                    {qUrl && <button onClick={() => setQuoteModal({ isOpen: true, url: qUrl, name: findVal(o, 'name'), api: o._apiUrl })} className="flex items-center gap-1.5 text-[10px] font-black bg-slate-800 text-white px-4 py-1.5 rounded-full shadow-md"><LucideIcon name="eye" size={12} /> 查看材料</button>}
-                                                </div>
-                                            </div>
-                                            <div className="space-y-3 mb-6">
-                                                <div className="flex items-center gap-3 text-slate-700 font-black bg-slate-50 p-3 rounded-2xl w-fit border border-slate-100"><LucideIcon name="clock" size={18} className="text-emerald-500" /><span>{findVal(o, 'time')}</span></div>
-                                                <div className="flex items-start gap-3 px-1"><LucideIcon name="map-pin" size={18} className="shrink-0 mt-0.5 text-slate-300" /><span className="text-sm text-slate-500 font-bold leading-relaxed">{findVal(o, 'address')}</span></div>
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-2">
-                                                {["未撿取", "已備貨", "檢查完畢"].map((st) => {
-                                                    const active = (status === st) || (!status && st === "未撿取");
-                                                    return <button key={st} onClick={() => handleUpdateStatus(o, st)} className={`py-4 rounded-2xl text-[11px] font-black transition-all active:scale-95 border ${active ? "bg-slate-800 text-white border-slate-800 shadow-xl" : "bg-white text-slate-400 border-slate-100 hover:bg-slate-50"}`}>{st}</button>
-                                                })}
-                                            </div>
+                            <h3 className="font-black text-slate-600 flex items-center gap-2 px-2"><LucideIcon name="list-checks" className="text-emerald-600" /> {selectedDate} 排程 ({filtered.length})</h3>
+                            {filtered.length === 0 ? <div className="py-20 text-center bg-white rounded-[3rem] border-2 border-dashed text-slate-300 font-black italic">尚無待辦事項</div> : filtered.map(o => (
+                                <div key={o._src + (o["訂單編號"]||o["__row__"])} className="bg-white rounded-[2.5rem] shadow-sm border p-7 order-card">
+                                    <div className="flex justify-between mb-5">
+                                        <div className="space-y-1">
+                                            <div className="flex gap-2"><span className={`text-[9px] font-black px-2 py-0.5 rounded border ${o._src==='OFFICIAL'?'bg-blue-50 text-blue-600 border-blue-100':'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>{CONFIG[o._src].name}</span><span className="text-[9px] font-black bg-slate-100 text-slate-400 px-2 py-0.5 rounded uppercase">{o["__sheet__"]}</span></div>
+                                            <h4 className="font-black text-2xl text-slate-800">{findVal(o, 'name')}</h4>
+                                            <p className="text-[10px] text-slate-300 font-bold tracking-widest">#{findVal(o, 'id')}</p>
                                         </div>
-                                    );
-                                })
-                            )}
+                                        <div className={`text-[10px] font-black px-4 py-1.5 rounded-full h-fit shadow-sm ${findVal(o, 'status').includes("檢查") ? "bg-emerald-500 text-white" : findVal(o, 'status').includes("已備") ? "bg-amber-400 text-white" : "bg-red-600 text-white"}`}>{findVal(o, 'status') || "未撿取"}</div>
+                                    </div>
+                                    <div className="space-y-3 mb-6">
+                                        <div className="flex items-center gap-3 text-slate-700 font-black bg-slate-50 p-3 rounded-2xl w-fit border border-slate-100"><LucideIcon name="clock" className="text-emerald-500" />{findVal(o, 'time')}</div>
+                                        <div className="flex items-start gap-3 px-1 text-sm text-slate-500 font-bold leading-relaxed"><LucideIcon name="map-pin" className="shrink-0 text-slate-300" />{findVal(o, 'address')}</div>
+                                    </div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {["未撿取", "已備貨", "檢查完畢"].map(st => <button key={st} onClick={() => handleUpdate(o, st)} className={`py-4 rounded-2xl text-[11px] font-black border transition-all active:scale-95 ${findVal(o, 'status') === st || (!findVal(o,'status') && st==='未撿取') ? 'bg-slate-800 text-white shadow-xl' : 'bg-white text-slate-400 border-slate-100'}`}>{st}</button>)}
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </main>
-
-                    <QuoteModal isOpen={quoteModal.isOpen} onClose={() => setQuoteModal({ ...quoteModal, isOpen: false })} quoteUrl={quoteModal.url} orderName={quoteModal.name} apiUrl={quoteModal.api} />
-                    {toast && <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-full shadow-2xl z-[300] text-sm font-black animate-bounce ${toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'}`}>{toast.text}</div>}
-                    {loading && <div className="fixed inset-0 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center z-[500]"><div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mb-4"></div><span className="font-black text-emerald-800 tracking-[0.3em] text-xs uppercase">Syncing Data</span></div>}
+                    {toast && <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-10 py-4 rounded-full shadow-2xl z-[300] bg-slate-900 text-white text-sm font-black animate-bounce">{toast}</div>}
+                    {loading && <div className="fixed inset-0 bg-white/40 backdrop-blur-md flex flex-col items-center justify-center z-[500]"><div className="w-12 h-12 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin"></div></div>}
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
 </html>
