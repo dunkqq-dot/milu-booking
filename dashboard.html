@@ -37,10 +37,11 @@
 <body id="app" v-cloak>
 
     <div class="flex h-full">
-        <!-- 左側列表 -->
-        <div class="w-full md:w-1/3 bg-white border-r border-gray-200 flex flex-col h-full z-10" :class="{'hidden md:flex': selectedOrder}">
+        <!-- 左側側邊欄 -->
+        <aside class="flex flex-col bg-slate-50 border-r border-slate-200 z-30 transition-all duration-300 relative shrink-0 shadow-sm"
+               :class="[selectedOrder ? 'hidden md:flex w-80 lg:w-96' : 'w-full md:w-80 lg:w-96']">
             
-             <!-- 頂部標題與搜尋 -->
+            <!-- 頂部標題與搜尋 -->
             <div class="p-5 bg-white space-y-4">
                 <div class="flex items-center justify-between">
                     <div>
@@ -54,9 +55,14 @@
                     </button>
                 </div>
                 
+                <div class="relative group">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm transition-colors group-focus-within:text-milu-gold"></i>
+                    <input type="text" v-model="searchQuery" placeholder="搜尋姓名、電話、編號..." 
+                           class="w-full pl-10 pr-4 py-3 bg-slate-100/50 rounded-2xl outline-none focus:ring-4 ring-milu-gold/10 text-sm font-medium border border-transparent focus:border-milu-gold/30 focus:bg-white transition-all">
+                </div>
             </div>
 
-                        <!-- 日曆模組 (搜尋時隱藏) -->
+            <!-- 日曆模組 (搜尋時隱藏) -->
             <div class="px-5 pb-5 pt-2 bg-white border-b border-slate-100" v-if="!searchQuery">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="font-bold text-sm text-slate-700 flex items-center gap-2">
@@ -163,33 +169,15 @@
                     </div>
                 </div>
             </div>
-             // --- 日曆邏輯實作 ---
-                const viewDate = ref(new Date());
-                const currentMonthYear = computed(() => {
-                    return `${viewDate.value.getFullYear()}年 ${viewDate.value.getMonth() + 1}月`;
-                });
-                const calendarDays = computed(() => {
-                    const year = viewDate.value.getFullYear();
-                    const month = viewDate.value.getMonth();
-                    const firstDay = new Date(year, month, 1).getDay();
-                    const lastDate = new Date(year, month + 1, 0).getDate();
-                    const days = [];
-                    // 填補月初空白
-                    for (let i = 0; i < firstDay; i++) days.push({ dayNum: '', dateStr: '' });
-                    // 填寫日期
-                    for (let d = 1; d <= lastDate; d++) {
-                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                        const hasOrder = reservations.value.some(r => r.date === dateStr);
-                        days.push({ dayNum: d, dateStr, hasOrder });
-                    }
-                    return days;
-                });
-                const changeMonth = (delta) => {
-                    const d = new Date(viewDate.value);
-                    d.setMonth(d.getMonth() + delta);
-                    viewDate.value = d;
-                };
+            
+            <!-- 錯誤訊息提示 -->
+            <div v-if="errorMsg" class="p-3 bg-red-50 text-red-500 text-[11px] border-t border-red-100 flex items-start gap-2">
+                <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
+                <span>{{ errorMsg }}</span>
+            </div>
+        </aside>
 
+        </div>
 
         <!-- 右側詳情 -->
         <div class="w-full md:w-2/3 bg-[#F9F9F9] flex flex-col relative h-full" :class="{'hidden md:flex': !selectedOrder}">
@@ -411,7 +399,33 @@
                 const isEditing = ref(false);
                 const editForm = ref({});
                 const filter = ref('ALL');
-                
+                // --- 日曆邏輯實作 ---
+                const viewDate = ref(new Date());
+                const currentMonthYear = computed(() => {
+                    return `${viewDate.value.getFullYear()}年 ${viewDate.value.getMonth() + 1}月`;
+                });
+                const calendarDays = computed(() => {
+                    const year = viewDate.value.getFullYear();
+                    const month = viewDate.value.getMonth();
+                    const firstDay = new Date(year, month, 1).getDay();
+                    const lastDate = new Date(year, month + 1, 0).getDate();
+                    const days = [];
+                    // 填補月初空白
+                    for (let i = 0; i < firstDay; i++) days.push({ dayNum: '', dateStr: '' });
+                    // 填寫日期
+                    for (let d = 1; d <= lastDate; d++) {
+                        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                        const hasOrder = reservations.value.some(r => r.date === dateStr);
+                        days.push({ dayNum: d, dateStr, hasOrder });
+                    }
+                    return days;
+                });
+                const changeMonth = (delta) => {
+                    const d = new Date(viewDate.value);
+                    d.setMonth(d.getMonth() + delta);
+                    viewDate.value = d;
+                };
+
                 // 🔍 新增篩選變數
                 const searchQuery = ref('');
                 const filterDate = ref('');
