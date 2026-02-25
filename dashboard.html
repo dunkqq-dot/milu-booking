@@ -365,7 +365,7 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <script>
+      <script>
         const { createApp, ref, computed, onMounted } = Vue;
 
         const configMap = {
@@ -401,6 +401,7 @@
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
                 const lastUpdated = ref(null);
+                
                 // --- 日曆邏輯實作 ---
                 const viewDate = ref(new Date());
                 const currentMonthYear = computed(() => {
@@ -427,15 +428,7 @@
                     d.setMonth(d.getMonth() + delta);
                     viewDate.value = d;
                 };
-                const safeText = (text) => (text && String(text).trim() !== '') ? String(text) : ' ';
-                const formatMoney = (val) => (!val && val !== 0) ? '0' : val.toLocaleString();
-                const parseMoney = (val) => {
-                    if (!val) return 0;
-                    const str = String(val).replace(/[^\d.-]/g, '');
-                    return parseInt(str) || 0;
-                };
-
-                // 增加了 '取貨' 判斷，使工作室取貨也能顯示選單
+ // 增加了 '取貨' 判斷，使工作室取貨也能顯示選單
                 const isTimeSlotService = (service) => service.includes('外送') || service.includes('自取') || service.includes('取貨');
 
                 const displayRawPrice = computed({
@@ -616,7 +609,36 @@
                 const getLabel = (type, service) => (configMap[service] || configMap['專人佈置'])[type];
                 const selectOrder = (order) => { if(!isEditing.value) selectedOrder.value = order; };
 
-       
+                // 🔍 強化版篩選邏輯
+                const filteredList = computed(() => {
+                    let result = reservations.value;
+
+                    // 1. 狀態篩選
+                    if (filter.value === 'UNPAID') result = result.filter(r => r.status === 'UNPAID' || r.status === 'WAITING_PAYMENT');
+                    else if (filter.value !== 'ALL') result = result.filter(r => r.status === filter.value);
+
+                    // 2. 關鍵字搜尋 (支援姓名、電話、LINE)
+                    if (searchQuery.value) {
+                        const q = searchQuery.value.toLowerCase();
+                        result = result.filter(r => 
+                            r.contactName.toLowerCase().includes(q) || 
+                            r.phone.includes(q) || 
+                            r.lineName.toLowerCase().includes(q)
+                        );
+                    }
+
+                    // 3. 日期篩選
+                    if (filterDate.value) {
+                        result = result.filter(r => r.date === filterDate.value);
+                    }
+
+                    // 4. 服務篩選
+                    if (filterService.value) {
+                        result = result.filter(r => r.service === filterService.value);
+                    }
+
+                    return result;
+                });
 
                 const clearFilters = () => {
                     filterDate.value = '';
