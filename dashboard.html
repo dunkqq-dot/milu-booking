@@ -38,7 +38,7 @@
 <body id="app" v-cloak>
 
     <div class="flex h-full">
-        <!-- 左側側邊欄 -->
+       <!-- 左側側邊欄 -->
         <aside class="flex flex-col bg-slate-50 border-r border-slate-200 z-30 transition-all duration-300 relative shrink-0 shadow-sm"
                :class="[selectedOrder ? 'hidden md:flex w-80 lg:w-96' : 'w-full md:w-80 lg:w-96']">
             
@@ -56,7 +56,11 @@
                     </button>
                 </div>
                 
-
+                <div class="relative group">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm transition-colors group-focus-within:text-milu-gold"></i>
+                    <input type="text" v-model="searchQuery" placeholder="搜尋姓名、電話、編號..." 
+                           class="w-full pl-10 pr-4 py-3 bg-slate-100/50 rounded-2xl outline-none focus:ring-4 ring-milu-gold/10 text-sm font-medium border border-transparent focus:border-milu-gold/30 focus:bg-white transition-all">
+                </div>
             </div>
 
             <!-- 日曆模組 (搜尋時隱藏) -->
