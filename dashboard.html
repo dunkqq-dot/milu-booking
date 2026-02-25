@@ -32,6 +32,7 @@
         /* 自定義 SweetAlert 按鈕樣式 */
         .swal2-confirm { background-color: #10B981 !important; } /* 綠色 */
         .swal2-deny { background-color: #6B7280 !important; } /* 灰色 */
+         .calendar-selected { background-color: #C69C6D !important; color: white !important; }
     </style>
 </head>
 <body id="app" v-cloak>
@@ -55,11 +56,7 @@
                     </button>
                 </div>
                 
-                <div class="relative group">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm transition-colors group-focus-within:text-milu-gold"></i>
-                    <input type="text" v-model="searchQuery" placeholder="搜尋姓名、電話、編號..." 
-                           class="w-full pl-10 pr-4 py-3 bg-slate-100/50 rounded-2xl outline-none focus:ring-4 ring-milu-gold/10 text-sm font-medium border border-transparent focus:border-milu-gold/30 focus:bg-white transition-all">
-                </div>
+
             </div>
 
             <!-- 日曆模組 (搜尋時隱藏) -->
