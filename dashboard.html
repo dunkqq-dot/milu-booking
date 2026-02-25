@@ -30,15 +30,16 @@
         .edit-input { width: 100%; border-bottom: 1px solid #ddd; background: transparent; padding: 2px 0; font-weight: bold; color: #4A4A4A; }
         
         /* 自定義 SweetAlert 按鈕樣式 */
-        .swal2-confirm { background-color: #10B981 !important; } /* 綠色 */
-        .swal2-deny { background-color: #6B7280 !important; } /* 灰色 */
-         .calendar-selected { background-color: #C69C6D !important; color: white !important; }
+        .swal2-confirm { background-color: #10B981 !important; } 
+        .swal2-deny { background-color: #6B7280 !important; }
+
+        .calendar-selected { background-color: #C69C6D !important; color: white !important; }
     </style>
 </head>
 <body id="app" v-cloak>
 
     <div class="flex h-full">
-       <!-- 左側側邊欄 -->
+        <!-- 左側側邊欄 -->
         <aside class="flex flex-col bg-slate-50 border-r border-slate-200 z-30 transition-all duration-300 relative shrink-0 shadow-sm"
                :class="[selectedOrder ? 'hidden md:flex w-80 lg:w-96' : 'w-full md:w-80 lg:w-96']">
             
@@ -178,8 +179,6 @@
             </div>
         </aside>
 
-        </div>
-
         <!-- 右側詳情 -->
         <div class="w-full md:w-2/3 bg-[#F9F9F9] flex flex-col relative h-full" :class="{'hidden md:flex': !selectedOrder}">
             
@@ -206,7 +205,6 @@
                                 <i class="fa-solid fa-pen"></i>
                             </button>
                             <div v-else class="absolute top-4 right-4 flex items-center gap-2">
-                                <!-- 移除原本的 checkbox，改用確認視窗邏輯 -->
                                 <button @click="saveEdit" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm shadow font-bold flex items-center gap-1">
                                     <i class="fa-solid fa-floppy-disk"></i> 儲存
                                 </button>
@@ -246,7 +244,7 @@
                                         <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                     </div>
                                     <div v-else>
-                                        <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
+                                        <p class="text-xl text-gray-400 font-bold mb-1 flex items-center gap-2">
                                             <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                         </p>
                                         <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
@@ -254,9 +252,6 @@
                                             <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
                                         </p>
                                     </div>
-                                    <p class="text-xs text-gray-300 font-mono mt-2" v-if="!isEditing">
-                                        {{ selectedOrder.userId ? `ID: ...${selectedOrder.userId.substr(-4)}` : '未綁定LINE ID' }}
-                                    </p>
                                 </div>
                                 <div class="text-right">
                                     <p class="text-xs text-gray-400 mb-1">SERVICE</p>
@@ -326,7 +321,6 @@
 
                             <!-- 動作按鈕 -->
                             <div v-if="!isEditing" class="pt-2 space-y-3">
-                                
                                 <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知 & 帳號
                                 </button>
@@ -339,7 +333,6 @@
                                     <button @click="updateOrderStatus('COMPLETE')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                         <i class="fa-solid fa-flag-checkered"></i> 完成訂單 (結案)
                                     </button>
-                                    <p class="text-center text-xs text-gray-400">已付款，可進行結案</p>
                                 </div>
 
                                 <div v-if="selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELED' || selectedOrder.status === 'REFUNDED'" class="space-y-3">
@@ -359,8 +352,6 @@
                                         <i class="fa-solid fa-ban"></i> 取消訂單
                                     </button>
                                 </div>
-
-                                <p class="text-center text-xs text-gray-400 pt-2">* 點擊按鈕將同步更新試算表與發送 LINE 通知</p>
                             </div>
                         </div>
                     </div>
@@ -400,6 +391,16 @@
                 const isEditing = ref(false);
                 const editForm = ref({});
                 const filter = ref('ALL');
+                
+                // 🔍 新增篩選變數
+                const searchQuery = ref('');
+                const filterDate = ref('');
+                const filterService = ref('');
+
+                const loading = ref(true);
+                const errorMsg = ref(null);
+                const rawJsonData = ref(null);
+                const lastUpdated = ref(null);
                 // --- 日曆邏輯實作 ---
                 const viewDate = ref(new Date());
                 const currentMonthYear = computed(() => {
@@ -426,17 +427,6 @@
                     d.setMonth(d.getMonth() + delta);
                     viewDate.value = d;
                 };
-
-                // 🔍 新增篩選變數
-                const searchQuery = ref('');
-                const filterDate = ref('');
-                const filterService = ref('');
-
-                const loading = ref(true);
-                const errorMsg = ref(null);
-                const rawJsonData = ref(null);
-                const lastUpdated = ref(null);
-
                 const safeText = (text) => (text && String(text).trim() !== '') ? String(text) : ' ';
                 const formatMoney = (val) => (!val && val !== 0) ? '0' : val.toLocaleString();
                 const parseMoney = (val) => {
@@ -626,36 +616,7 @@
                 const getLabel = (type, service) => (configMap[service] || configMap['專人佈置'])[type];
                 const selectOrder = (order) => { if(!isEditing.value) selectedOrder.value = order; };
 
-                // 🔍 強化版篩選邏輯
-                const filteredList = computed(() => {
-                    let result = reservations.value;
-
-                    // 1. 狀態篩選
-                    if (filter.value === 'UNPAID') result = result.filter(r => r.status === 'UNPAID' || r.status === 'WAITING_PAYMENT');
-                    else if (filter.value !== 'ALL') result = result.filter(r => r.status === filter.value);
-
-                    // 2. 關鍵字搜尋 (支援姓名、電話、LINE)
-                    if (searchQuery.value) {
-                        const q = searchQuery.value.toLowerCase();
-                        result = result.filter(r => 
-                            r.contactName.toLowerCase().includes(q) || 
-                            r.phone.includes(q) || 
-                            r.lineName.toLowerCase().includes(q)
-                        );
-                    }
-
-                    // 3. 日期篩選
-                    if (filterDate.value) {
-                        result = result.filter(r => r.date === filterDate.value);
-                    }
-
-                    // 4. 服務篩選
-                    if (filterService.value) {
-                        result = result.filter(r => r.service === filterService.value);
-                    }
-
-                    return result;
-                });
+       
 
                 const clearFilters = () => {
                     filterDate.value = '';
