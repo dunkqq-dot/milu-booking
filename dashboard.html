@@ -30,20 +30,19 @@
         .edit-input { width: 100%; border-bottom: 1px solid #ddd; background: transparent; padding: 2px 0; font-weight: bold; color: #4A4A4A; }
         
         /* 自定義 SweetAlert 按鈕樣式 */
-        .swal2-confirm { background-color: #10B981 !important; } 
-        .swal2-deny { background-color: #6B7280 !important; }
-
-        .calendar-selected { background-color: #C69C6D !important; color: white !important; }
+        .swal2-confirm { background-color: #10B981 !important; } /* 綠色 */
+        .swal2-deny { background-color: #6B7280 !important; } /* 灰色 */
+         .calendar-selected { background-color: #C69C6D !important; color: white !important; }
     </style>
 </head>
 <body id="app" v-cloak>
 
     <div class="flex h-full">
-        <!-- 左側側邊欄 -->
+        <!-- 左側列表 -->
         <aside class="flex flex-col bg-slate-50 border-r border-slate-200 z-30 transition-all duration-300 relative shrink-0 shadow-sm"
                :class="[selectedOrder ? 'hidden md:flex w-80 lg:w-96' : 'w-full md:w-80 lg:w-96']">
             
-            <!-- 頂部標題與搜尋 -->
+            <!-- Header 區塊：標題 + 工具列 -->
             <div class="p-5 bg-white space-y-4">
                 <div class="flex items-center justify-between">
                     <div>
@@ -56,15 +55,20 @@
                         <i class="fa-solid fa-rotate text-sm"></i>
                     </button>
                 </div>
-                
-                <div class="relative group">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm transition-colors group-focus-within:text-milu-gold"></i>
-                    <input type="text" v-model="searchQuery" placeholder="搜尋姓名、電話、編號..." 
-                           class="w-full pl-10 pr-4 py-3 bg-slate-100/50 rounded-2xl outline-none focus:ring-4 ring-milu-gold/10 text-sm font-medium border border-transparent focus:border-milu-gold/30 focus:bg-white transition-all">
-                </div>
-            </div>
 
-            <!-- 日曆模組 (搜尋時隱藏) -->
+                <!-- 🔍 新增：搜尋與進階篩選區塊 -->
+                <div class="bg-white p-2 rounded-lg border border-gray-200 space-y-2">
+                    <!-- 關鍵字搜尋 -->
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-300 text-xs"></i>
+                        <input type="text" v-model="searchQuery" placeholder="搜尋姓名、電話、LINE..." 
+                               class="w-full pl-8 pr-2 py-1.5 text-xs bg-gray-50 border border-gray-100 rounded focus:outline-none focus:border-milu-gold focus:bg-white transition">
+                        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-2 text-gray-300 hover:text-gray-500">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                    </div>
+                    
+<!-- 日曆模組 (搜尋時隱藏) -->
             <div class="px-5 pb-5 pt-2 bg-white border-b border-slate-100" v-if="!searchQuery">
                 <div class="flex justify-between items-center mb-3">
                     <h3 class="font-bold text-sm text-slate-700 flex items-center gap-2">
@@ -104,29 +108,20 @@
                 </div>
             </div>
 
-            <!-- 狀態快速篩選頁籤 -->
-            <div class="flex p-3 gap-2 bg-slate-50 border-b border-slate-200 shrink-0 overflow-x-auto no-scrollbar">
-                <button v-for="opt in [{k:'ALL', n:'全部'}, {k:'UNPAID', n:'待付款'}, {k:'CONFIRMED', n:'已付款'}]" 
-                        :key="opt.k"
-                        @click="filter = opt.k" 
-                        :class="filter === opt.k ? 'bg-milu-gold text-white shadow-md' : 'bg-white text-slate-500 hover:bg-white/80'" 
-                        class="flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all whitespace-nowrap border border-transparent">
-                    {{ opt.n }}
-                </button>
+            <!-- 狀態頁籤 (全部/未付款/已付款) -->
+            <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto">
+                <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">全部</button>
+                <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">未付款</button>
+                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已付款</button>
             </div>
 
-            <!-- 訂單列表區域 -->
-            <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 no-scrollbar">
-                <!-- 無資料狀態 -->
-                <div v-if="filteredList.length === 0" class="flex flex-col items-center justify-center py-20 text-slate-400 space-y-2">
-                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-2">
-                        <i class="fa-regular fa-folder-open text-2xl opacity-40"></i>
-                    </div>
-                    <p class="text-sm font-medium">沒有找到任何訂單</p>
-                    <button @click="clearFilters" class="text-xs text-milu-gold underline font-bold">重設篩選條件</button>
+            <!-- 訂單列表 -->
+            <div class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
+                <div v-if="filteredList.length === 0" class="text-center py-10 text-gray-400 text-sm flex flex-col items-center">
+                    <i class="fa-regular fa-folder-open text-2xl mb-2 opacity-50"></i>
+                    沒有符合條件的訂單
                 </div>
 
-                <!-- 訂單列表 -->
                 <div v-for="order in filteredList" :key="order.oid" @click="selectOrder(order)" 
                      class="p-4 rounded-xl cursor-pointer transition-all bg-white border border-transparent hover:border-gray-200 card-shadow"
                      :class="{'active-item': selectedOrder && selectedOrder.oid === order.oid}">
@@ -156,28 +151,15 @@
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
                     
-                    <!-- 尾款欄位顯示 (修正需求) -->
                     <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.status !== 'CANCELED' && order.status !== 'COMPLETED'">
-                        <span class="text-[10px] text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
-                        <span class="text-[11px] font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-500' : 'text-green-600'">
-                            <template v-if="order.rawPrice > 0">
-                                <span v-if="(order.rawPrice - order.receivedPrice) > 0">
-                                    尚欠: NT$ {{ formatMoney(order.rawPrice - order.receivedPrice) }}
-                                </span>
-                                <span v-else>已付清</span>
-                            </template>
-                            <template v-else>待報價</template>
+                        <span class="text-xs text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
+                        <span class="text-xs font-bold" :class="order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500') : 'text-gray-400'">
+                            {{ order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? `尚欠: NT$ ${formatMoney(order.rawPrice - order.receivedPrice)}` : '已付清') : '待報價' }}
                         </span>
                     </div>
                 </div>
             </div>
-            
-            <!-- 錯誤訊息提示 -->
-            <div v-if="errorMsg" class="p-3 bg-red-50 text-red-500 text-[11px] border-t border-red-100 flex items-start gap-2">
-                <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
-                <span>{{ errorMsg }}</span>
-            </div>
-        </aside>
+        </div>
 
         <!-- 右側詳情 -->
         <div class="w-full md:w-2/3 bg-[#F9F9F9] flex flex-col relative h-full" :class="{'hidden md:flex': !selectedOrder}">
@@ -205,6 +187,7 @@
                                 <i class="fa-solid fa-pen"></i>
                             </button>
                             <div v-else class="absolute top-4 right-4 flex items-center gap-2">
+                                <!-- 移除原本的 checkbox，改用確認視窗邏輯 -->
                                 <button @click="saveEdit" class="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg text-sm shadow font-bold flex items-center gap-1">
                                     <i class="fa-solid fa-floppy-disk"></i> 儲存
                                 </button>
@@ -244,7 +227,7 @@
                                         <input v-model="editForm.phone" class="edit-input text-sm" placeholder="電話">
                                     </div>
                                     <div v-else>
-                                        <p class="text-xl text-gray-400 font-bold mb-1 flex items-center gap-2">
+                                        <p class="text-2xl text-gray-400 font-bold mb-1 flex items-center gap-2">
                                             <i class="fa-brands fa-line text-green-500 text-xl"></i> {{ selectedOrder.lineName }}
                                         </p>
                                         <p class="font-bold text-2xl text-gray-800">{{ selectedOrder.contactName }}</p>
@@ -252,6 +235,9 @@
                                             <i class="fa-solid fa-phone text-xs"></i> {{ selectedOrder.phone }}
                                         </p>
                                     </div>
+                                    <p class="text-xs text-gray-300 font-mono mt-2" v-if="!isEditing">
+                                        {{ selectedOrder.userId ? `ID: ...${selectedOrder.userId.substr(-4)}` : '未綁定LINE ID' }}
+                                    </p>
                                 </div>
                                 <div class="text-right">
                                     <p class="text-xs text-gray-400 mb-1">SERVICE</p>
@@ -321,6 +307,7 @@
 
                             <!-- 動作按鈕 -->
                             <div v-if="!isEditing" class="pt-2 space-y-3">
+                                
                                 <button v-if="selectedOrder.status === 'UNPAID'" @click="updateOrderStatus('PAYMENT_REQUEST')" class="w-full bg-blue-500 hover:bg-blue-600 text-white py-3.5 rounded-xl font-bold transition shadow-lg flex items-center justify-center gap-2">
                                     <i class="fa-solid fa-envelope mr-1"></i> (選用) 發送付款須知 & 帳號
                                 </button>
@@ -333,6 +320,7 @@
                                     <button @click="updateOrderStatus('COMPLETE')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3.5 rounded-xl font-bold transition shadow-lg active:scale-95 flex items-center justify-center gap-2">
                                         <i class="fa-solid fa-flag-checkered"></i> 完成訂單 (結案)
                                     </button>
+                                    <p class="text-center text-xs text-gray-400">已付款，可進行結案</p>
                                 </div>
 
                                 <div v-if="selectedOrder.status === 'COMPLETED' || selectedOrder.status === 'CANCELED' || selectedOrder.status === 'REFUNDED'" class="space-y-3">
@@ -352,6 +340,8 @@
                                         <i class="fa-solid fa-ban"></i> 取消訂單
                                     </button>
                                 </div>
+
+                                <p class="text-center text-xs text-gray-400 pt-2">* 點擊按鈕將同步更新試算表與發送 LINE 通知</p>
                             </div>
                         </div>
                     </div>
@@ -365,7 +355,7 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-      <script>
+    <script>
         const { createApp, ref, computed, onMounted } = Vue;
 
         const configMap = {
@@ -401,8 +391,7 @@
                 const errorMsg = ref(null);
                 const rawJsonData = ref(null);
                 const lastUpdated = ref(null);
-                
-                // --- 日曆邏輯實作 ---
+// --- 日曆邏輯實作 ---
                 const viewDate = ref(new Date());
                 const currentMonthYear = computed(() => {
                     return `${viewDate.value.getFullYear()}年 ${viewDate.value.getMonth() + 1}月`;
@@ -428,7 +417,16 @@
                     d.setMonth(d.getMonth() + delta);
                     viewDate.value = d;
                 };
- // 增加了 '取貨' 判斷，使工作室取貨也能顯示選單
+
+                const safeText = (text) => (text && String(text).trim() !== '') ? String(text) : ' ';
+                const formatMoney = (val) => (!val && val !== 0) ? '0' : val.toLocaleString();
+                const parseMoney = (val) => {
+                    if (!val) return 0;
+                    const str = String(val).replace(/[^\d.-]/g, '');
+                    return parseInt(str) || 0;
+                };
+
+                // 增加了 '取貨' 判斷，使工作室取貨也能顯示選單
                 const isTimeSlotService = (service) => service.includes('外送') || service.includes('自取') || service.includes('取貨');
 
                 const displayRawPrice = computed({
