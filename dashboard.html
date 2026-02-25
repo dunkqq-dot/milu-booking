@@ -55,18 +55,6 @@
                         <i class="fa-solid fa-rotate text-sm"></i>
                     </button>
                 </div>
-
-                <!-- 🔍 新增：搜尋與進階篩選區塊 -->
-                <div class="bg-white p-2 rounded-lg border border-gray-200 space-y-2">
-                    <!-- 關鍵字搜尋 -->
-                    <div class="relative">
-                        <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-300 text-xs"></i>
-                        <input type="text" v-model="searchQuery" placeholder="搜尋姓名、電話、LINE..." 
-                               class="w-full pl-8 pr-2 py-1.5 text-xs bg-gray-50 border border-gray-100 rounded focus:outline-none focus:border-milu-gold focus:bg-white transition">
-                        <button v-if="searchQuery" @click="searchQuery = ''" class="absolute right-2 top-2 text-gray-300 hover:text-gray-500">
-                            <i class="fa-solid fa-times"></i>
-                        </button>
-                    </div>
                     
 <!-- 日曆模組 (搜尋時隱藏) -->
             <div class="px-5 pb-5 pt-2 bg-white border-b border-slate-100" v-if="!searchQuery">
@@ -108,20 +96,29 @@
                 </div>
             </div>
 
-            <!-- 狀態頁籤 (全部/未付款/已付款) -->
-            <div class="flex p-2 gap-2 bg-gray-50 border-b border-gray-200 shrink-0 overflow-x-auto">
-                <button @click="filter = 'ALL'" :class="filter === 'ALL' ? 'bg-white text-milu-gold shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">全部</button>
-                <button @click="filter = 'UNPAID'" :class="filter === 'UNPAID' ? 'bg-white text-red-500 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">未付款</button>
-                <button @click="filter = 'CONFIRMED'" :class="filter === 'CONFIRMED' ? 'bg-white text-green-600 shadow-sm border' : 'text-gray-400'" class="flex-1 py-2 text-xs font-bold rounded-lg transition-all whitespace-nowrap px-2">已付款</button>
+            <!-- 狀態快速篩選頁籤 -->
+            <div class="flex p-3 gap-2 bg-slate-50 border-b border-slate-200 shrink-0 overflow-x-auto no-scrollbar">
+                <button v-for="opt in [{k:'ALL', n:'全部'}, {k:'UNPAID', n:'待付款'}, {k:'CONFIRMED', n:'已付款'}]" 
+                        :key="opt.k"
+                        @click="filter = opt.k" 
+                        :class="filter === opt.k ? 'bg-milu-gold text-white shadow-md' : 'bg-white text-slate-500 hover:bg-white/80'" 
+                        class="flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all whitespace-nowrap border border-transparent">
+                    {{ opt.n }}
+                </button>
             </div>
 
-            <!-- 訂單列表 -->
-            <div class="flex-1 overflow-y-auto p-2 space-y-2 bg-gray-50">
-                <div v-if="filteredList.length === 0" class="text-center py-10 text-gray-400 text-sm flex flex-col items-center">
-                    <i class="fa-regular fa-folder-open text-2xl mb-2 opacity-50"></i>
-                    沒有符合條件的訂單
+           <!-- 訂單列表區域 -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 no-scrollbar">
+                <!-- 無資料狀態 -->
+                <div v-if="filteredList.length === 0" class="flex flex-col items-center justify-center py-20 text-slate-400 space-y-2">
+                    <div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mb-2">
+                        <i class="fa-regular fa-folder-open text-2xl opacity-40"></i>
+                    </div>
+                    <p class="text-sm font-medium">沒有找到任何訂單</p>
+                    <button @click="clearFilters" class="text-xs text-milu-gold underline font-bold">重設篩選條件</button>
                 </div>
 
+                <!-- 訂單列表 -->
                 <div v-for="order in filteredList" :key="order.oid" @click="selectOrder(order)" 
                      class="p-4 rounded-xl cursor-pointer transition-all bg-white border border-transparent hover:border-gray-200 card-shadow"
                      :class="{'active-item': selectedOrder && selectedOrder.oid === order.oid}">
@@ -151,16 +148,21 @@
                         <span class="flex items-center gap-1">⏰ {{ order.time }}</span>
                     </div>
                     
+                    <!-- 尾款欄位顯示 (修正需求) -->
                     <div class="mt-2 pt-2 border-t border-gray-100 flex justify-between items-center" v-if="order.status !== 'CANCELED' && order.status !== 'COMPLETED'">
-                        <span class="text-xs text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
-                        <span class="text-xs font-bold" :class="order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? 'text-red-400' : 'text-green-500') : 'text-gray-400'">
-                            {{ order.rawPrice > 0 ? ((order.rawPrice - order.receivedPrice) > 0 ? `尚欠: NT$ ${formatMoney(order.rawPrice - order.receivedPrice)}` : '已付清') : '待報價' }}
+                        <span class="text-[10px] text-gray-400">總額: NT$ {{ formatMoney(order.rawPrice) }}</span>
+                        <span class="text-[11px] font-bold" :class="(order.rawPrice - order.receivedPrice) > 0 ? 'text-red-500' : 'text-green-600'">
+                            <template v-if="order.rawPrice > 0">
+                                <span v-if="(order.rawPrice - order.receivedPrice) > 0">
+                                    尚欠: NT$ {{ formatMoney(order.rawPrice - order.receivedPrice) }}
+                                </span>
+                                <span v-else>已付清</span>
+                            </template>
+                            <template v-else>待報價</template>
                         </span>
                     </div>
                 </div>
             </div>
-        </div>
-
         <!-- 右側詳情 -->
         <div class="w-full md:w-2/3 bg-[#F9F9F9] flex flex-col relative h-full" :class="{'hidden md:flex': !selectedOrder}">
             
