@@ -232,20 +232,29 @@
                 }
             };
 
-            // 日曆與過濾邏輯
+           // 日曆與過濾邏輯
             const { firstDay, daysCount } = useMemo(() => {
                 const year = currentMonth.getFullYear();
                 const month = currentMonth.getMonth();
                 return {
+                    // 取得該月第 1 天是星期幾 (0-6)
                     firstDay: new Date(year, month, 1).getDay(),
+                    // 取得該月總共有幾天
                     daysCount: new Date(year, month + 1, 0).getDate()
                 };
             }, [currentMonth]);
 
             const daysArray = Array.from({ length: 42 }, (_, i) => {
                 const day = i - firstDay + 1;
-                return (day > 0 && day <= daysCount) ? 
-                    new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toISOString().split('T')[0] : null;
+                if (day > 0 && day <= daysCount) {
+                    // 修正處：避免使用 toISOString() 導致時區偏移
+                    // 直接手動格式化為 YYYY-MM-DD
+                    const year = currentMonth.getFullYear();
+                    const month = String(currentMonth.getMonth() + 1).padStart(2, '0');
+                    const date = String(day).padStart(2, '0');
+                    return `${year}-${month}-${date}`;
+                }
+                return null;
             });
 
             const filteredOrders = useMemo(() => {
