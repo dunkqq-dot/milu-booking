@@ -294,7 +294,7 @@
                                 </div>
                                 <div className="grid grid-cols-7 gap-1">
                                     {daysArray.map((dateStr, i) => {
-                                        const dayNum = dateStr ? parseInt(dateStr.split('-')[2]) : null;
+                                        const dayNum = dateStr ? parseInt(dateStr.split('-')[1]) : null;
                                         const isSelected = dateStr === selectedDate;
                                         const dayOrders = dateStr ? state.allOrders.filter(o => getDisplayVal(o, 'date').replace(/\//g,'-').includes(dateStr)) : [];
                                         return (
