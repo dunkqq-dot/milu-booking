@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Official Website Calendar Admin Pro - Integrated</title>
-    <!-- 載入必要套件 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.244.0/dist/umd/lucide.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
@@ -51,13 +50,14 @@
             "台中工作室": "台中工作室自取"
         };
 
-        // 穩定版 Icon 元件 - 確保不會引發 removeChild 錯誤
+        // 安全防禦版 Icon 元件 - 加上 window.lucide 檢查避免崩潰
         const Icon = ({ name, size = 16, className = "" }) => {
             const containerRef = useRef(null);
             useEffect(() => {
-                if (window.lucide && containerRef.current) {
+                const lucideObj = window.lucide || (window.lucideWeb && window.lucideWeb.lucide);
+                if (lucideObj && containerRef.current) {
                     containerRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
-                    window.lucide.createIcons({
+                    lucideObj.createIcons({
                         root: containerRef.current,
                         attrs: { class: className, style: `width: ${size}px; height: ${size}px;` }
                     });
@@ -140,9 +140,9 @@
                         let newSelected = prev.selectedOrder;
                         if (newSelected) {
                             const currentId = getDisplayVal(newSelected, 'id');
-                            newSelected = data.find(o => getDisplayVal(o, 'id') === currentId) || null;
+                            newSelected = Array.isArray(data) ? (data.find(o => getDisplayVal(o, 'id') === currentId) || null) : null;
                         }
-                        return { ...prev, allOrders: data, selectedOrder: newSelected };
+                        return { ...prev, allOrders: Array.isArray(data) ? data : [], selectedOrder: newSelected };
                     });
                 } catch (e) {
                     notify("無法連線至 Google 試算表");
@@ -180,7 +180,6 @@
                         const d = new Date(rawVal);
                         rawVal = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
                     }
-                    // 重要：確保 cache 內沒有 undefined，否則會導致輸入框鎖死
                     cache[f] = (rawVal === null || rawVal === undefined) ? "" : String(rawVal).trim();
                 });
                 setState(prev => ({ ...prev, isEditing: true, editCache: cache }));
@@ -232,14 +231,11 @@
                 }
             };
 
-           // 日曆與過濾邏輯
             const { firstDay, daysCount } = useMemo(() => {
                 const year = currentMonth.getFullYear();
                 const month = currentMonth.getMonth();
                 return {
-                    // 取得該月第 1 天是星期幾 (0-6)
                     firstDay: new Date(year, month, 1).getDay(),
-                    // 取得該月總共有幾天
                     daysCount: new Date(year, month + 1, 0).getDate()
                 };
             }, [currentMonth]);
@@ -247,8 +243,6 @@
             const daysArray = Array.from({ length: 42 }, (_, i) => {
                 const day = i - firstDay + 1;
                 if (day > 0 && day <= daysCount) {
-                    // 修正處：避免使用 toISOString() 導致時區偏移
-                    // 直接手動格式化為 YYYY-MM-DD
                     const year = currentMonth.getFullYear();
                     const month = String(currentMonth.getMonth() + 1).padStart(2, '0');
                     const date = String(day).padStart(2, '0');
@@ -258,6 +252,7 @@
             });
 
             const filteredOrders = useMemo(() => {
+                if (!Array.isArray(state.allOrders)) return [];
                 return state.allOrders.filter(o => {
                     const id = getDisplayVal(o, 'id').toLowerCase();
                     const name = getDisplayVal(o, 'name').toLowerCase();
@@ -283,13 +278,11 @@
                     </header>
 
                     <div className="flex-1 flex overflow-hidden relative">
-                        {/* 左側側邊欄：搜尋 + 日曆 + 列表 */}
                         <aside className={`w-full md:w-80 border-r bg-white flex flex-col z-30 transition-all ${state.selectedOrder ? 'hidden md:flex' : 'flex'}`}>
                             <div className="p-4 border-b">
                                 <input type="text" placeholder="搜尋編號或姓名..." className="w-full px-4 py-2.5 bg-slate-100 rounded-xl outline-none focus:ring-2 ring-blue-500/20 text-sm font-bold" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
                             </div>
 
-                            {/* 日曆元件 */}
                             <div className={`p-4 border-b ${searchTerm ? 'opacity-20 pointer-events-none' : ''}`}>
                                 <div className="flex justify-between items-center mb-4">
                                     <h3 className="font-bold text-sm text-slate-500">{currentMonth.getFullYear()}年 {currentMonth.getMonth() + 1}月</h3>
@@ -305,7 +298,7 @@
                                     {daysArray.map((dateStr, i) => {
                                         const dayNum = dateStr ? parseInt(dateStr.split('-')[2]) : null;
                                         const isSelected = dateStr === selectedDate;
-                                        const dayOrders = dateStr ? state.allOrders.filter(o => getDisplayVal(o, 'date').replace(/\//g,'-').includes(dateStr)) : [];
+                                        const dayOrders = (dateStr && Array.isArray(state.allOrders)) ? state.allOrders.filter(o => getDisplayVal(o, 'date').replace(/\//g,'-').includes(dateStr)) : [];
                                         return (
                                             <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
                                                 className={`h-9 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all relative ${
@@ -337,7 +330,6 @@
                             </div>
                         </aside>
 
-                        {/* 右側內容區塊 */}
                         <main className={`flex-1 flex flex-col overflow-y-auto z-40 bg-slate-50 ${state.selectedOrder ? 'flex' : 'hidden md:flex'}`}>
                             {state.selectedOrder ? (
                                 <div className="p-6 md:p-10 space-y-8 max-w-5xl w-full mx-auto">
@@ -362,7 +354,6 @@
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 text-sm">
-                                        {/* 客戶聯絡 */}
                                         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
                                             <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest">客戶聯絡資訊</h3>
                                             <div className="space-y-4">
@@ -377,7 +368,6 @@
                                             </div>
                                         </div>
 
-                                        {/* 配送與地址 */}
                                         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
                                             <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest">配送與地址</h3>
                                             {state.isEditing ? (
@@ -392,7 +382,6 @@
                                             ) : <p className="font-bold text-slate-600 leading-relaxed">{getDisplayVal(state.selectedOrder, 'address')}</p>}
                                         </div>
 
-                                        {/* 日期與時間 */}
                                         <div className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
                                             <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest">排程日期與時段</h3>
                                             <div className="space-y-4">
@@ -413,7 +402,6 @@
                                             </div>
                                         </div>
 
-                                        {/* 內部備註 */}
                                         <div className="md:col-span-2 lg:col-span-3 bg-white p-6 rounded-3xl border border-slate-100 shadow-sm space-y-4">
                                             <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-widest">內部備註</h3>
                                             {state.isEditing ? <textarea className="w-full p-4 bg-slate-50 rounded-xl font-bold outline-none border-2 border-transparent focus:border-blue-500 min-h-[100px]" value={state.editCache.note || ""} onChange={e => updateCache('note', e.target.value)} /> : <p className="font-bold text-slate-500 italic bg-slate-50 p-4 rounded-2xl border border-dashed border-slate-200">{getDisplayVal(state.selectedOrder, 'note') || "尚無備註"}</p>}
@@ -429,7 +417,6 @@
                         </main>
                     </div>
 
-                    {/* 反饋元件 */}
                     {toast && <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-slate-900 text-white rounded-2xl shadow-2xl z-[100] font-black text-[10px] tracking-widest uppercase animate-bounce">{toast}</div>}
                     {loading && <div className="fixed inset-0 bg-white/60 backdrop-blur-[2px] z-[100] flex items-center justify-center flex-col gap-4">
                         <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
