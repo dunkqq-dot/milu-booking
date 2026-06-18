@@ -4,11 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Official Website Calendar Admin Pro - Integrated</title>
+    <!-- 替換為更穩定快速的 cdnjs 與 jsdelivr，避免 unpkg 斷線導致全白 -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@0.244.0/dist/umd/lucide.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Noto+Sans+TC:wght@400;700;900&display=swap');
         body { font-family: 'Inter', 'Noto Sans TC', sans-serif; background-color: #f8fafc; }
@@ -50,14 +51,13 @@
             "台中工作室": "台中工作室自取"
         };
 
-        // 安全防禦版 Icon 元件 - 加上 window.lucide 檢查避免崩潰
+        // 穩定版 Icon 元件 - 確保不會引發 removeChild 錯誤
         const Icon = ({ name, size = 16, className = "" }) => {
             const containerRef = useRef(null);
             useEffect(() => {
-                const lucideObj = window.lucide || (window.lucideWeb && window.lucideWeb.lucide);
-                if (lucideObj && containerRef.current) {
+                if (window.lucide && containerRef.current) {
                     containerRef.current.innerHTML = `<i data-lucide="${name}"></i>`;
-                    lucideObj.createIcons({
+                    window.lucide.createIcons({
                         root: containerRef.current,
                         attrs: { class: className, style: `width: ${size}px; height: ${size}px;` }
                     });
@@ -140,9 +140,9 @@
                         let newSelected = prev.selectedOrder;
                         if (newSelected) {
                             const currentId = getDisplayVal(newSelected, 'id');
-                            newSelected = Array.isArray(data) ? (data.find(o => getDisplayVal(o, 'id') === currentId) || null) : null;
+                            newSelected = data.find(o => getDisplayVal(o, 'id') === currentId) || null;
                         }
-                        return { ...prev, allOrders: Array.isArray(data) ? data : [], selectedOrder: newSelected };
+                        return { ...prev, allOrders: data, selectedOrder: newSelected };
                     });
                 } catch (e) {
                     notify("無法連線至 Google 試算表");
@@ -252,7 +252,6 @@
             });
 
             const filteredOrders = useMemo(() => {
-                if (!Array.isArray(state.allOrders)) return [];
                 return state.allOrders.filter(o => {
                     const id = getDisplayVal(o, 'id').toLowerCase();
                     const name = getDisplayVal(o, 'name').toLowerCase();
@@ -298,7 +297,7 @@
                                     {daysArray.map((dateStr, i) => {
                                         const dayNum = dateStr ? parseInt(dateStr.split('-')[2]) : null;
                                         const isSelected = dateStr === selectedDate;
-                                        const dayOrders = (dateStr && Array.isArray(state.allOrders)) ? state.allOrders.filter(o => getDisplayVal(o, 'date').replace(/\//g,'-').includes(dateStr)) : [];
+                                        const dayOrders = dateStr ? state.allOrders.filter(o => getDisplayVal(o, 'date').replace(/\//g,'-').includes(dateStr)) : [];
                                         return (
                                             <div key={i} onClick={() => dateStr && setSelectedDate(dateStr)}
                                                 className={`h-9 rounded-lg flex flex-col items-center justify-center cursor-pointer transition-all relative ${
