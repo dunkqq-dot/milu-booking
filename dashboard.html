@@ -380,6 +380,19 @@
                     return parseInt(str) || 0;
                 };
 
+                const cleanPhone = (val) => {
+                    if (!val) return '';
+                    let p = String(val).trim().replace(/^'+/, '');
+                    if (/^9\d{8}$/.test(p)) p = '0' + p;
+                    return p;
+                };
+
+                const formatPhoneForSheet = (val) => {
+                    const p = cleanPhone(val);
+                    if (!p) return '';
+                    return p.startsWith("'") ? p : "'" + p;
+                };
+
                 // 增加了 '取貨' 判斷，使工作室取貨也能顯示選單
                 const isTimeSlotService = (service) => service.includes('外送') || service.includes('自取') || service.includes('取貨');
 
@@ -528,7 +541,7 @@
                                 oid: item[0] || `M-${index}`, 
                                 lineName: item[2] || '未知LINE', 
                                 contactName: item[3] || '未知客戶', 
-                                phone: item[4] || '', 
+                                phone: cleanPhone(item[4]), 
                                 service: serviceName, 
                                 date: formatGASDate(item[5]), 
                                 time: formatGASTime(item[6]), 
@@ -702,6 +715,7 @@
                     // 2. 強制設定 notifyMake 為 'true'，確保 Make 收到正確訊號
                     const makePayload = {
                         ...payload, // 包含 orderId, service, date, time, price, balance 等所有欄位
+                        phone: cleanPhone(payload.phone),
                         
                         // Override specific fields for Make to ensure success
                         notifyMake: 'true', 
@@ -738,19 +752,19 @@
                 const updateOrderStatus = async (actionType) => {
                     const order = selectedOrder.value;
                     if (!order) return;
-                    if (!order.userId) return Swal.fire('無法發送', '此訂單沒有抓到客人的 LINE ID', 'warning');
+                    const hasUserId = Boolean(order.userId);
                     
                     Swal.fire({
-                        title: '確認發送通知？',
-                        text: `即將發送 LINE 通知給 ${order.contactName}`,
+                        title: hasUserId ? '確認發送通知？' : '確認更新訂單？',
+                        text: hasUserId ? `即將發送 LINE 通知給 ${order.contactName}` : `即將更新 ${order.contactName} 的訂單資料（未綁定 LINE ID，僅更新試算表）`,
                         icon: 'question',
                         showCancelButton: true,
-                        confirmButtonText: '確定發送',
+                        confirmButtonText: hasUserId ? '確定發送' : '確定更新',
                         cancelButtonText: '取消'
                     }).then(async (result) => {
                         if (result.isConfirmed) {
                             try {
-                                Swal.fire({ title: '處理中...', text: '正在發送通知並更新資料', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                                Swal.fire({ title: '處理中...', text: hasUserId ? '正在發送通知並更新資料' : '正在更新資料', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
                                 const flex = buildRichFlexMessage(order, actionType);
                                 
                                 let statusText = '';
@@ -771,7 +785,7 @@
                                     service: order.service,
                                     lineName: order.lineName,
                                     clientName: order.contactName, 
-                                    phone: order.phone,
+                                    phone: formatPhoneForSheet(order.phone),
                                     date: order.date,
                                     time: order.time,
                                     location: order.location,
@@ -781,9 +795,9 @@
                                     balance: balance,
                                     createCalendarEvent: actionType === 'CONFIRM' ? 'true' : 'false',
                                     notifyMake: 'false', // ⛔ 告訴 GAS 不要發送，因為我們自己發
-                                    to: order.userId,
-                                    message: { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex },
-                                    flexContents: flex
+                                    to: order.userId || '',
+                                    message: hasUserId ? { type: "flex", altText: `通知：${order.service} ${statusText}`, contents: flex } : null,
+                                    flexContents: hasUserId ? flex : null
                                 };
 
                                 // 🚀 修正：個別處理 Promise 錯誤，防止單一請求失敗導致整體流程中斷
@@ -792,8 +806,9 @@
                                            .then(res => { /* ok */ })
                                            .catch(err => console.log("GAS Request finished (ignore error):", err));
 
-                                const p2 = sendToMake(payload, flex)
-                                           .catch(err => console.log("Make Request finished (ignore error):", err));
+                                const p2 = hasUserId 
+                                           ? sendToMake(payload, flex).catch(err => console.log("Make Request finished (ignore error):", err))
+                                           : Promise.resolve();
 
                                 await Promise.all([p1, p2]);
                                 
@@ -804,8 +819,8 @@
                                 else if (actionType === 'REFUND') order.status = 'REFUNDED';
                                 else if (actionType === 'RESTORE') order.status = 'UNPAID';
                                 
-                                Swal.fire('成功', '通知已送出！', 'success');
-                            } catch (e) { Swal.fire('錯誤', '發送失敗：' + e.message, 'error'); }
+                                Swal.fire('成功', hasUserId ? '通知已送出！' : '資料已更新！', 'success');
+                            } catch (e) { Swal.fire('錯誤', '處理失敗：' + e.message, 'error'); }
                         }
                     });
                 };
@@ -814,6 +829,7 @@
                 const startEdit = () => { 
                     const formData = { ...selectedOrder.value };
                     if (formData.date && formData.date.includes('/')) formData.date = formData.date.replace(/\//g, '-');
+                    formData.phone = cleanPhone(formData.phone);
                     editForm.value = formData; 
                     isEditing.value = true; 
                 };
@@ -839,8 +855,9 @@
 
                     const order = selectedOrder.value;
                     const shouldNotify = isConfirmed; // true=發送, false=靜音
+                    const canNotify = shouldNotify && Boolean(order.userId);
 
-                    Swal.fire({ title: '儲存中...', text: shouldNotify ? '正在更新並發送通知...' : '正在安靜儲存...', didOpen: () => Swal.showLoading() });
+                    Swal.fire({ title: '儲存中...', text: canNotify ? '正在更新並發送通知...' : '正在安靜儲存...', didOpen: () => Swal.showLoading() });
                     
                     let statusText = '';
                     if (order.status === 'CONFIRMED') statusText = '✅ 已付款';
@@ -860,7 +877,7 @@
                         service: order.service,
                         lineName: editForm.value.lineName,
                         clientName: editForm.value.contactName, 
-                        phone: editForm.value.phone,
+                        phone: formatPhoneForSheet(editForm.value.phone),
                         date: editForm.value.date,
                         time: editForm.value.time,
                         location: editForm.value.location,
@@ -873,11 +890,11 @@
                         createCalendarEvent: (order.status === 'CONFIRMED' || order.status === 'COMPLETED') ? 'true' : 'false',
                         notifyMake: 'false', // ⛔ 告訴 GAS 不要發送
                         
-                        // 關鍵：如果選擇不通知，將 to 設為空字串，讓 Make 的 Filter 擋下
-                        to: shouldNotify ? order.userId : '', 
+                        // 關鍵：如果選擇不通知或未綁定 ID，將 to 設為空字串，讓 Make 的 Filter 擋下
+                        to: canNotify ? order.userId : '', 
                         
-                        message: shouldNotify ? { type: "flex", altText: `資料更新：${order.service}`, contents: flex } : null,
-                        flexContents: shouldNotify ? flex : null
+                        message: canNotify ? { type: "flex", altText: `資料更新：${order.service}`, contents: flex } : null,
+                        flexContents: canNotify ? flex : null
                     };
 
                     try {
@@ -887,18 +904,20 @@
                                    .then(res => { /* ok */ })
                                    .catch(err => console.log("GAS Request finished (ignore error):", err));
 
-                        // 發送 LINE 到 Make (修正：無論是否通知都發送，交由 Make Filter 決定)
-                        const p2 = sendToMake(payload, flex)
-                                   .catch(err => console.log("Make Request finished (ignore error):", err));
+                        // 發送 LINE 到 Make (修正：若有要通知且有 userId 才發送)
+                        const p2 = canNotify 
+                                   ? sendToMake(payload, flex).catch(err => console.log("Make Request finished (ignore error):", err))
+                                   : Promise.resolve();
 
                         await Promise.all([p1, p2]);
                         
                         Object.assign(selectedOrder.value, editForm.value);
+                        selectedOrder.value.phone = cleanPhone(editForm.value.phone);
                         selectedOrder.value.contactName = editForm.value.contactName; 
                         selectedOrder.value.rawPrice = parseMoney(editForm.value.rawPrice);
                         selectedOrder.value.receivedPrice = parseMoney(editForm.value.receivedPrice);
                         isEditing.value = false;
-                        Swal.fire('成功', shouldNotify ? '資料已更新並發送通知！' : '資料已更新 (未發送通知)', 'success');
+                        Swal.fire('成功', canNotify ? '資料已更新並發送通知！' : '資料已更新 (未發送通知)', 'success');
                     } catch (e) { 
                         // 這個 catch 現在只會捕捉程式邏輯錯誤，而不會捕捉被忽略的網路錯誤
                         Swal.fire('錯誤', e.message, 'error'); 
